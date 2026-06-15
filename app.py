@@ -934,7 +934,7 @@ st.set_page_config(
 )
 st.title("四柱推命 鑑定補助アプリ")
 st.caption("開発中の鑑定補助アプリです")
-st.write("まずは、自分用の鑑定補助アプリとして作成します。")
+st.write("生年月日などの基本情報から、鑑定の参考情報を表示します。")
 
 SHOW_DEVELOPMENT_PANELS = False
 SHOW_MANUAL_MEISHIKI_INPUT = False
