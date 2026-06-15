@@ -1,0 +1,32 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python cache and test cache
+__pycache__/
+pycache/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs, temporary files, and local backups
+*.log
+*.bak
+*.backup
+*.tmp
+
+# Internal development notes and diagnostic files
+*_notes.md
+run_*.py
+*.csv
+AGENTS.md
+calendar_validation_cases.py
+calendar_validation_case_template.py
+
+# Explicit generated backup file (also covered by *.csv)
+sekki_correction_reference_template.backup.csv
