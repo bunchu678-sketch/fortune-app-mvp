@@ -20,6 +20,13 @@ from gogyou_logic import (
 from utils import format_score_percent
 
 CHART_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759"]
+GOGYO_RADAR_LABELS = {
+    "木": "Wood",
+    "火": "Fire",
+    "土": "Earth",
+    "金": "Metal",
+    "水": "Water",
+}
 
 def to_numeric_scores(score_dict):
     numeric_scores = {}
@@ -349,6 +356,10 @@ def configure_matplotlib_japanese_font():
 
 def show_gogyo_radar_chart(scores, day_tenkan):
     chart_order = get_gogyo_chart_order(day_tenkan)
+    chart_labels = [
+        GOGYO_RADAR_LABELS.get(element, str(element))
+        for element in chart_order
+    ]
     values = [scores.get(element, 0) for element in chart_order]
 
     if plt is None or np is None:
@@ -366,12 +377,12 @@ def show_gogyo_radar_chart(scores, day_tenkan):
     ax.plot(angles_for_plot, values_for_plot)
     ax.fill(angles_for_plot, values_for_plot, alpha=0.25)
     ax.set_xticks(angles)
-    ax.set_xticklabels(chart_order)
+    ax.set_xticklabels(chart_labels)
 
     max_score = max(values) if values else 0
     upper = max(5, max_score)
     ax.set_ylim(0, upper)
-    ax.set_title("五行バランス", pad=20)
+    ax.set_title("Five Elements Balance", pad=20)
 
     st.pyplot(fig)
     plt.close(fig)
