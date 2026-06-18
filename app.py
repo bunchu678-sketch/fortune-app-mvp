@@ -3,7 +3,10 @@ import streamlit as st
 from datetime import date, datetime, time as datetime_time
 
 from calendar_logic import calculate_auto_meishiki
-from calendar_reference import get_development_calendar_context
+from calendar_reference import (
+    get_calendar_context_for_birth_year,
+    get_development_calendar_context,
+)
 from chart_render import render_gogyo_balance
 from gogyou_logic import calculate_gogyo_scores_from_meishiki
 from meishiki_validation import (
@@ -1091,28 +1094,31 @@ effective_meishiki_result = select_effective_meishiki(
 effective_meishiki = effective_meishiki_result.get("meishiki") or meishiki
 effective_meishiki_source_label = "自動計算命式"
 
-calendar_context = get_development_calendar_context()
+calendar_context = get_calendar_context_for_birth_year(birth_date.year)
 auto_calculation_errors = []
-try:
-    auto_effective_meishiki = calculate_auto_meishiki(
-        birth_info,
-        risshun_datetime=calendar_context["risshun_datetime"],
-        sekki_entries=calendar_context["sekki_entries"],
-        base_date=calendar_context["base_date"],
-        base_day_kanchi=calendar_context["base_day_kanchi"],
-    )
-    effective_meishiki_result = select_effective_meishiki(
-        input_mode="auto",
-        manual_meishiki=meishiki,
-        auto_meishiki=auto_effective_meishiki,
-    )
+if not calendar_context.get("ok"):
+    auto_calculation_errors.extend(calendar_context.get("errors", []))
+else:
+    try:
+        auto_effective_meishiki = calculate_auto_meishiki(
+            birth_info,
+            risshun_datetime=calendar_context["risshun_datetime"],
+            sekki_entries=calendar_context["sekki_entries"],
+            base_date=calendar_context["base_date"],
+            base_day_kanchi=calendar_context["base_day_kanchi"],
+        )
+        effective_meishiki_result = select_effective_meishiki(
+            input_mode="auto",
+            manual_meishiki=meishiki,
+            auto_meishiki=auto_effective_meishiki,
+        )
 
-    if effective_meishiki_result.get("ok"):
-        effective_meishiki = effective_meishiki_result["meishiki"]
-    else:
-        auto_calculation_errors.extend(effective_meishiki_result.get("errors", []))
-except Exception as exc:
-    auto_calculation_errors.append(str(exc))
+        if effective_meishiki_result.get("ok"):
+            effective_meishiki = effective_meishiki_result["meishiki"]
+        else:
+            auto_calculation_errors.extend(effective_meishiki_result.get("errors", []))
+    except Exception as exc:
+        auto_calculation_errors.append(str(exc))
 
 effective_hour_tenkan = get_manual_pillar_value(effective_meishiki, "hour", "tenkan")
 effective_day_tenkan = get_manual_pillar_value(effective_meishiki, "day", "tenkan")
@@ -1165,6 +1171,7 @@ if st.button("鑑定結果を表示する"):
         st.error("命式を自動計算できませんでした。")
         for error in auto_calculation_errors:
             st.write(f"- {error}")
+        st.stop()
     st.subheader("基本情報")
     basic_info_data = {
         "項目": [

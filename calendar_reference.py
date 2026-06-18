@@ -1,6 +1,12 @@
 from datetime import date, datetime
 
-from sekki_data import get_sekki_entries_by_year
+from sekki_data import (
+    get_risshun_datetime_by_year,
+    get_sekki_entries_around_year,
+    get_sekki_entries_by_year,
+    get_supported_birth_year_range,
+    is_supported_birth_year,
+)
 
 
 DEVELOPMENT_SEKKI_YEAR = 2020
@@ -42,4 +48,51 @@ def get_development_calendar_context() -> dict:
         "base_date": DEVELOPMENT_BASE_DATE,
         "base_day_kanchi": DEVELOPMENT_BASE_DAY_KANCHI,
         "warnings": get_development_calendar_warnings(),
+    }
+
+
+def get_supported_birth_year_message() -> str:
+    start_year, end_year = get_supported_birth_year_range()
+    return f"自動命式計算は現在{start_year}年〜{end_year}年の生年月日に対応しています。"
+
+
+def get_calendar_context_for_birth_year(birth_year: int) -> dict:
+    """
+    入力生年に応じた自動命式計算用カレンダー設定を返す。
+
+    月柱判定では年初・年末境界に隣接年の節入りが必要になるため、
+    birth_year-1, birth_year, birth_year+1 の十二節を結合して渡す。
+    """
+    year = int(birth_year)
+    if not is_supported_birth_year(year):
+        return {
+            "ok": False,
+            "label": "対応範囲外",
+            "risshun_datetime": None,
+            "sekki_entries": [],
+            "sekki_year": year,
+            "base_date": DEVELOPMENT_BASE_DATE,
+            "base_day_kanchi": DEVELOPMENT_BASE_DAY_KANCHI,
+            "warnings": [],
+            "errors": [get_supported_birth_year_message()],
+        }
+
+    risshun_datetime = get_risshun_datetime_by_year(year)
+    sekki_entries = get_sekki_entries_around_year(year)
+    errors = []
+    if risshun_datetime is None:
+        errors.append(f"{year}年の立春データを取得できません。")
+    if not sekki_entries:
+        errors.append(f"{year}年前後の節入りデータを取得できません。")
+
+    return {
+        "ok": not errors,
+        "label": f"{year}年生年月日用カレンダー設定",
+        "risshun_datetime": risshun_datetime,
+        "sekki_entries": sekki_entries,
+        "sekki_year": year,
+        "base_date": DEVELOPMENT_BASE_DATE,
+        "base_day_kanchi": DEVELOPMENT_BASE_DAY_KANCHI,
+        "warnings": get_development_calendar_warnings(),
+        "errors": errors,
     }
