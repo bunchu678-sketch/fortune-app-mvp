@@ -4,8 +4,10 @@ import pandas as pd
 import streamlit as st
 try:
     import matplotlib.pyplot as plt
+    import matplotlib.font_manager as font_manager
 except ImportError:
     plt = None
+    font_manager = None
 try:
     import numpy as np
 except ImportError:
@@ -20,13 +22,18 @@ from gogyou_logic import (
 from utils import format_score_percent
 
 CHART_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759"]
-GOGYO_RADAR_LABELS = {
-    "木": "Wood",
-    "火": "Fire",
-    "土": "Earth",
-    "金": "Metal",
-    "水": "Water",
-}
+JAPANESE_FONT_CANDIDATES = [
+    "Noto Sans CJK JP",
+    "Noto Sans JP",
+    "Noto Serif CJK JP",
+    "IPAexGothic",
+    "IPAGothic",
+    "TakaoGothic",
+    "Yu Gothic",
+    "Meiryo",
+    "MS Gothic",
+    "Hiragino Sans",
+]
 
 def to_numeric_scores(score_dict):
     numeric_scores = {}
@@ -348,25 +355,34 @@ def show_horizontal_bar_chart(title, score_dict):
 
 def configure_matplotlib_japanese_font():
     if plt is None:
-        return
+        return False
 
-    plt.rcParams["font.family"] = ["Yu Gothic", "Meiryo", "MS Gothic", "DejaVu Sans"]
     plt.rcParams["axes.unicode_minus"] = False
+
+    if font_manager is None:
+        return False
+
+    available_fonts = {
+        font.name
+        for font in font_manager.fontManager.ttflist
+    }
+    for font_name in JAPANESE_FONT_CANDIDATES:
+        if font_name in available_fonts:
+            plt.rcParams["font.family"] = [font_name]
+            return True
+
+    return False
 
 
 def show_gogyo_radar_chart(scores, day_tenkan):
     chart_order = get_gogyo_chart_order(day_tenkan)
-    chart_labels = [
-        GOGYO_RADAR_LABELS.get(element, str(element))
-        for element in chart_order
-    ]
     values = [scores.get(element, 0) for element in chart_order]
 
     if plt is None or np is None:
         st.write("レーダーチャートを表示するには matplotlib と numpy が必要です。")
         return
 
-    configure_matplotlib_japanese_font()
+    has_japanese_font = configure_matplotlib_japanese_font()
     values_for_plot = values + values[:1]
     angles = np.linspace(0, 2 * np.pi, len(chart_order), endpoint=False).tolist()
     angles_for_plot = angles + angles[:1]
@@ -377,12 +393,13 @@ def show_gogyo_radar_chart(scores, day_tenkan):
     ax.plot(angles_for_plot, values_for_plot)
     ax.fill(angles_for_plot, values_for_plot, alpha=0.25)
     ax.set_xticks(angles)
-    ax.set_xticklabels(chart_labels)
+    ax.set_xticklabels(chart_order if has_japanese_font else [])
 
     max_score = max(values) if values else 0
     upper = max(5, max_score)
     ax.set_ylim(0, upper)
-    ax.set_title("Five Elements Balance", pad=20)
+    if has_japanese_font:
+        ax.set_title("五行バランス", pad=20)
 
     st.pyplot(fig)
     plt.close(fig)
