@@ -25,15 +25,18 @@ from meishiki_model import (
     select_effective_meishiki,
 )
 from personality_logic import (
+    aggregate_juuni_unsei_thinking_tendency,
     get_kubou,
     get_juuni_unsei,
     get_tsuhensei,
-    render_juuni_unsei_thinking_tendency,
+    render_juuni_unsei_detail,
+    render_juuni_unsei_summary_table,
+    render_juuni_unsei_thinking_charts,
+    render_juuni_unsei_thinking_pillar_table,
+    render_juuni_unsei_thinking_score_table,
     render_nikkan_public_comment,
-    render_private_juuni_unsei_comments,
     render_private_month_pair_comment,
     render_private_tsuhensei_comments,
-    render_public_juuni_unsei_comments,
     render_public_month_pair_comment,
     render_public_tsuhensei_comments,
 )
@@ -52,6 +55,39 @@ def render_special_meishiki(ijou_kanshi_data, gogyo_result):
         return
 
     st.table(pd.DataFrame(rows))
+
+
+def render_juuni_unsei_comments_for_mobile(juuni_unsei_display_data, comment_type):
+    summary_title = (
+        "十二運星から読み取れる性格の詳細表"
+        if comment_type == "public"
+        else "十二運星から読み取れる性格メモの詳細表"
+    )
+    with st.expander(summary_title, expanded=False):
+        render_juuni_unsei_summary_table(juuni_unsei_display_data)
+
+    for data in juuni_unsei_display_data:
+        render_juuni_unsei_detail(data, comment_type)
+
+
+def render_juuni_unsei_thinking_tendency_for_mobile(
+    pillar_juuni_unsei_data,
+    is_private=False,
+):
+    if is_private:
+        st.markdown("#### 十二運星から読み取れる考え方の傾向メモ")
+
+    with st.expander("四柱ごとの分類表", expanded=False):
+        render_juuni_unsei_thinking_pillar_table(pillar_juuni_unsei_data)
+
+    aggregated_scores = aggregate_juuni_unsei_thinking_tendency(
+        pillar_juuni_unsei_data
+    )
+
+    with st.expander("集計結果", expanded=False):
+        render_juuni_unsei_thinking_score_table(aggregated_scores)
+
+    render_juuni_unsei_thinking_charts(aggregated_scores)
 
 
 def format_datetime_for_display(value):
@@ -960,16 +996,15 @@ birth_date = st.date_input(
 st.write("出生時刻")
 hour_options = [f"{hour:02d}" for hour in range(24)]
 minute_options = [f"{minute:02d}" for minute in range(60)]
-col_birth_hour, col_birth_minute, col_birth_unknown = st.columns([1, 1, 1])
-with col_birth_hour:
-    birth_hour = st.selectbox("時", hour_options, key="birth_hour")
-with col_birth_minute:
-    birth_minute = st.selectbox("分", minute_options, key="birth_minute")
-with col_birth_unknown:
-    birth_time_unknown = st.checkbox("不明")
+birth_time_unknown = st.checkbox("不明")
 if birth_time_unknown:
     birth_time_display = "不明"
 else:
+    col_birth_hour, col_birth_minute = st.columns([1, 1])
+    with col_birth_hour:
+        birth_hour = st.selectbox("時", hour_options, key="birth_hour")
+    with col_birth_minute:
+        birth_minute = st.selectbox("分", minute_options, key="birth_minute")
     birth_time_display = f"{birth_hour}:{birth_minute}"
 prefectures = [
     "未選択",
@@ -982,21 +1017,11 @@ prefectures = [
     "徳島県", "香川県", "愛媛県", "高知県",
     "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県",
     "沖縄県",
-    "その他",
 ]
 birth_place_type = st.selectbox("出生地", prefectures)
-birth_country = ""
-if birth_place_type == "その他":
-    birth_country = st.text_input(
-        "国名",
-        placeholder="例：韓国、中国、アメリカなど"
-    )
-if birth_place_type == "その他":
-    birth_place_display = birth_country
-else:
-    birth_place_display = birth_place_type
+birth_place_display = birth_place_type
 birth_place_for_model = None if birth_place_display == "未選択" else birth_place_display
-birth_country_for_model = "日本" if birth_place_type != "その他" else birth_country
+birth_country_for_model = "日本"
 birth_time_for_model = None
 if not birth_time_unknown:
     birth_time_for_model = datetime_time(int(birth_hour), int(birth_minute))
@@ -1175,29 +1200,21 @@ if st.button("鑑定結果を表示する"):
             st.write(f"- {error}")
         st.stop()
     st.subheader("基本情報")
-    basic_info_data = {
-        "項目": [
-            "氏名",
-            "ふりがな",
-            "生年月日",
-            "出生時刻",
-            "出生地",
-            "性別",
-            "相談内容",
-            "鑑定日",
-        ],
-        "内容": [
-            name,
-            furigana,
-            birth_date,
-            birth_time_display,
-            birth_place_display,
-            gender,
-            consultation,
-            reading_date,
-        ],
-    }
-    st.table(basic_info_data)
+    basic_info_rows = []
+    if name.strip():
+        basic_info_rows.append({"項目": "氏名", "内容": name})
+    if furigana.strip():
+        basic_info_rows.append({"項目": "ふりがな", "内容": furigana})
+    basic_info_rows.append({"項目": "生年月日", "内容": birth_date})
+    basic_info_rows.append({"項目": "出生時刻", "内容": birth_time_display})
+    if birth_place_display and birth_place_display != "未選択":
+        basic_info_rows.append({"項目": "出生地", "内容": birth_place_display})
+    if gender and gender != "未選択":
+        basic_info_rows.append({"項目": "性別", "内容": gender})
+    if consultation.strip():
+        basic_info_rows.append({"項目": "相談内容", "内容": consultation})
+    basic_info_rows.append({"項目": "鑑定日", "内容": reading_date})
+    st.table(pd.DataFrame(basic_info_rows))
     st.subheader("命式表")
     meishiki_data = {
         "項目": [
@@ -1319,24 +1336,33 @@ if st.button("鑑定結果を表示する"):
             render_public_tsuhensei_comments(life_stage_tsuhensei_data)
             render_public_month_pair_comment(month_zokkan_tsuhensei, month_tsuhensei)
         elif section_title == "十二運星から読み取れる性格":
-            render_public_juuni_unsei_comments(juuni_unsei_display_data)
+            render_juuni_unsei_comments_for_mobile(
+                juuni_unsei_display_data,
+                "public",
+            )
         elif section_title == "十二運星から読み取れる考え方の傾向":
-            render_juuni_unsei_thinking_tendency(pillar_juuni_unsei_data)
+            render_juuni_unsei_thinking_tendency_for_mobile(pillar_juuni_unsei_data)
         else:
-            st.write("今後実装予定です。")
+            pass
     st.header("自分用")
     for section_title in comment_sections:
         st.subheader(section_title)
         if section_title == "特殊な命式":
             render_special_meishiki(ijou_kanshi_data, gogyo_result)
         elif section_title == "日干から読み取れる性格":
-            st.write("日干の自分用メモは今後実装予定です。")
+            pass
         elif section_title == "通変星・蔵干通変星から読み取れる性格":
             render_private_tsuhensei_comments(life_stage_tsuhensei_data)
             render_private_month_pair_comment(month_zokkan_tsuhensei, month_tsuhensei)
         elif section_title == "十二運星から読み取れる性格":
-            render_private_juuni_unsei_comments(juuni_unsei_display_data)
+            render_juuni_unsei_comments_for_mobile(
+                juuni_unsei_display_data,
+                "private",
+            )
         elif section_title == "十二運星から読み取れる考え方の傾向":
-            render_juuni_unsei_thinking_tendency(pillar_juuni_unsei_data, is_private=True)
+            render_juuni_unsei_thinking_tendency_for_mobile(
+                pillar_juuni_unsei_data,
+                is_private=True,
+            )
         else:
-            st.write("今後実装予定です。")
+            pass
