@@ -65,6 +65,9 @@ def inject_mobile_input_styles():
         div[data-testid="stDateInput"] input {
             caret-color: transparent;
         }
+        div[data-testid="stSelectbox"] input {
+            caret-color: transparent;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -81,19 +84,28 @@ def inject_date_input_keyboard_guard():
             function guardDateInputs() {
                 try {
                     const doc = window.parent.document;
-                    targetLabels.forEach((label) => {
-                        const inputs = doc.querySelectorAll(
-                            `input[aria-label="${label}"]`
-                        );
-                        inputs.forEach((input) => {
+            targetLabels.forEach((label) => {
+                const inputs = doc.querySelectorAll(
+                    `input[aria-label="${label}"]`
+                );
+                inputs.forEach((input) => {
                             input.setAttribute("readonly", "readonly");
                             input.setAttribute("inputmode", "none");
-                            input.style.caretColor = "transparent";
-                        });
-                    });
-                } catch (error) {
-                    return;
-                }
+                    input.style.caretColor = "transparent";
+                });
+            });
+
+            const selectInputs = doc.querySelectorAll(
+                'div[data-testid="stSelectbox"] input'
+            );
+            selectInputs.forEach((input) => {
+                input.setAttribute("inputmode", "none");
+                input.setAttribute("autocomplete", "off");
+                input.style.caretColor = "transparent";
+            });
+        } catch (error) {
+            return;
+        }
             }
 
             guardDateInputs();
@@ -1060,19 +1072,8 @@ birth_time_unknown = st.checkbox("不明")
 if birth_time_unknown:
     birth_time_display = "不明"
 else:
-    col_birth_hour, col_birth_minute = st.columns(2)
-    with col_birth_hour:
-        birth_hour = st.selectbox(
-            "出生時刻（時）",
-            hour_options,
-            key="birth_hour",
-        )
-    with col_birth_minute:
-        birth_minute = st.selectbox(
-            "出生時刻（分）",
-            minute_options,
-            key="birth_minute",
-        )
+    birth_hour = st.selectbox("時", hour_options, key="birth_hour")
+    birth_minute = st.selectbox("分", minute_options, key="birth_minute")
     birth_time_display = f"{birth_hour}:{birth_minute}"
 prefectures = [
     "未選択",
