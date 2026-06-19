@@ -1395,7 +1395,6 @@ if st.button("鑑定結果を表示する"):
         "特定日時での運勢",
         "今年一年の総合運勢",
     ]
-    st.header("相手用")
     for section_title in comment_sections:
         st.subheader(section_title)
         if section_title == "特殊な命式":
@@ -1414,25 +1413,28 @@ if st.button("鑑定結果を表示する"):
             render_juuni_unsei_thinking_tendency_for_mobile(pillar_juuni_unsei_data)
         else:
             pass
-    st.header("自分用")
-    for section_title in comment_sections:
-        st.subheader(section_title)
-        if section_title == "特殊な命式":
-            render_special_meishiki(ijou_kanshi_data, gogyo_result)
-        elif section_title == "日干から読み取れる性格":
-            pass
-        elif section_title == "通変星・蔵干通変星から読み取れる性格":
-            render_private_tsuhensei_comments(life_stage_tsuhensei_data)
-            render_private_month_pair_comment(month_zokkan_tsuhensei, month_tsuhensei)
-        elif section_title == "十二運星から読み取れる性格":
-            render_juuni_unsei_comments_for_mobile(
-                juuni_unsei_display_data,
-                "private",
-            )
-        elif section_title == "十二運星から読み取れる考え方の傾向":
-            render_juuni_unsei_thinking_tendency_for_mobile(
-                pillar_juuni_unsei_data,
-                is_private=True,
-            )
-        else:
-            pass
+    with st.expander("鑑定者用メモ", expanded=False):
+        for section_title in comment_sections:
+            st.subheader(section_title)
+            if section_title == "特殊な命式":
+                render_special_meishiki(ijou_kanshi_data, gogyo_result)
+            elif section_title == "日干から読み取れる性格":
+                pass
+            elif section_title == "通変星・蔵干通変星から読み取れる性格":
+                render_private_tsuhensei_comments(life_stage_tsuhensei_data)
+                render_private_month_pair_comment(
+                    month_zokkan_tsuhensei,
+                    month_tsuhensei,
+                )
+            elif section_title == "十二運星から読み取れる性格":
+                render_juuni_unsei_comments_for_mobile(
+                    juuni_unsei_display_data,
+                    "private",
+                )
+            elif section_title == "十二運星から読み取れる考え方の傾向":
+                render_juuni_unsei_thinking_tendency_for_mobile(
+                    pillar_juuni_unsei_data,
+                    is_private=True,
+                )
+            else:
+                pass
