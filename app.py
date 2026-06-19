@@ -1414,6 +1414,18 @@ if st.button("鑑定結果を表示する"):
         else:
             pass
     with st.expander("鑑定者用メモ", expanded=False):
+        st.subheader("基本情報")
+        st.table(pd.DataFrame(basic_info_rows))
+
+        st.subheader("命式表")
+        st.table(meishiki_data)
+
+        st.subheader("空亡")
+        st.write(f"空亡：{display_kubou if display_kubou else '未入力'}")
+
+        st.subheader("五行のバランス")
+        render_gogyo_balance(gogyo_result, effective_day_tenkan)
+
         for section_title in comment_sections:
             st.subheader(section_title)
             if section_title == "特殊な命式":
