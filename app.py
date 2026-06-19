@@ -27,6 +27,7 @@ from meishiki_model import (
 )
 from personality_logic import (
     aggregate_juuni_unsei_thinking_tendency,
+    get_month_pair_comment,
     get_kubou,
     get_juuni_unsei,
     get_tsuhensei,
@@ -38,7 +39,6 @@ from personality_logic import (
     render_nikkan_public_comment,
     render_private_month_pair_comment,
     render_private_tsuhensei_comments,
-    render_public_month_pair_comment,
     render_public_tsuhensei_comments,
 )
 from special_chart_logic import (
@@ -56,6 +56,25 @@ def render_special_meishiki(ijou_kanshi_data, gogyo_result):
         return
 
     st.table(pd.DataFrame(rows))
+
+
+def render_public_month_pair_comment_for_audience(zokkan_tsuhensei, tsuhensei):
+    if (
+        not zokkan_tsuhensei
+        or not tsuhensei
+        or zokkan_tsuhensei == "－"
+        or tsuhensei == "－"
+    ):
+        return
+
+    comment_text = get_month_pair_comment(zokkan_tsuhensei, tsuhensei, "public")
+    if not comment_text:
+        return
+
+    with st.expander("月柱の蔵干通変星と通変星から読み取れる性格", expanded=False):
+        st.write(f"蔵干通変星：{zokkan_tsuhensei}")
+        st.write(f"通変星：{tsuhensei}")
+        st.write(comment_text)
 
 
 def inject_mobile_input_styles():
@@ -1403,7 +1422,10 @@ if st.button("鑑定結果を表示する"):
             render_nikkan_public_comment(effective_day_tenkan)
         elif section_title == "通変星・蔵干通変星から読み取れる性格":
             render_public_tsuhensei_comments(life_stage_tsuhensei_data)
-            render_public_month_pair_comment(month_zokkan_tsuhensei, month_tsuhensei)
+            render_public_month_pair_comment_for_audience(
+                month_zokkan_tsuhensei,
+                month_tsuhensei,
+            )
         elif section_title == "十二運星から読み取れる性格":
             render_juuni_unsei_comments_for_mobile(
                 juuni_unsei_display_data,
