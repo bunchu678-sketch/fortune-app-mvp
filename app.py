@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from datetime import date, datetime, time as datetime_time
 
 from calendar_logic import calculate_auto_meishiki
@@ -55,6 +56,68 @@ def render_special_meishiki(ijou_kanshi_data, gogyo_result):
         return
 
     st.table(pd.DataFrame(rows))
+
+
+def inject_mobile_input_styles():
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stDateInput"] input {
+            caret-color: transparent;
+        }
+        .mobile-time-label {
+            padding-top: 2.25rem;
+            white-space: nowrap;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def inject_date_input_keyboard_guard():
+    components.html(
+        """
+        <script>
+        (function () {
+            const targetLabels = ["生年月日", "鑑定日"];
+
+            function guardDateInputs() {
+                try {
+                    const doc = window.parent.document;
+                    targetLabels.forEach((label) => {
+                        const inputs = doc.querySelectorAll(
+                            `input[aria-label="${label}"]`
+                        );
+                        inputs.forEach((input) => {
+                            input.setAttribute("readonly", "readonly");
+                            input.setAttribute("inputmode", "none");
+                            input.style.caretColor = "transparent";
+                        });
+                    });
+                } catch (error) {
+                    return;
+                }
+            }
+
+            guardDateInputs();
+            setTimeout(guardDateInputs, 300);
+            setTimeout(guardDateInputs, 1000);
+
+            try {
+                const observer = new MutationObserver(guardDateInputs);
+                observer.observe(window.parent.document.body, {
+                    childList: true,
+                    subtree: true,
+                });
+            } catch (error) {
+                return;
+            }
+        })();
+        </script>
+        """,
+        height=0,
+    )
 
 
 def render_juuni_unsei_comments_for_mobile(juuni_unsei_display_data, comment_type):
@@ -976,6 +1039,7 @@ st.set_page_config(
 st.title("四柱推命 鑑定補助アプリ")
 st.caption("開発中の鑑定補助アプリです")
 st.write("生年月日などの基本情報から、鑑定の参考情報を表示します。")
+inject_mobile_input_styles()
 
 SHOW_DEVELOPMENT_PANELS = False
 SHOW_MANUAL_MEISHIKI_INPUT = False
@@ -1000,11 +1064,36 @@ birth_time_unknown = st.checkbox("不明")
 if birth_time_unknown:
     birth_time_display = "不明"
 else:
-    col_birth_hour, col_birth_minute = st.columns([1, 1])
+    (
+        col_birth_hour,
+        col_birth_hour_label,
+        col_birth_minute,
+        col_birth_minute_label,
+        col_birth_suffix,
+    ) = st.columns([1.4, 0.35, 1.4, 0.35, 0.9])
     with col_birth_hour:
-        birth_hour = st.selectbox("時", hour_options, key="birth_hour")
+        birth_hour = st.selectbox(
+            "時",
+            hour_options,
+            key="birth_hour",
+            label_visibility="collapsed",
+        )
+    with col_birth_hour_label:
+        st.markdown('<div class="mobile-time-label">時</div>', unsafe_allow_html=True)
     with col_birth_minute:
-        birth_minute = st.selectbox("分", minute_options, key="birth_minute")
+        birth_minute = st.selectbox(
+            "分",
+            minute_options,
+            key="birth_minute",
+            label_visibility="collapsed",
+        )
+    with col_birth_minute_label:
+        st.markdown('<div class="mobile-time-label">分</div>', unsafe_allow_html=True)
+    with col_birth_suffix:
+        st.markdown(
+            '<div class="mobile-time-label">生まれ</div>',
+            unsafe_allow_html=True,
+        )
     birth_time_display = f"{birth_hour}:{birth_minute}"
 prefectures = [
     "未選択",
@@ -1044,6 +1133,7 @@ reading_date = st.date_input(
     min_value=date(1900, 1, 1),
     max_value=date(2050, 12, 31),
 )
+inject_date_input_keyboard_guard()
 
 if SHOW_DEVELOPMENT_PANELS:
     render_auto_meishiki_reading_preview_development_panel()
