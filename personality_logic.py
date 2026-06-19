@@ -20,14 +20,14 @@ from fortune_data import (
 from utils import format_score_percent
 
 THINKING_CATEGORY_DEFINITIONS = [
-    ("brain_type", "右脳／左脳", ["右脳", "左脳"]),
+    ("brain_type", "右脳／左脳", ["左脳", "右脳"]),
     ("merit_type", "メリット型／デメリット型", ["メリット型", "デメリット型"]),
     ("work_type", "仕事4分類", ["現場型攻め", "現場型守り", "管理型ムードメーカー", "管理型アイデアマン"]),
     ("goal_type", "目標への向かい方", ["目標直進型", "目標変化型"]),
     ("principle_type", "原理原則型／応用拡大型", ["原理原則型", "応用拡大型"]),
 ]
 
-BRAIN_TYPE_ORDER = ["右脳", "左脳"]
+BRAIN_TYPE_ORDER = ["左脳", "右脳"]
 
 MERIT_TYPE_ORDER = ["メリット型", "デメリット型"]
 
@@ -213,25 +213,12 @@ def render_public_tsuhensei_comments(life_stage_tsuhensei_data):
         outer = stage_data["outer"]
         inner = stage_data["inner"]
         with st.expander(f"▼ {stage}の傾向"):
-            if outer == "－":
-                st.write(f"本来の自分像：{get_tsuhensei_display_name(inner)}")
-                if inner:
-                    st.write(f"この時期の本来の自分像には、{inner}の性質が表れます。")
-                    write_tsuhensei_comment(inner, "public")
-                else:
-                    st.write("本来の自分像が未入力です。")
-            else:
-                st.write(f"外側に見せている自分像：{get_tsuhensei_display_name(outer)}")
-                st.write(f"本来の自分像：{get_tsuhensei_display_name(inner)}")
-                if outer and inner:
-                    st.write(f"この時期は、外側には{outer}の性質が見えやすく、周囲からはそのような印象を持たれやすい時期です。")
-                    st.write(f"一方で、本来の自分像には{inner}の性質があります。")
-                else:
-                    st.write("未入力の項目があります。入力されている項目のコメントを表示します。")
-                st.markdown("**外側に見せている自分像：**")
+            st.markdown(f"**外側に見せている自分像：{get_tsuhensei_display_name(outer)}**")
+            if outer != "－":
                 write_tsuhensei_comment(outer, "public")
-                st.markdown("**本来の自分像：**")
-                write_tsuhensei_comment(inner, "public")
+
+            st.markdown(f"**本来の自分像：{get_tsuhensei_display_name(inner)}**")
+            write_tsuhensei_comment(inner, "public")
 
 
 def render_private_tsuhensei_comments(life_stage_tsuhensei_data):
@@ -263,14 +250,11 @@ def render_public_month_pair_comment(center_star, tsuhensei):
         st.write(f"中心星：{center_star}")
         st.write(f"通変星：{tsuhensei}")
         st.write(f"組み合わせ：{month_pair_key}")
-        st.write("ここでいう中心星とは、月柱の蔵干通変星のことです。")
-        st.write("月柱は、その人の生き方の方針や社会運を読むうえで重要な柱です。")
-        st.write("そのため、中心星と通変星の組み合わせから、社会の中で表れやすい性格傾向を読み取ります。")
         comment_text = get_month_pair_comment(center_star, tsuhensei, "public")
         if comment_text:
             st.write(comment_text)
         else:
-            st.write("この組み合わせの相手用コメントは未登録です。")
+            st.write("この組み合わせのコメントは未登録です。")
 
 
 def render_private_month_pair_comment(center_star, tsuhensei):
@@ -375,14 +359,15 @@ def render_juuni_unsei_detail(data, comment_type):
     with st.expander(expander_title):
         st.write(f"{pillar_label}：{juuni_unsei_display}")
 
-        st.markdown("**読み解きテーマ：**")
-        st.write(get_juuni_unsei_theme_display(pillar_key))
+        if comment_type != "public":
+            st.markdown("**読み解きテーマ：**")
+            st.write(get_juuni_unsei_theme_display(pillar_key))
 
-        st.markdown("**読み解きポイント：**")
-        st.write(get_juuni_unsei_reading_points_display(pillar_key))
+            st.markdown("**読み解きポイント：**")
+            st.write(get_juuni_unsei_reading_points_display(pillar_key))
 
-        st.markdown("**分類：**")
-        st.write(get_juuni_unsei_group_display(juuni_unsei))
+            st.markdown("**分類：**")
+            st.write(get_juuni_unsei_group_display(juuni_unsei))
 
         st.markdown("**キーワード：**")
         st.write(get_juuni_unsei_keywords_display(juuni_unsei))
@@ -391,7 +376,7 @@ def render_juuni_unsei_detail(data, comment_type):
             st.write("十二運星が未入力です。")
             return
 
-        label = "相手用コメント：" if comment_type == "public" else "自分用メモ："
+        label = "コメント：" if comment_type == "public" else "自分用メモ："
         st.markdown(f"**{label}**")
 
         comment_text = get_juuni_unsei_comment(juuni_unsei, comment_type)
@@ -403,8 +388,6 @@ def render_juuni_unsei_detail(data, comment_type):
 
 
 def render_public_juuni_unsei_comments(juuni_unsei_display_data):
-    render_juuni_unsei_summary_table(juuni_unsei_display_data)
-
     for data in juuni_unsei_display_data:
         render_juuni_unsei_detail(data, "public")
 

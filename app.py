@@ -148,13 +148,9 @@ def inject_date_input_keyboard_guard():
 
 
 def render_juuni_unsei_comments_for_mobile(juuni_unsei_display_data, comment_type):
-    summary_title = (
-        "十二運星から読み取れる性格の詳細表"
-        if comment_type == "public"
-        else "十二運星から読み取れる性格メモの詳細表"
-    )
-    with st.expander(summary_title, expanded=False):
-        render_juuni_unsei_summary_table(juuni_unsei_display_data)
+    if comment_type != "public":
+        with st.expander("十二運星から読み取れる性格メモの詳細表", expanded=False):
+            render_juuni_unsei_summary_table(juuni_unsei_display_data)
 
     for data in juuni_unsei_display_data:
         render_juuni_unsei_detail(data, comment_type)
@@ -167,15 +163,16 @@ def render_juuni_unsei_thinking_tendency_for_mobile(
     if is_private:
         st.markdown("#### 十二運星から読み取れる考え方の傾向メモ")
 
-    with st.expander("四柱ごとの分類表", expanded=False):
-        render_juuni_unsei_thinking_pillar_table(pillar_juuni_unsei_data)
-
     aggregated_scores = aggregate_juuni_unsei_thinking_tendency(
         pillar_juuni_unsei_data
     )
 
-    with st.expander("集計結果", expanded=False):
-        render_juuni_unsei_thinking_score_table(aggregated_scores)
+    if is_private:
+        with st.expander("四柱ごとの分類表", expanded=False):
+            render_juuni_unsei_thinking_pillar_table(pillar_juuni_unsei_data)
+
+        with st.expander("集計結果", expanded=False):
+            render_juuni_unsei_thinking_score_table(aggregated_scores)
 
     render_juuni_unsei_thinking_charts(aggregated_scores)
 
