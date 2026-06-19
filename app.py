@@ -65,10 +65,6 @@ def inject_mobile_input_styles():
         div[data-testid="stDateInput"] input {
             caret-color: transparent;
         }
-        .mobile-time-label {
-            padding-top: 2.25rem;
-            white-space: nowrap;
-        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -1064,35 +1060,18 @@ birth_time_unknown = st.checkbox("不明")
 if birth_time_unknown:
     birth_time_display = "不明"
 else:
-    (
-        col_birth_hour,
-        col_birth_hour_label,
-        col_birth_minute,
-        col_birth_minute_label,
-        col_birth_suffix,
-    ) = st.columns([1.4, 0.35, 1.4, 0.35, 0.9])
+    col_birth_hour, col_birth_minute = st.columns(2)
     with col_birth_hour:
         birth_hour = st.selectbox(
-            "時",
+            "出生時刻（時）",
             hour_options,
             key="birth_hour",
-            label_visibility="collapsed",
         )
-    with col_birth_hour_label:
-        st.markdown('<div class="mobile-time-label">時</div>', unsafe_allow_html=True)
     with col_birth_minute:
         birth_minute = st.selectbox(
-            "分",
+            "出生時刻（分）",
             minute_options,
             key="birth_minute",
-            label_visibility="collapsed",
-        )
-    with col_birth_minute_label:
-        st.markdown('<div class="mobile-time-label">分</div>', unsafe_allow_html=True)
-    with col_birth_suffix:
-        st.markdown(
-            '<div class="mobile-time-label">生まれ</div>',
-            unsafe_allow_html=True,
         )
     birth_time_display = f"{birth_hour}:{birth_minute}"
 prefectures = [
