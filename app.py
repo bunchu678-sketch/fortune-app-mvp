@@ -50,6 +50,7 @@ from special_chart_logic import (
     format_ijou_kanshi_type,
 )
 from yearly_flow_logic import build_yearly_monthly_flow, is_kubou_branch
+from yearly_overall_logic import build_yearly_overall_fortune
 
 
 def format_day_ijou_kanshi_result(ijou_kanshi_data):
@@ -315,6 +316,27 @@ def render_yearly_monthly_flow(yearly_flow_result):
                 '<div style="border-top: 1px dashed rgba(49, 51, 63, 0.25); margin: 1rem 0;"></div>',
                 unsafe_allow_html=True,
             )
+
+
+def render_yearly_overall_fortune(yearly_overall_result):
+    if not isinstance(yearly_overall_result, dict):
+        return
+
+    if yearly_overall_result.get("error"):
+        st.caption(yearly_overall_result["error"])
+        return
+
+    year = yearly_overall_result.get("year", "")
+    year_kanchi = yearly_overall_result.get("year_kanchi", "")
+    tsuhensei = yearly_overall_result.get("tsuhensei", "")
+    theme = yearly_overall_result.get("theme", "")
+    comment = yearly_overall_result.get("comment", "")
+
+    with st.container():
+        st.markdown(f"**{year}年　{year_kanchi}｜{tsuhensei}**")
+        st.markdown(f"テーマ：{theme}")
+        if comment:
+            st.markdown(comment.replace("\n", "  \n"))
 
 
 def render_daiun_transition_separator(row):
@@ -1449,6 +1471,10 @@ yearly_flow_result = build_yearly_monthly_flow(
     day_tenkan=effective_day_tenkan,
     kubou=display_kubou,
 )
+yearly_overall_result = build_yearly_overall_fortune(
+    reading_date=reading_date,
+    day_tenkan=effective_day_tenkan,
+)
 
 # =========================
 # 鑑定結果
@@ -1610,6 +1636,8 @@ if st.button("鑑定結果を表示する"):
             render_daiun_table(daiun_result, display_kubou)
         elif section_title == "今年の運勢の流れ":
             render_yearly_monthly_flow(yearly_flow_result)
+        elif section_title == "今年一年の総合運勢":
+            render_yearly_overall_fortune(yearly_overall_result)
         else:
             pass
     with st.expander("鑑定者用メモ", expanded=False):
@@ -1651,5 +1679,7 @@ if st.button("鑑定結果を表示する"):
                 render_daiun_table(daiun_result, display_kubou)
             elif section_title == "今年の運勢の流れ":
                 render_yearly_monthly_flow(yearly_flow_result)
+            elif section_title == "今年一年の総合運勢":
+                render_yearly_overall_fortune(yearly_overall_result)
             else:
                 pass
