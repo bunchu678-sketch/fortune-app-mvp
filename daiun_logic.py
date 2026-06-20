@@ -10,6 +10,15 @@ YANG_TENKAN = {"甲", "丙", "戊", "庚", "壬"}
 YIN_TENKAN = {"乙", "丁", "己", "辛", "癸"}
 MALE_LABELS = {"男", "男性"}
 FEMALE_LABELS = {"女", "女性"}
+SETSUBOKU_TRANSITIONS = {
+    "forward": {("丑", "寅"), ("辰", "巳"), ("未", "申"), ("戌", "亥")},
+    "reverse": {("寅", "丑"), ("巳", "辰"), ("申", "未"), ("亥", "戌")},
+}
+SETSUBOKU_DIRECTION_ALIASES = {
+    "順行": "forward",
+    "逆行": "reverse",
+    "backward": "reverse",
+}
 DAIUN_TSUHENSEI_COMMENTS = {
     "比肩": (
         "自分の考えや気持ちを積極的に行動へ移すと良い時期。"
@@ -190,6 +199,16 @@ def format_age(age_int):
     return f"{int(age_int)}歳"
 
 
+def format_setsuboku_age_range(start_age, end_age):
+    return f"{int(start_age)}歳〜{int(end_age)}歳頃"
+
+
+def is_setsuboku_transition(current_branch, next_branch, direction):
+    direction_key = SETSUBOKU_DIRECTION_ALIASES.get(direction, direction)
+    transitions = SETSUBOKU_TRANSITIONS.get(direction_key, set())
+    return (current_branch, next_branch) in transitions
+
+
 def _get_tsuhensei(day_tenkan, target_tenkan):
     try:
         from personality_logic import get_tsuhensei
@@ -264,6 +283,7 @@ def build_daiun_table(
         return _build_empty_result("起運年齢を計算できませんでした。")
 
     rows = []
+    age_ranges = []
     step = direction["step"]
     for index in range(1, int(count) + 1):
         offset = step * index
@@ -276,6 +296,7 @@ def build_daiun_table(
         else:
             start_age = kigun_age + 1 + (index - 2) * 10
             end_age = kigun_age + (index - 1) * 10
+        age_ranges.append((start_age, end_age))
         rows.append({
             "大運": f"第{index}大運",
             "開始年齢": format_age(start_age),
@@ -288,7 +309,37 @@ def build_daiun_table(
             "通変星": tsuhensei,
             "十二運星": _get_juuni_unsei(day_tenkan, chishi),
             "コメント": get_daiun_tsuhensei_comment(tsuhensei),
+            "次の大運との間が接木運": False,
+            "接木運_次大運": "",
+            "接木運_次地支": "",
+            "接木運_開始年齢": None,
+            "接木運_終了年齢": None,
+            "接木運_表示年齢": "",
         })
+
+    for index in range(len(rows) - 1):
+        current_row = rows[index]
+        next_row = rows[index + 1]
+        current_branch = current_row.get("地支", "")
+        next_branch = next_row.get("地支", "")
+        switch_age = age_ranges[index + 1][0]
+        setsuboku_start_age = max(0, switch_age - 3)
+        setsuboku_end_age = switch_age + 3
+
+        current_row["接木運_次大運"] = next_row.get("大運", "")
+        current_row["接木運_次地支"] = next_branch
+        if is_setsuboku_transition(
+            current_branch,
+            next_branch,
+            direction["direction"],
+        ):
+            current_row["次の大運との間が接木運"] = True
+            current_row["接木運_開始年齢"] = setsuboku_start_age
+            current_row["接木運_終了年齢"] = setsuboku_end_age
+            current_row["接木運_表示年齢"] = format_setsuboku_age_range(
+                setsuboku_start_age,
+                setsuboku_end_age,
+            )
 
     return {
         "ok": True,

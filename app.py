@@ -231,7 +231,7 @@ def render_daiun_table(daiun_result):
                 st.markdown(f"{kanchi}｜{tsuhensei}")
                 st.markdown(f"コメント：{comment}")
             if index < len(rows) - 1:
-                st.divider()
+                render_daiun_transition_separator(row)
         return
 
     message = (
@@ -241,6 +241,28 @@ def render_daiun_table(daiun_result):
     )
     if message:
         st.caption(message)
+
+
+def render_daiun_transition_separator(row):
+    if row.get("次の大運との間が接木運"):
+        age_text = row.get("接木運_表示年齢", "")
+        current_branch = row.get("地支", "")
+        next_branch = row.get("接木運_次地支", "")
+        st.markdown(
+            f"""
+<div style="border-top: 2px solid #555; border-bottom: 2px solid #555; padding: 0.65rem 0; margin: 1rem 0;">
+  <div style="font-weight: 700;">接木運　{age_text}</div>
+  <div>{current_branch} → {next_branch}</div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+        return
+
+    st.markdown(
+        '<div style="border-top: 1px dashed rgba(49, 51, 63, 0.35); margin: 1rem 0;"></div>',
+        unsafe_allow_html=True,
+    )
 
 
 def format_datetime_for_display(value):
