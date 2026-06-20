@@ -248,15 +248,7 @@ def render_daiun_transition_separator(row):
         age_text = row.get("接木運_表示年齢", "")
         current_branch = row.get("地支", "")
         next_branch = row.get("接木運_次地支", "")
-        st.markdown(
-            f"""
-<div style="border-top: 2px solid #555; border-bottom: 2px solid #555; padding: 0.65rem 0; margin: 1rem 0;">
-  <div style="font-weight: 700;">接木運　{age_text}</div>
-  <div>{current_branch} → {next_branch}</div>
-</div>
-""",
-            unsafe_allow_html=True,
-        )
+        st.warning(f"接木運　{age_text}　{current_branch} → {next_branch}")
         return
 
     st.markdown(
