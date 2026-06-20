@@ -49,6 +49,7 @@ from special_chart_logic import (
     build_special_meishiki_rows,
     format_ijou_kanshi_type,
 )
+from specific_datetime_logic import build_specific_datetime_fortunes
 from yearly_flow_logic import build_yearly_monthly_flow, is_kubou_branch
 from yearly_overall_logic import build_yearly_overall_fortune
 
@@ -337,6 +338,47 @@ def render_yearly_overall_fortune(yearly_overall_result):
         st.markdown(f"テーマ：{theme}")
         if comment:
             st.markdown(comment.replace("\n", "  \n"))
+
+
+def render_specific_datetime_fortunes(specific_datetime_result, is_enabled):
+    if not is_enabled:
+        return
+
+    rows = (
+        specific_datetime_result.get("rows", [])
+        if isinstance(specific_datetime_result, dict)
+        else []
+    )
+    if not rows:
+        return
+
+    st.caption(
+        "※入力日時の日干支をもとにした簡易的な鑑定補助です。"
+        "具体的な判断は相談内容と合わせて確認してください。"
+    )
+    for index, row in enumerate(rows):
+        display_datetime = row.get("display_datetime", "")
+        day_kanchi = row.get("day_kanchi", "")
+        tsuhensei = row.get("tsuhensei", "")
+        keyword = row.get("keyword", "")
+        error = row.get("error", "")
+
+        with st.container():
+            st.markdown(f"**{html.escape(str(display_datetime or ''))}**")
+            if error:
+                st.caption(error)
+            else:
+                st.markdown(
+                    f"{html.escape(str(day_kanchi or ''))}｜"
+                    f"{html.escape(str(tsuhensei or ''))}"
+                )
+                st.markdown(f"キーワード：{keyword}")
+
+        if index < len(rows) - 1:
+            st.markdown(
+                '<div style="border-top: 1px dashed rgba(49, 51, 63, 0.25); margin: 1rem 0;"></div>',
+                unsafe_allow_html=True,
+            )
 
 
 def render_daiun_transition_separator(row):
@@ -1309,6 +1351,46 @@ reading_date = st.date_input(
     min_value=date(1900, 1, 1),
     max_value=date(2050, 12, 31),
 )
+specific_datetime_enabled = st.checkbox("特定の日時について占う")
+specific_datetime_candidates = []
+if specific_datetime_enabled:
+    specific_datetime_count = st.selectbox(
+        "候補数",
+        [1, 2, 3],
+        key="specific_datetime_count",
+    )
+    default_candidate_hours = [14, 10, 9]
+    for candidate_index in range(int(specific_datetime_count)):
+        candidate_number = candidate_index + 1
+        st.markdown(f"**候補{candidate_number}**")
+        candidate_date = st.date_input(
+            f"候補{candidate_number} 日付",
+            value=reading_date,
+            min_value=date(1900, 1, 1),
+            max_value=date(2050, 12, 31),
+            key=f"specific_candidate_date_{candidate_number}",
+        )
+        candidate_hour_col, candidate_minute_col = st.columns(2)
+        with candidate_hour_col:
+            candidate_hour = st.selectbox(
+                f"候補{candidate_number} 時",
+                hour_options,
+                index=default_candidate_hours[candidate_index],
+                key=f"specific_candidate_hour_{candidate_number}",
+            )
+        with candidate_minute_col:
+            candidate_minute = st.selectbox(
+                f"候補{candidate_number} 分",
+                minute_options,
+                index=0,
+                key=f"specific_candidate_minute_{candidate_number}",
+            )
+        specific_datetime_candidates.append(
+            {
+                "date": candidate_date,
+                "time": datetime_time(int(candidate_hour), int(candidate_minute)),
+            }
+        )
 inject_date_input_keyboard_guard()
 
 if SHOW_DEVELOPMENT_PANELS:
@@ -1475,6 +1557,14 @@ yearly_overall_result = build_yearly_overall_fortune(
     reading_date=reading_date,
     day_tenkan=effective_day_tenkan,
 )
+specific_datetime_result = (
+    build_specific_datetime_fortunes(
+        specific_datetime_candidates,
+        effective_day_tenkan,
+    )
+    if specific_datetime_enabled
+    else {"ok": True, "rows": [], "errors": []}
+)
 
 # =========================
 # 鑑定結果
@@ -1636,6 +1726,11 @@ if st.button("鑑定結果を表示する"):
             render_daiun_table(daiun_result, display_kubou)
         elif section_title == "今年の運勢の流れ":
             render_yearly_monthly_flow(yearly_flow_result)
+        elif section_title == "特定日時での運勢":
+            render_specific_datetime_fortunes(
+                specific_datetime_result,
+                specific_datetime_enabled,
+            )
         elif section_title == "今年一年の総合運勢":
             render_yearly_overall_fortune(yearly_overall_result)
         else:
@@ -1679,6 +1774,11 @@ if st.button("鑑定結果を表示する"):
                 render_daiun_table(daiun_result, display_kubou)
             elif section_title == "今年の運勢の流れ":
                 render_yearly_monthly_flow(yearly_flow_result)
+            elif section_title == "特定日時での運勢":
+                render_specific_datetime_fortunes(
+                    specific_datetime_result,
+                    specific_datetime_enabled,
+                )
             elif section_title == "今年一年の総合運勢":
                 render_yearly_overall_fortune(yearly_overall_result)
             else:
