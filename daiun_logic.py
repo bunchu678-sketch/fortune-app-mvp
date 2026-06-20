@@ -270,8 +270,12 @@ def build_daiun_table(
         daiun_kanchi = shift_kanchi(month_kanchi, offset)
         tenkan, chishi = split_kanchi(daiun_kanchi)
         tsuhensei = _get_tsuhensei(day_tenkan, tenkan)
-        start_age = kigun_age + (index - 1) * 10
-        end_age = start_age + 9
+        if index == 1:
+            start_age = 0
+            end_age = kigun_age
+        else:
+            start_age = kigun_age + 1 + (index - 2) * 10
+            end_age = kigun_age + (index - 1) * 10
         rows.append({
             "大運": f"第{index}大運",
             "開始年齢": format_age(start_age),
