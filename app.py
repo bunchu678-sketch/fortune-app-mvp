@@ -185,7 +185,20 @@ def render_daiun_table(daiun_result):
         kigun_age = daiun_result.get("kigun_age")
         if direction_label and kigun_age:
             st.caption(f"{direction_label} / 起運 {format_age(kigun_age)}")
-        st.table(pd.DataFrame(rows))
+        display_columns = [
+            "大運",
+            "開始年齢",
+            "終了年齢",
+            "天干",
+            "地支",
+            "通変星",
+            "コメント",
+        ]
+        display_rows = [
+            {column: row.get(column, "") for column in display_columns}
+            for row in rows
+        ]
+        st.table(pd.DataFrame(display_rows, columns=display_columns))
         return
 
     message = (

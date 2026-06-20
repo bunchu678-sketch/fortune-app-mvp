@@ -201,6 +201,7 @@ def build_daiun_table(
             "地支": chishi,
             "通変星": _get_tsuhensei(day_tenkan, tenkan),
             "十二運星": _get_juuni_unsei(day_tenkan, chishi),
+            "コメント": "",
         })
 
     return {
