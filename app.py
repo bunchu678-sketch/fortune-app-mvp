@@ -11,6 +11,7 @@ from calendar_reference import (
     get_development_calendar_context,
 )
 from chart_render import render_gogyo_balance
+from daiun_logic import build_daiun_table
 from gogyou_logic import calculate_gogyo_scores_from_meishiki
 from meishiki_validation import (
     format_validation_summary_text,
@@ -177,10 +178,33 @@ def render_juuni_unsei_thinking_tendency_for_mobile(
     render_juuni_unsei_thinking_charts(aggregated_scores)
 
 
+def render_daiun_table(daiun_result):
+    rows = daiun_result.get("rows", []) if isinstance(daiun_result, dict) else []
+    if rows:
+        direction_label = daiun_result.get("direction_label", "")
+        kigun_age = daiun_result.get("kigun_age")
+        if direction_label and kigun_age:
+            st.caption(f"{direction_label} / 起運 {format_age(kigun_age)}")
+        st.table(pd.DataFrame(rows))
+        return
+
+    message = (
+        daiun_result.get("message")
+        if isinstance(daiun_result, dict)
+        else ""
+    )
+    if message:
+        st.caption(message)
+
+
 def format_datetime_for_display(value):
     if not value:
         return "未設定"
     return value.strftime("%Y-%m-%d %H:%M")
+
+
+def format_age(age_int):
+    return f"{int(age_int)}歳"
 
 
 def format_development_calendar_caption(calendar_context):
@@ -1273,6 +1297,19 @@ gogyo_result = calculate_gogyo_scores_from_meishiki(
 
 # 異常干支判定（後で表示に使うため、内部的に計算しておく）
 ijou_kanshi_data = build_ijou_kanshi_data_from_meishiki(effective_meishiki)
+effective_month_kanchi = ""
+if effective_month_tenkan and effective_month_chishi:
+    effective_month_kanchi = f"{effective_month_tenkan}{effective_month_chishi}"
+
+daiun_result = build_daiun_table(
+    birth_date=birth_date,
+    birth_year=birth_date.year if birth_date else None,
+    gender=gender,
+    year_tenkan=effective_year_tenkan,
+    month_kanchi=effective_month_kanchi,
+    day_tenkan=effective_day_tenkan,
+    sekki_entries=calendar_context.get("sekki_entries", []),
+)
 
 # =========================
 # 鑑定結果
@@ -1430,6 +1467,8 @@ if st.button("鑑定結果を表示する"):
             )
         elif section_title == "十二運星から読み取れる考え方の傾向":
             render_juuni_unsei_thinking_tendency_for_mobile(pillar_juuni_unsei_data)
+        elif section_title == "大運と接木運":
+            render_daiun_table(daiun_result)
         else:
             pass
     with st.expander("鑑定者用メモ", expanded=False):
@@ -1467,5 +1506,7 @@ if st.button("鑑定結果を表示する"):
                     pillar_juuni_unsei_data,
                     is_private=True,
                 )
+            elif section_title == "大運と接木運":
+                render_daiun_table(daiun_result)
             else:
                 pass
