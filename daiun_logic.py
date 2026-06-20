@@ -209,7 +209,10 @@ def _get_juuni_unsei(day_tenkan, chishi):
 
 
 def get_daiun_tsuhensei_comment(tsuhensei):
-    return DAIUN_TSUHENSEI_COMMENTS.get(tsuhensei, "")
+    if not isinstance(tsuhensei, str):
+        return ""
+
+    return DAIUN_TSUHENSEI_COMMENTS.get(tsuhensei.strip(), "")
 
 
 def _build_empty_result(message):

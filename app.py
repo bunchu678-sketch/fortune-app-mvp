@@ -11,7 +11,7 @@ from calendar_reference import (
     get_development_calendar_context,
 )
 from chart_render import render_gogyo_balance
-from daiun_logic import build_daiun_table
+from daiun_logic import build_daiun_table, get_daiun_tsuhensei_comment
 from gogyou_logic import calculate_gogyo_scores_from_meishiki
 from meishiki_validation import (
     format_validation_summary_text,
@@ -224,7 +224,7 @@ def render_daiun_table(daiun_result):
             end_age = row.get("終了年齢", "")
             kanchi = f"{row.get('天干', '')}{row.get('地支', '')}"
             tsuhensei = row.get("通変星", "")
-            comment = row.get("コメント", "")
+            comment = row.get("コメント", "") or get_daiun_tsuhensei_comment(tsuhensei)
 
             with st.container():
                 st.markdown(f"**{daiun_label}　{start_age}〜{end_age}**")
