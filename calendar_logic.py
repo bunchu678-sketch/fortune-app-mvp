@@ -17,6 +17,83 @@ from meishiki_model import build_auto_meishiki_record
 YEAR_KANCHI_BASE_YEAR = 1984
 YEAR_KANCHI_BASE = "甲子"
 GETSUREI_SIMPLE_RULE = "日干の五行と月支の基本五行が一致するかで判定する簡易月令判定"
+TAIZAN_HIDDEN_STEM_TABLE = {
+    7: {
+        "亥": "戊", "戌": "辛", "酉": "庚", "申": "戊",
+        "未": "丁", "午": "丙", "巳": "戊", "辰": "乙",
+        "卯": "甲", "寅": "戊", "丑": "癸", "子": "壬",
+    },
+    8: {
+        "亥": "甲", "戌": "辛", "酉": "庚", "申": "壬",
+        "未": "丁", "午": "丙", "巳": "庚", "辰": "乙",
+        "卯": "甲", "寅": "丙", "丑": "癸", "子": "壬",
+    },
+    9: {
+        "亥": "甲", "戌": "辛", "酉": "庚", "申": "壬",
+        "未": "丁", "午": "丙", "巳": "庚", "辰": "乙",
+        "卯": "甲", "寅": "丙", "丑": "癸", "子": "壬",
+    },
+    10: {
+        "亥": "甲", "戌": "丁", "酉": "庚", "申": "壬",
+        "未": "乙", "午": "丙", "巳": "庚", "辰": "癸",
+        "卯": "甲", "寅": "丙", "丑": "辛", "子": "壬",
+    },
+    11: {
+        "亥": "甲", "戌": "丁", "酉": "辛", "申": "壬",
+        "未": "乙", "午": "己", "巳": "庚", "辰": "癸",
+        "卯": "乙", "寅": "丙", "丑": "辛", "子": "癸",
+    },
+    12: {
+        "亥": "甲", "戌": "丁", "酉": "辛", "申": "壬",
+        "未": "乙", "午": "己", "巳": "庚", "辰": "癸",
+        "卯": "乙", "寅": "丙", "丑": "辛", "子": "癸",
+    },
+    13: {
+        "亥": "甲", "戌": "戊", "酉": "辛", "申": "壬",
+        "未": "己", "午": "己", "巳": "庚", "辰": "戊",
+        "卯": "乙", "寅": "丙", "丑": "己", "子": "癸",
+    },
+    14: {
+        "亥": "甲", "戌": "戊", "酉": "辛", "申": "壬",
+        "未": "己", "午": "己", "巳": "庚", "辰": "戊",
+        "卯": "乙", "寅": "丙", "丑": "己", "子": "癸",
+    },
+    15: {
+        "亥": "壬", "戌": "戊", "酉": "辛", "申": "庚",
+        "未": "己", "午": "己", "巳": "丙", "辰": "戊",
+        "卯": "乙", "寅": "甲", "丑": "己", "子": "癸",
+    },
+    16: {
+        "亥": "壬", "戌": "戊", "酉": "辛", "申": "庚",
+        "未": "己", "午": "己", "巳": "丙", "辰": "戊",
+        "卯": "乙", "寅": "甲", "丑": "己", "子": "癸",
+    },
+    17: {
+        "亥": "壬", "戌": "戊", "酉": "辛", "申": "庚",
+        "未": "己", "午": "己", "巳": "丙", "辰": "戊",
+        "卯": "乙", "寅": "甲", "丑": "己", "子": "癸",
+    },
+    18: {
+        "亥": "壬", "戌": "戊", "酉": "辛", "申": "庚",
+        "未": "己", "午": "己", "巳": "丙", "辰": "戊",
+        "卯": "乙", "寅": "甲", "丑": "己", "子": "癸",
+    },
+    19: {
+        "亥": "壬", "戌": "戊", "酉": "辛", "申": "庚",
+        "未": "己", "午": "己", "巳": "丙", "辰": "戊",
+        "卯": "乙", "寅": "甲", "丑": "己", "子": "癸",
+    },
+    20: {
+        "亥": "壬", "戌": "戊", "酉": "辛", "申": "庚",
+        "未": "己", "午": "己", "巳": "丙", "辰": "戊",
+        "卯": "乙", "寅": "甲", "丑": "己", "子": "癸",
+    },
+    21: {
+        "亥": "壬", "戌": "戊", "酉": "辛", "申": "庚",
+        "未": "己", "午": "丁", "巳": "丙", "辰": "戊",
+        "卯": "乙", "寅": "甲", "丑": "己", "子": "癸",
+    },
+}
 
 
 def build_getsurei_result(
@@ -334,6 +411,37 @@ def find_month_branch_by_sekki(target_datetime, sekki_entries) -> dict:
     }
 
 
+def calculate_days_after_latest_sekki(target_datetime, latest_sekki_datetime) -> int:
+    """
+    節入り日を1日目として、対象日時が節入り後何日目かを返す。
+
+    泰山流の月律分野蔵干 深浅表では時刻差ではなく日付差で見るため、
+    datetime の date() 同士を比較する。
+    """
+    if target_datetime is None:
+        raise ValueError("target_datetime is required.")
+    if latest_sekki_datetime is None:
+        raise ValueError("latest_sekki_datetime is required.")
+
+    return (target_datetime.date() - latest_sekki_datetime.date()).days + 1
+
+
+def get_taizan_hidden_stem(branch: str, day_count: int) -> str:
+    """
+    泰山流「月律分野蔵干 深浅表」から、地支と節入り後日数に応じた蔵干を返す。
+    """
+    if branch not in CHISHI_ORDER:
+        raise ValueError(f"Invalid branch: {branch}")
+    if day_count < 1:
+        raise ValueError(f"day_count must be positive: {day_count}")
+
+    row_key = day_count if day_count <= 20 else 21
+    if row_key <= 7:
+        row_key = 7
+
+    return TAIZAN_HIDDEN_STEM_TABLE[row_key][branch]
+
+
 def calculate_month_pillar(target_datetime, year_tenkan: str, sekki_entries) -> dict:
     """
     対象日時、年干、節入り日時リストから月柱を計算する。
@@ -608,13 +716,14 @@ def calculate_hour_pillar(target_datetime, day_tenkan: str) -> dict:
 # 泰山流万年暦との差分検証を行ってから、既存の命式表へ接続する。
 
 
-def build_auto_pillar_result(kanchi_key: str, detail: dict) -> dict:
+def build_auto_pillar_result(kanchi_key: str, detail: dict, zokkan: str = "") -> dict:
     kanchi = detail[kanchi_key]
     tenkan, chishi = split_kanchi(kanchi)
     return {
         "kanchi": kanchi,
         "tenkan": tenkan,
         "chishi": chishi,
+        "zokkan": zokkan,
         "detail": detail,
     }
 
@@ -706,17 +815,46 @@ def calculate_auto_meishiki(
         base_day_kanchi,
     )
     hour_result = calculate_hour_pillar(calculation_datetime, day_result["tenkan"])
+    hidden_stem_day_count = calculate_days_after_latest_sekki(
+        calculation_datetime,
+        month_result["matched_sekki_datetime"],
+    )
+    hidden_stems = {
+        "year": get_taizan_hidden_stem(year_result["chishi"], hidden_stem_day_count),
+        "month": get_taizan_hidden_stem(month_result["chishi"], hidden_stem_day_count),
+        "day": get_taizan_hidden_stem(day_result["chishi"], hidden_stem_day_count),
+        "hour": get_taizan_hidden_stem(hour_result["chishi"], hidden_stem_day_count),
+    }
 
     return {
         "birth_info": birth_info,
         "calculation_datetime": calculation_datetime,
-        "year": build_auto_pillar_result("year_kanchi", year_result),
-        "month": build_auto_pillar_result("month_kanchi", month_result),
-        "day": build_auto_pillar_result("day_kanchi", day_result),
-        "hour": build_auto_pillar_result("hour_kanchi", hour_result),
+        "hidden_stem_day_count": hidden_stem_day_count,
+        "hidden_stem_latest_sekki_datetime": month_result["matched_sekki_datetime"],
+        "year": build_auto_pillar_result(
+            "year_kanchi",
+            year_result,
+            hidden_stems["year"],
+        ),
+        "month": build_auto_pillar_result(
+            "month_kanchi",
+            month_result,
+            hidden_stems["month"],
+        ),
+        "day": build_auto_pillar_result(
+            "day_kanchi",
+            day_result,
+            hidden_stems["day"],
+        ),
+        "hour": build_auto_pillar_result(
+            "hour_kanchi",
+            hour_result,
+            hidden_stems["hour"],
+        ),
         "notes": [
             "日柱計算の基準日は検証中です。",
             "節入り日時データは検証用または外部入力です。",
+            "蔵干は泰山流の月律分野蔵干 深浅表で算出しています。",
             "正確な節入り日時データと日柱基準日を確定してから既存の命式表へ接続します。",
         ],
     }
