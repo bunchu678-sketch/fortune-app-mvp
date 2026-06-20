@@ -46,11 +46,44 @@ from special_chart_logic import (
     SPECIAL_CHART_EMPTY_MESSAGE,
     build_ijou_kanshi_data_from_meishiki,
     build_special_meishiki_rows,
+    format_ijou_kanshi_type,
 )
+
+
+def format_day_ijou_kanshi_result(ijou_kanshi_data):
+    for data in ijou_kanshi_data or []:
+        if data.get("pillar_label") != "日柱":
+            continue
+
+        ijou_type = data.get("ijou_type", "")
+        tenkan = data.get("tenkan", "")
+        chishi = data.get("chishi", "")
+        if not ijou_type or not tenkan or not chishi:
+            return ""
+
+        return f"{tenkan}{chishi}：{format_ijou_kanshi_type(ijou_type)}"
+
+    return ""
+
+
+def build_special_meishiki_display_rows(rows, ijou_kanshi_data):
+    display_rows = []
+    day_ijou_text = format_day_ijou_kanshi_result(ijou_kanshi_data)
+
+    for row in rows:
+        if row.get("判定") == "異常干支":
+            if day_ijou_text:
+                display_rows.append({"判定": row.get("判定", ""), "結果": day_ijou_text})
+            continue
+
+        display_rows.append(row)
+
+    return display_rows
 
 
 def render_special_meishiki(ijou_kanshi_data, gogyo_result):
     rows = build_special_meishiki_rows(ijou_kanshi_data, gogyo_result)
+    rows = build_special_meishiki_display_rows(rows, ijou_kanshi_data)
 
     if not rows:
         st.write(SPECIAL_CHART_EMPTY_MESSAGE)
