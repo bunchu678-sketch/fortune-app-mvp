@@ -185,20 +185,20 @@ def render_daiun_table(daiun_result):
         kigun_age = daiun_result.get("kigun_age")
         if direction_label and kigun_age:
             st.caption(f"{direction_label} / 起運 {format_age(kigun_age)}")
-        display_columns = [
-            "大運",
-            "開始年齢",
-            "終了年齢",
-            "天干",
-            "地支",
-            "通変星",
-            "コメント",
-        ]
-        display_rows = [
-            {column: row.get(column, "") for column in display_columns}
-            for row in rows
-        ]
-        st.table(pd.DataFrame(display_rows, columns=display_columns))
+        for index, row in enumerate(rows):
+            daiun_label = row.get("大運", "")
+            start_age = row.get("開始年齢", "")
+            end_age = row.get("終了年齢", "")
+            kanchi = f"{row.get('天干', '')}{row.get('地支', '')}"
+            tsuhensei = row.get("通変星", "")
+            comment = row.get("コメント", "")
+
+            with st.container():
+                st.markdown(f"**{daiun_label}　{start_age}〜{end_age}**")
+                st.markdown(f"{kanchi}｜{tsuhensei}")
+                st.markdown(f"コメント：{comment}")
+            if index < len(rows) - 1:
+                st.divider()
         return
 
     message = (
