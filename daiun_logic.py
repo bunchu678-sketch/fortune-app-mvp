@@ -286,7 +286,7 @@ def build_daiun_table(
     age_ranges = []
     step = direction["step"]
     for index in range(1, int(count) + 1):
-        offset = step * index
+        offset = step * (index - 1)
         daiun_kanchi = shift_kanchi(month_kanchi, offset)
         tenkan, chishi = split_kanchi(daiun_kanchi)
         tsuhensei = _get_tsuhensei(day_tenkan, tenkan)
