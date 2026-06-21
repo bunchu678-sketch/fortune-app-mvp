@@ -401,6 +401,46 @@ def format_datetime_for_display(value):
     return value.strftime("%Y-%m-%d %H:%M")
 
 
+def format_time_adjustment_minutes_for_display(minutes):
+    try:
+        rounded_minutes = int(round(float(minutes or 0)))
+    except (TypeError, ValueError):
+        rounded_minutes = 0
+
+    sign = "+" if rounded_minutes >= 0 else ""
+    return f"{sign}{rounded_minutes}分"
+
+
+def format_adjusted_birth_datetime_for_display(value):
+    if not value:
+        return ""
+    return value.strftime("%Y/%m/%d %H:%M頃")
+
+
+def render_birthplace_time_adjustment_note(birth_info):
+    if not isinstance(birth_info, dict):
+        return
+    if not birth_info.get("time_adjustment_enabled"):
+        return
+
+    birth_place = birth_info.get("birth_place", "")
+    longitude = birth_info.get("birthplace_longitude")
+    adjustment_minutes = birth_info.get("time_adjustment_minutes", 0)
+    adjusted_birth_datetime = birth_info.get("adjusted_birth_datetime")
+
+    if longitude is None or not adjusted_birth_datetime:
+        return
+
+    st.caption(f"出生地補正：{birth_place}（経度{float(longitude):.2f}度）")
+    st.caption(
+        f"補正値：{format_time_adjustment_minutes_for_display(adjustment_minutes)}"
+    )
+    st.caption(
+        "補正後出生日時："
+        f"{format_adjusted_birth_datetime_for_display(adjusted_birth_datetime)}"
+    )
+
+
 def format_age(age_int):
     return f"{int(age_int)}歳"
 
@@ -1340,6 +1380,12 @@ birth_info = build_birth_info(
     time_adjustment_enabled=False,
     time_adjustment_minutes=0,
 )
+adjusted_birth_datetime = birth_info.get("adjusted_birth_datetime")
+calculation_birth_date = (
+    adjusted_birth_datetime.date()
+    if adjusted_birth_datetime is not None
+    else birth_date
+)
 gender = st.selectbox(
     "性別",
     ["未選択", "男性", "女性", "その他・回答しない"]
@@ -1469,7 +1515,7 @@ effective_meishiki_result = select_effective_meishiki(
 effective_meishiki = effective_meishiki_result.get("meishiki") or meishiki
 effective_meishiki_source_label = "自動計算命式"
 
-calendar_context = get_calendar_context_for_birth_year(birth_date.year)
+calendar_context = get_calendar_context_for_birth_year(calculation_birth_date.year)
 auto_calculation_errors = []
 if not calendar_context.get("ok"):
     auto_calculation_errors.extend(calendar_context.get("errors", []))
@@ -1540,8 +1586,8 @@ if effective_month_tenkan and effective_month_chishi:
     effective_month_kanchi = f"{effective_month_tenkan}{effective_month_chishi}"
 
 daiun_result = build_daiun_table(
-    birth_date=birth_date,
-    birth_year=birth_date.year if birth_date else None,
+    birth_date=calculation_birth_date,
+    birth_year=calculation_birth_date.year if calculation_birth_date else None,
     gender=gender,
     year_tenkan=effective_year_tenkan,
     month_kanchi=effective_month_kanchi,
@@ -1738,6 +1784,7 @@ if st.button("鑑定結果を表示する"):
     with st.expander("鑑定者用メモ", expanded=False):
         st.subheader("基本情報")
         st.table(pd.DataFrame(basic_info_rows))
+        render_birthplace_time_adjustment_note(birth_info)
 
         st.subheader("命式表")
         st.table(meishiki_data)

@@ -1,7 +1,10 @@
 from datetime import datetime, time as datetime_time
 
 from fortune_data import CHISHI_ORDER, TENKAN_ORDER, get_simple_zokkan_by_chishi
-from time_adjustment_logic import apply_time_adjustment
+from time_adjustment_logic import (
+    apply_birthplace_time_adjustment,
+    apply_time_adjustment,
+)
 
 PILLAR_KEYS = ["year", "month", "day", "hour"]
 PILLAR_DISPLAY_ORDER = ["hour", "day", "month", "year"]
@@ -339,21 +342,36 @@ def build_birth_info(
     time_adjustment_minutes=0,
 ):
     raw_birth_datetime = build_raw_birth_datetime(birth_date, birth_time)
-    adjustment_minutes = int(time_adjustment_minutes or 0)
-    applied_adjustment_minutes = (
-        adjustment_minutes if time_adjustment_enabled else 0
-    )
-    adjusted_birth_datetime = apply_time_adjustment(
-        raw_birth_datetime,
-        applied_adjustment_minutes,
-    )
+    adjustment_minutes = float(time_adjustment_minutes or 0)
+
+    if time_adjustment_enabled:
+        adjusted_birth_datetime = apply_time_adjustment(
+            raw_birth_datetime,
+            adjustment_minutes,
+        )
+        applied_adjustment_minutes = adjustment_minutes
+        applied_adjustment_enabled = bool(raw_birth_datetime)
+        birthplace_longitude = None
+        time_adjustment_reason = "manual"
+    else:
+        adjustment_result = apply_birthplace_time_adjustment(
+            raw_birth_datetime,
+            birth_place,
+        )
+        adjusted_birth_datetime = adjustment_result["adjusted_birth_datetime"]
+        applied_adjustment_minutes = adjustment_result["time_adjustment_minutes"]
+        applied_adjustment_enabled = adjustment_result["time_adjustment_enabled"]
+        birthplace_longitude = adjustment_result["longitude"]
+        time_adjustment_reason = adjustment_result["time_adjustment_reason"]
 
     return {
         "raw_birth_datetime": raw_birth_datetime,
         "birth_place": birth_place or "",
         "birth_country": birth_country if birth_country is not None else "日本",
-        "time_adjustment_enabled": bool(time_adjustment_enabled),
+        "time_adjustment_enabled": applied_adjustment_enabled,
         "time_adjustment_minutes": applied_adjustment_minutes,
+        "birthplace_longitude": birthplace_longitude,
+        "time_adjustment_reason": time_adjustment_reason,
         "adjusted_birth_datetime": adjusted_birth_datetime,
     }
 
