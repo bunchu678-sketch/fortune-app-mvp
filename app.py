@@ -12,7 +12,10 @@ from calendar_reference import (
     get_development_calendar_context,
 )
 from chart_render import render_gogyo_balance
-from daiun_logic import build_daiun_table, get_daiun_tsuhensei_comment
+from daiun_logic import (
+    build_daiun_table,
+    get_daiun_tsuhensei_summary,
+)
 from gogyou_logic import calculate_gogyo_scores_from_meishiki
 from meishiki_validation import (
     format_validation_summary_text,
@@ -231,15 +234,6 @@ def render_kubou_note():
     st.caption("※赤文字は空亡であることを示します。")
 
 
-def render_setsuboku_help():
-    with st.expander("？ 接木運とは", expanded=False):
-        st.write(
-            "接木運とは、大運が切り替わる前後の変化が出やすい時期です。"
-            "環境や気持ちの揺らぎが起こりやすく、次の流れへ移る準備期間として見ることができます。"
-            "無理に結論を急がず、身の回りを整えながら進むことが大切です。"
-        )
-
-
 def render_daiun_table(daiun_result, kubou=""):
     rows = daiun_result.get("rows", []) if isinstance(daiun_result, dict) else []
     if rows:
@@ -248,7 +242,6 @@ def render_daiun_table(daiun_result, kubou=""):
         if direction_label and kigun_age:
             st.caption(f"{direction_label} / 起運 {format_age(kigun_age)}")
         render_kubou_note()
-        render_setsuboku_help()
         for index, row in enumerate(rows):
             daiun_label = row.get("大運", "")
             start_age = row.get("開始年齢", "")
@@ -259,7 +252,9 @@ def render_daiun_table(daiun_result, kubou=""):
                 is_kubou_branch(row.get("地支", ""), kubou),
             )
             tsuhensei = row.get("通変星", "")
-            comment = row.get("コメント", "") or get_daiun_tsuhensei_comment(tsuhensei)
+            summary = get_daiun_tsuhensei_summary(tsuhensei)
+            period = row.get("周期") or summary.get("period") or "—"
+            keywords = row.get("キーワード") or summary.get("keywords") or "—"
 
             with st.container():
                 st.markdown(f"**{daiun_label}　{start_age}〜{end_age}**")
@@ -267,7 +262,8 @@ def render_daiun_table(daiun_result, kubou=""):
                     f"{kanchi_html}｜{html.escape(str(tsuhensei or ''))}",
                     unsafe_allow_html=True,
                 )
-                st.markdown(f"コメント：{comment}")
+                st.markdown(f"周期：{html.escape(str(period))}")
+                st.markdown(f"キーワード：{html.escape(str(keywords))}")
             if index < len(rows) - 1:
                 render_daiun_transition_separator(row)
         return

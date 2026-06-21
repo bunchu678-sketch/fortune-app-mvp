@@ -94,6 +94,49 @@ DAIUN_TSUHENSEI_COMMENTS = {
     ),
 }
 
+DAIUN_TSUHENSEI_SUMMARY = {
+    "比肩": {
+        "period": "発芽期〜芽を出す時〜",
+        "keywords": "独立・積極・実行",
+    },
+    "劫財": {
+        "period": "発芽期〜芽を出す時〜",
+        "keywords": "協調・消極・緩慢",
+    },
+    "食神": {
+        "period": "成長期〜芽から茎へと成長するとき〜",
+        "keywords": "調整・安定・宣伝",
+    },
+    "傷官": {
+        "period": "成長期〜芽から茎へと成長するとき〜",
+        "keywords": "直感・感情・紛争",
+    },
+    "偏財": {
+        "period": "開花期〜花を咲かせる時〜",
+        "keywords": "奉仕・出入・流動",
+    },
+    "正財": {
+        "period": "開花期〜花を咲かせる時〜",
+        "keywords": "収穫・資産・固定",
+    },
+    "偏官": {
+        "period": "収穫期〜結実の時〜",
+        "keywords": "転換・変動・拡大",
+    },
+    "正官": {
+        "period": "収穫期〜結実の時〜",
+        "keywords": "発展・責任・完成",
+    },
+    "偏印": {
+        "period": "開墾期〜後始末、次の準備の時〜",
+        "keywords": "変化・開発・整理",
+    },
+    "印綬": {
+        "period": "開墾期〜後始末、次の準備の時〜",
+        "keywords": "反省・研究・結果",
+    },
+}
+
 
 def normalize_to_date(value):
     if isinstance(value, datetime):
@@ -234,6 +277,22 @@ def get_daiun_tsuhensei_comment(tsuhensei):
     return DAIUN_TSUHENSEI_COMMENTS.get(tsuhensei.strip(), "")
 
 
+def get_daiun_tsuhensei_summary(tsuhensei):
+    if not isinstance(tsuhensei, str):
+        return {
+            "period": "",
+            "keywords": "",
+        }
+
+    return DAIUN_TSUHENSEI_SUMMARY.get(
+        tsuhensei.strip(),
+        {
+            "period": "",
+            "keywords": "",
+        },
+    )
+
+
 def _build_empty_result(message):
     return {
         "ok": False,
@@ -290,6 +349,7 @@ def build_daiun_table(
         daiun_kanchi = shift_kanchi(month_kanchi, offset)
         tenkan, chishi = split_kanchi(daiun_kanchi)
         tsuhensei = _get_tsuhensei(day_tenkan, tenkan)
+        summary = get_daiun_tsuhensei_summary(tsuhensei)
         if index == 1:
             start_age = 0
             end_age = kigun_age
@@ -309,6 +369,8 @@ def build_daiun_table(
             "通変星": tsuhensei,
             "十二運星": _get_juuni_unsei(day_tenkan, chishi),
             "コメント": get_daiun_tsuhensei_comment(tsuhensei),
+            "周期": summary["period"],
+            "キーワード": summary["keywords"],
             "次の大運との間が接木運": False,
             "接木運_次大運": "",
             "接木運_次地支": "",
