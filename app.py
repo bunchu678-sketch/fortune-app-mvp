@@ -205,7 +205,6 @@ def render_juuni_unsei_comments_for_mobile(juuni_unsei_display_data, comment_typ
 
 
 THINKING_BAR_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759"]
-THINKING_BAR_MIN_INSIDE_LABEL_WIDTH = 28
 
 
 def to_numeric_thinking_scores(score_dict):
@@ -220,21 +219,24 @@ def to_numeric_thinking_scores(score_dict):
     return numeric_scores
 
 
-def render_thinking_score_caption(numeric_scores):
-    st.caption(
-        " / ".join(
-            f"{label}: {format_score_percent(score)}"
-            for label, score in numeric_scores.items()
+def render_thinking_score_legend(numeric_scores):
+    legend_rows = []
+
+    for index, (label, value) in enumerate(numeric_scores.items()):
+        color = THINKING_BAR_COLORS[index % len(THINKING_BAR_COLORS)]
+        legend_rows.append(
+            "<span style=\"display:inline-flex;align-items:center;gap:6px;color:#24292f;\">"
+            f"<span style=\"width:10px;height:10px;background:{color};display:inline-block;border-radius:2px;\"></span>"
+            f"{html.escape(label)} {html.escape(format_score_percent(value))}"
+            "</span>"
         )
-    )
 
-
-def should_render_thinking_label_inside(label_text, width):
-    required_width = max(
-        THINKING_BAR_MIN_INSIDE_LABEL_WIDTH,
-        min(44, len(label_text) * 2.2),
+    st.markdown(
+        "<div style=\"display:flex;flex-wrap:wrap;gap:8px 14px;margin:6px 0 2px;font-size:12px;\">"
+        + "".join(legend_rows)
+        + "</div>",
+        unsafe_allow_html=True,
     )
-    return width >= required_width
 
 
 def render_thinking_stacked_bar(title, score_dict):
@@ -249,13 +251,11 @@ def render_thinking_stacked_bar(title, score_dict):
 
     if positive_total <= 0:
         st.write("集計できるデータがありません。")
-        render_thinking_score_caption(numeric_scores)
+        render_thinking_score_legend(numeric_scores)
         return
 
     scale = 100 if positive_total <= 100 else positive_total
     segments = []
-    narrow_labels = []
-    segment_start = 0
 
     for index, (label, value) in enumerate(numeric_scores.items()):
         if value <= 0:
@@ -264,20 +264,7 @@ def render_thinking_stacked_bar(title, score_dict):
         width = value / scale * 100
         color = THINKING_BAR_COLORS[index % len(THINKING_BAR_COLORS)]
         label_text = f"{label} {format_score_percent(value)}"
-        segment_text = (
-            label_text
-            if should_render_thinking_label_inside(label_text, width)
-            else ""
-        )
-
-        if not segment_text:
-            narrow_labels.append(
-                {
-                    "label_text": label_text,
-                    "color": color,
-                    "center": segment_start + (width / 2),
-                }
-            )
+        segment_text = format_score_percent(value)
 
         segments.append(
             "<div "
@@ -302,7 +289,6 @@ def render_thinking_stacked_bar(title, score_dict):
             f"{html.escape(segment_text)}"
             "</div>"
         )
-        segment_start += width
 
     st.markdown(
         "<div style=\""
@@ -319,54 +305,7 @@ def render_thinking_stacked_bar(title, score_dict):
         unsafe_allow_html=True,
     )
 
-    if narrow_labels:
-        outside_label_height = 20 + (len(narrow_labels) * 22)
-        leader_rows = []
-
-        for label_index, label_data in enumerate(narrow_labels):
-            segment_center = max(2.0, min(98.0, label_data["center"]))
-            label_y = 20 + (label_index * 22)
-
-            if segment_center < 30:
-                label_x = 3
-                anchor = "start"
-            elif segment_center > 70:
-                label_x = 97
-                anchor = "end"
-            else:
-                label_x = segment_center
-                anchor = "middle"
-
-            leader_rows.append(
-                "<g>"
-                f"<polyline points=\"{segment_center:.2f},0 {segment_center:.2f},{label_y - 8} {label_x:.2f},{label_y - 8}\" "
-                "fill=\"none\" stroke=\"#6e7781\" stroke-width=\"0.45\" />"
-                f"<circle cx=\"{segment_center:.2f}\" cy=\"0\" r=\"0.8\" fill=\"{label_data['color']}\" />"
-                f"<rect x=\"{label_x - 1.2 if anchor != 'start' else label_x:.2f}\" y=\"{label_y - 4.2}\" "
-                f"width=\"1.8\" height=\"1.8\" fill=\"{label_data['color']}\" rx=\"0.3\" />"
-                f"<text x=\"{label_x:.2f}\" y=\"{label_y:.2f}\" text-anchor=\"{anchor}\" "
-                "fill=\"#24292f\" font-size=\"3.6\" font-weight=\"700\">"
-                f"{html.escape(label_data['label_text'])}"
-                "</text>"
-                "</g>"
-            )
-
-        st.markdown(
-            "<svg "
-            "viewBox=\"0 0 100 "
-            f"{outside_label_height}\" "
-            "width=\"100%\" "
-            f"height=\"{outside_label_height}\" "
-            "role=\"img\" "
-            "aria-label=\"棒外ラベル\" "
-            "style=\"display:block;margin-top:4px;overflow:visible;\""
-            ">"
-            + "".join(leader_rows)
-            + "</svg>",
-            unsafe_allow_html=True,
-        )
-
-    render_thinking_score_caption(numeric_scores)
+    render_thinking_score_legend(numeric_scores)
 
 
 def calculate_svg_pie_point(center_x, center_y, radius, angle):
