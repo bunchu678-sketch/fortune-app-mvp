@@ -206,7 +206,6 @@ def render_juuni_unsei_comments_for_mobile(juuni_unsei_display_data, comment_typ
 
 THINKING_BAR_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759"]
 THINKING_BAR_MIN_INSIDE_LABEL_WIDTH = 28
-THINKING_PIE_INSIDE_LABEL_MIN_PERCENT = 45
 
 
 def to_numeric_thinking_scores(score_dict):
@@ -256,6 +255,7 @@ def render_thinking_stacked_bar(title, score_dict):
     scale = 100 if positive_total <= 100 else positive_total
     segments = []
     narrow_labels = []
+    segment_start = 0
 
     for index, (label, value) in enumerate(numeric_scores.items()):
         if value <= 0:
@@ -271,7 +271,13 @@ def render_thinking_stacked_bar(title, score_dict):
         )
 
         if not segment_text:
-            narrow_labels.append((label_text, color))
+            narrow_labels.append(
+                {
+                    "label_text": label_text,
+                    "color": color,
+                    "center": segment_start + (width / 2),
+                }
+            )
 
         segments.append(
             "<div "
@@ -296,6 +302,7 @@ def render_thinking_stacked_bar(title, score_dict):
             f"{html.escape(segment_text)}"
             "</div>"
         )
+        segment_start += width
 
     st.markdown(
         "<div style=\""
@@ -313,16 +320,49 @@ def render_thinking_stacked_bar(title, score_dict):
     )
 
     if narrow_labels:
-        st.markdown(
-            "<div style=\"display:flex;flex-wrap:wrap;gap:8px 12px;margin-top:6px;font-size:12px;\">"
-            + "".join(
-                "<span style=\"display:inline-flex;align-items:center;gap:5px;color:#24292f;\">"
-                f"<span style=\"width:10px;height:10px;background:{color};display:inline-block;border-radius:2px;\"></span>"
-                f"{html.escape(label_text)}"
-                "</span>"
-                for label_text, color in narrow_labels
+        outside_label_height = 20 + (len(narrow_labels) * 22)
+        leader_rows = []
+
+        for label_index, label_data in enumerate(narrow_labels):
+            segment_center = max(2.0, min(98.0, label_data["center"]))
+            label_y = 20 + (label_index * 22)
+
+            if segment_center < 30:
+                label_x = 3
+                anchor = "start"
+            elif segment_center > 70:
+                label_x = 97
+                anchor = "end"
+            else:
+                label_x = segment_center
+                anchor = "middle"
+
+            leader_rows.append(
+                "<g>"
+                f"<polyline points=\"{segment_center:.2f},0 {segment_center:.2f},{label_y - 8} {label_x:.2f},{label_y - 8}\" "
+                "fill=\"none\" stroke=\"#6e7781\" stroke-width=\"0.45\" />"
+                f"<circle cx=\"{segment_center:.2f}\" cy=\"0\" r=\"0.8\" fill=\"{label_data['color']}\" />"
+                f"<rect x=\"{label_x - 1.2 if anchor != 'start' else label_x:.2f}\" y=\"{label_y - 4.2}\" "
+                f"width=\"1.8\" height=\"1.8\" fill=\"{label_data['color']}\" rx=\"0.3\" />"
+                f"<text x=\"{label_x:.2f}\" y=\"{label_y:.2f}\" text-anchor=\"{anchor}\" "
+                "fill=\"#24292f\" font-size=\"3.6\" font-weight=\"700\">"
+                f"{html.escape(label_data['label_text'])}"
+                "</text>"
+                "</g>"
             )
-            + "</div>",
+
+        st.markdown(
+            "<svg "
+            "viewBox=\"0 0 100 "
+            f"{outside_label_height}\" "
+            "width=\"100%\" "
+            f"height=\"{outside_label_height}\" "
+            "role=\"img\" "
+            "aria-label=\"棒外ラベル\" "
+            "style=\"display:block;margin-top:4px;overflow:visible;\""
+            ">"
+            + "".join(leader_rows)
+            + "</svg>",
             unsafe_allow_html=True,
         )
 
@@ -360,31 +400,6 @@ def build_svg_pie_slice_path(center_x, center_y, radius, start_angle, end_angle)
     )
 
 
-def adjust_pie_outside_label_positions(labels):
-    for side in ("left", "right"):
-        side_labels = sorted(
-            [label for label in labels if label["side"] == side],
-            key=lambda label: label["text_y"],
-        )
-        if not side_labels:
-            continue
-
-        for index in range(1, len(side_labels)):
-            previous_y = side_labels[index - 1]["text_y"]
-            if side_labels[index]["text_y"] < previous_y + 24:
-                side_labels[index]["text_y"] = previous_y + 24
-
-        overflow = side_labels[-1]["text_y"] - 270
-        if overflow > 0:
-            for label in side_labels:
-                label["text_y"] -= overflow
-
-        underflow = 32 - side_labels[0]["text_y"]
-        if underflow > 0:
-            for label in side_labels:
-                label["text_y"] += underflow
-
-
 def build_work_type_pie_svg(numeric_scores):
     filtered_scores = {
         label: value
@@ -392,13 +407,12 @@ def build_work_type_pie_svg(numeric_scores):
         if value > 0
     }
     total = sum(filtered_scores.values())
-    center_x = 240
-    center_y = 150
-    radius = 86
+    center_x = 150
+    center_y = 126
+    radius = 96
     start_angle = -90
     slices = []
-    inside_labels = []
-    outside_labels = []
+    percent_labels = []
 
     for index, (label, value) in enumerate(filtered_scores.items()):
         percent = value / total * 100
@@ -406,6 +420,7 @@ def build_work_type_pie_svg(numeric_scores):
         middle_angle = (start_angle + end_angle) / 2
         color = THINKING_BAR_COLORS[index % len(THINKING_BAR_COLORS)]
         label_text = f"{label} {format_score_percent(percent)}"
+        percent_text = format_score_percent(percent)
 
         slices.append(
             "<path "
@@ -416,56 +431,23 @@ def build_work_type_pie_svg(numeric_scores):
             f"><title>{html.escape(label_text)}</title></path>"
         )
 
-        middle_x, middle_y = calculate_svg_pie_point(
+        label_x, label_y = calculate_svg_pie_point(
             center_x,
             center_y,
-            radius * 0.58,
+            radius * 0.60,
             middle_angle,
         )
-        line_start_x, line_start_y = calculate_svg_pie_point(
-            center_x,
-            center_y,
-            radius * 0.94,
-            middle_angle,
+        percent_labels.append(
+            {
+                "text": percent_text,
+                "x": label_x,
+                "y": label_y,
+            }
         )
-        line_end_x, line_end_y = calculate_svg_pie_point(
-            center_x,
-            center_y,
-            radius * 1.12,
-            middle_angle,
-        )
-
-        if percent >= THINKING_PIE_INSIDE_LABEL_MIN_PERCENT:
-            inside_labels.append(
-                {
-                    "label": label,
-                    "percent": format_score_percent(percent),
-                    "x": middle_x,
-                    "y": middle_y,
-                }
-            )
-        else:
-            is_right_side = math.cos(math.radians(middle_angle)) >= 0
-            text_x = 360 if is_right_side else 120
-            outside_labels.append(
-                {
-                    "label_text": label_text,
-                    "side": "right" if is_right_side else "left",
-                    "anchor": "start" if is_right_side else "end",
-                    "text_x": text_x,
-                    "text_y": line_end_y,
-                    "line_start_x": line_start_x,
-                    "line_start_y": line_start_y,
-                    "line_end_x": text_x - 8 if is_right_side else text_x + 8,
-                    "line_end_y": line_end_y,
-                }
-            )
 
         start_angle = end_angle
 
-    adjust_pie_outside_label_positions(outside_labels)
-
-    inside_label_svg = "".join(
+    percent_label_svg = "".join(
         "<text "
         f"x=\"{label['x']:.2f}\" "
         f"y=\"{label['y']:.2f}\" "
@@ -479,48 +461,45 @@ def build_work_type_pie_svg(numeric_scores):
         "stroke-width=\"2\" "
         "stroke-linejoin=\"round\""
         ">"
-        f"<tspan x=\"{label['x']:.2f}\" dy=\"-0.35em\">{html.escape(label['label'])}</tspan>"
-        f"<tspan x=\"{label['x']:.2f}\" dy=\"1.25em\">{html.escape(label['percent'])}</tspan>"
+        f"{html.escape(label['text'])}"
         "</text>"
-        for label in inside_labels
-    )
-    outside_label_svg = "".join(
-        "<g>"
-        "<polyline "
-        f"points=\"{label['line_start_x']:.2f},{label['line_start_y']:.2f} "
-        f"{label['line_end_x']:.2f},{label['text_y']:.2f}\" "
-        "fill=\"none\" "
-        "stroke=\"#6e7781\" "
-        "stroke-width=\"1.4\" "
-        "/>"
-        "<text "
-        f"x=\"{label['text_x']:.2f}\" "
-        f"y=\"{label['text_y']:.2f}\" "
-        f"text-anchor=\"{label['anchor']}\" "
-        "dominant-baseline=\"middle\" "
-        "fill=\"#24292f\" "
-        "font-size=\"12\" "
-        "font-weight=\"700\""
-        ">"
-        f"{html.escape(label['label_text'])}"
-        "</text>"
-        "</g>"
-        for label in outside_labels
+        for label in percent_labels
     )
 
     return (
         "<svg "
-        "viewBox=\"0 0 480 300\" "
+        "viewBox=\"0 0 300 252\" "
         "width=\"100%\" "
         "role=\"img\" "
         "aria-label=\"仕事4分類の円グラフ\" "
-        "style=\"max-width:520px;display:block;margin:0 auto;\""
+        "style=\"max-width:420px;display:block;margin:0 auto;\""
         ">"
-        "<rect x=\"0\" y=\"0\" width=\"480\" height=\"300\" fill=\"transparent\" />"
+        "<rect x=\"0\" y=\"0\" width=\"300\" height=\"252\" fill=\"transparent\" />"
         + "".join(slices)
-        + inside_label_svg
-        + outside_label_svg
+        + percent_label_svg
         + "</svg>"
+    )
+
+
+def render_work_type_pie_legend(filtered_scores):
+    total = sum(filtered_scores.values())
+    legend_rows = []
+
+    for index, (label, value) in enumerate(filtered_scores.items()):
+        color = THINKING_BAR_COLORS[index % len(THINKING_BAR_COLORS)]
+        percent = format_score_percent(value / total * 100)
+        legend_rows.append(
+            "<span style=\"display:inline-flex;align-items:center;gap:6px;color:#24292f;\">"
+            f"<span style=\"width:10px;height:10px;background:{color};display:inline-block;border-radius:2px;\"></span>"
+            f"{index + 1}. {html.escape(label)} {html.escape(percent)}"
+            "</span>"
+        )
+
+    st.markdown(
+        "<div style=\"display:flex;flex-wrap:wrap;gap:8px 14px;margin:4px 0 8px;font-size:12px;\">"
+        + "".join(legend_rows)
+        + "</div>",
+        unsafe_allow_html=True,
     )
 
 
@@ -547,6 +526,7 @@ def render_work_type_pie_chart_for_mobile(title, score_dict):
         build_work_type_pie_svg(numeric_scores),
         unsafe_allow_html=True,
     )
+    render_work_type_pie_legend(filtered_scores)
     label_table = pd.DataFrame(
         {
             "番号": [str(index + 1) for index in range(len(filtered_scores))],
