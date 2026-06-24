@@ -1,4 +1,5 @@
 from html import escape
+from math import hypot
 
 import pandas as pd
 import streamlit as st
@@ -8,10 +9,6 @@ try:
 except ImportError:
     plt = None
     font_manager = None
-try:
-    import numpy as np
-except ImportError:
-    np = None
 
 from fortune_data import GOGYO_ORDER
 from gogyou_logic import (
@@ -22,6 +19,16 @@ from gogyou_logic import (
 from utils import format_score_percent
 
 CHART_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759"]
+GOGYO_RELATION_LAYOUT = [
+    {"label": "自我の星", "x": 210, "y": 56, "label_y": 20},
+    {"label": "表現の星", "x": 330, "y": 142, "label_y": 98},
+    {"label": "魅力の星", "x": 285, "y": 280, "label_y": 335},
+    {"label": "行動の星", "x": 135, "y": 280, "label_y": 335},
+    {"label": "知性の星", "x": 90, "y": 142, "label_y": 98},
+]
+GOGYO_NODE_RADIUS = 36
+GOGYO_SEISHO_PATH = [0, 1, 2, 3, 4, 0]
+GOGYO_SEIKOKU_PATH = [0, 2, 4, 1, 3, 0]
 JAPANESE_FONT_CANDIDATES = [
     "Noto Sans CJK JP",
     "Noto Sans JP",
@@ -374,35 +381,128 @@ def configure_matplotlib_japanese_font():
     return False
 
 
-def show_gogyo_radar_chart(scores, day_tenkan):
+def format_gogyo_node_score(value):
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError):
+        return "0"
+
+    if numeric_value.is_integer():
+        return str(int(numeric_value))
+
+    return f"{numeric_value:.1f}".rstrip("0").rstrip(".")
+
+
+def shorten_arrow(start, end, start_offset=GOGYO_NODE_RADIUS + 8, end_offset=GOGYO_NODE_RADIUS + 8):
+    start_x, start_y = start
+    end_x, end_y = end
+    distance = hypot(end_x - start_x, end_y - start_y)
+
+    if distance == 0:
+        return start_x, start_y, end_x, end_y
+
+    unit_x = (end_x - start_x) / distance
+    unit_y = (end_y - start_y) / distance
+
+    return (
+        start_x + unit_x * start_offset,
+        start_y + unit_y * start_offset,
+        end_x - unit_x * end_offset,
+        end_y - unit_y * end_offset,
+    )
+
+
+def build_gogyo_arrow_paths(nodes, index_path, css_class):
+    paths = []
+
+    for start_index, end_index in zip(index_path, index_path[1:]):
+        start = nodes[start_index]
+        end = nodes[end_index]
+        start_x, start_y, end_x, end_y = shorten_arrow(
+            (start["x"], start["y"]),
+            (end["x"], end["y"]),
+        )
+        paths.append(
+            "<line "
+            f"class=\"{css_class}\" "
+            f"x1=\"{start_x:.1f}\" y1=\"{start_y:.1f}\" "
+            f"x2=\"{end_x:.1f}\" y2=\"{end_y:.1f}\" "
+            "/>"
+        )
+
+    return "\n".join(paths)
+
+
+def build_gogyo_relationship_svg(scores, day_tenkan):
     chart_order = get_gogyo_chart_order(day_tenkan)
-    values = [scores.get(element, 0) for element in chart_order]
+    nodes = []
 
-    if plt is None or np is None:
-        st.write("レーダーチャートを表示するには matplotlib と numpy が必要です。")
-        return
+    for layout, element in zip(GOGYO_RELATION_LAYOUT, chart_order):
+        nodes.append({
+            "label": layout["label"],
+            "element": element,
+            "score": format_gogyo_node_score(scores.get(element, 0)),
+            "x": layout["x"],
+            "y": layout["y"],
+            "label_y": layout["label_y"],
+        })
 
-    has_japanese_font = configure_matplotlib_japanese_font()
-    values_for_plot = values + values[:1]
-    angles = np.linspace(0, 2 * np.pi, len(chart_order), endpoint=False).tolist()
-    angles_for_plot = angles + angles[:1]
+    node_markup = []
+    for node in nodes:
+        node_markup.append(
+            "<g>"
+            f"<text class=\"gogyo-role\" x=\"{node['x']}\" y=\"{node['label_y']}\">"
+            f"{escape(node['label'])}"
+            "</text>"
+            f"<circle class=\"gogyo-node\" cx=\"{node['x']}\" cy=\"{node['y']}\" r=\"{GOGYO_NODE_RADIUS}\" />"
+            f"<text class=\"gogyo-value\" x=\"{node['x']}\" y=\"{node['y'] + 6}\">"
+            f"{escape(node['element'])} {escape(node['score'])}"
+            "</text>"
+            "</g>"
+        )
 
-    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
-    ax.set_theta_offset(np.pi / 2)
-    ax.set_theta_direction(-1)
-    ax.plot(angles_for_plot, values_for_plot)
-    ax.fill(angles_for_plot, values_for_plot, alpha=0.25)
-    ax.set_xticks(angles)
-    ax.set_xticklabels(chart_order if has_japanese_font else [])
+    seisho_paths = build_gogyo_arrow_paths(nodes, GOGYO_SEISHO_PATH, "gogyo-seisho")
+    seikoku_paths = build_gogyo_arrow_paths(nodes, GOGYO_SEIKOKU_PATH, "gogyo-seikoku")
 
-    max_score = max(values) if values else 0
-    upper = max(5, max_score)
-    ax.set_ylim(0, upper)
-    if has_japanese_font:
-        ax.set_title("五行バランス", pad=20)
+    return (
+        "<svg class=\"gogyo-relationship-svg\" viewBox=\"0 0 420 360\" "
+        "role=\"img\" aria-label=\"五行バランス図\" xmlns=\"http://www.w3.org/2000/svg\">"
+        "<defs>"
+        "<marker id=\"gogyo-seisho-arrow\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" "
+        "markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\">"
+        "<path d=\"M 0 0 L 10 5 L 0 10 z\" fill=\"#8b949e\" />"
+        "</marker>"
+        "<marker id=\"gogyo-seikoku-arrow\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" "
+        "markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\">"
+        "<path d=\"M 0 0 L 10 5 L 0 10 z\" fill=\"#d97706\" />"
+        "</marker>"
+        "<style>"
+        ".gogyo-relationship-svg{width:100%;max-width:480px;height:auto;display:block;margin:0 auto;}"
+        ".gogyo-seisho{stroke:#8b949e;stroke-width:2.5;fill:none;marker-end:url(#gogyo-seisho-arrow);}"
+        ".gogyo-seikoku{stroke:#d97706;stroke-width:2.4;fill:none;marker-end:url(#gogyo-seikoku-arrow);}"
+        ".gogyo-node{fill:#ffffff;stroke:#24292f;stroke-width:2.2;}"
+        ".gogyo-role{font-size:15px;font-weight:700;fill:#24292f;text-anchor:middle;dominant-baseline:middle;}"
+        ".gogyo-value{font-size:20px;font-weight:700;fill:#111827;text-anchor:middle;dominant-baseline:middle;}"
+        ".gogyo-legend{font-size:13px;font-weight:700;fill:#57606a;text-anchor:start;dominant-baseline:middle;}"
+        "</style>"
+        "</defs>"
+        "<rect x=\"8\" y=\"8\" width=\"404\" height=\"344\" rx=\"8\" fill=\"#ffffff\" stroke=\"#d0d7de\" />"
+        f"{seisho_paths}"
+        f"{seikoku_paths}"
+        f"{''.join(node_markup)}"
+        "<line x1=\"22\" y1=\"338\" x2=\"54\" y2=\"338\" class=\"gogyo-seisho\" />"
+        "<text x=\"64\" y=\"338\" class=\"gogyo-legend\">相生</text>"
+        "<line x1=\"118\" y1=\"338\" x2=\"150\" y2=\"338\" class=\"gogyo-seikoku\" />"
+        "<text x=\"160\" y=\"338\" class=\"gogyo-legend\">相剋</text>"
+        "</svg>"
+    )
 
-    st.pyplot(fig)
-    plt.close(fig)
+
+def show_gogyo_relationship_chart(scores, day_tenkan):
+    st.markdown(
+        build_gogyo_relationship_svg(scores, day_tenkan),
+        unsafe_allow_html=True,
+    )
 
 
 def render_gogyo_balance(gogyo_result, day_tenkan):
@@ -422,7 +522,7 @@ def render_gogyo_balance(gogyo_result, day_tenkan):
         }
     )
     st.table(score_table)
-    show_gogyo_radar_chart(ordered_scores, day_tenkan)
+    show_gogyo_relationship_chart(ordered_scores, day_tenkan)
 
     with st.expander("五行点数の内訳"):
         special_flags = gogyo_result.get("special_flags", {})
