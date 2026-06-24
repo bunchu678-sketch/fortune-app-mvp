@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import math
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
@@ -11,7 +12,7 @@ from calendar_reference import (
     get_calendar_context_for_birth_year,
     get_development_calendar_context,
 )
-from chart_render import render_gogyo_balance, show_pie_chart
+from chart_render import render_gogyo_balance
 from daiun_logic import (
     build_daiun_table,
     get_daiun_tsuhensei_summary,
@@ -204,7 +205,8 @@ def render_juuni_unsei_comments_for_mobile(juuni_unsei_display_data, comment_typ
 
 
 THINKING_BAR_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759"]
-THINKING_BAR_MIN_INSIDE_LABEL_WIDTH = 13
+THINKING_BAR_MIN_INSIDE_LABEL_WIDTH = 28
+THINKING_PIE_INSIDE_LABEL_MIN_PERCENT = 45
 
 
 def to_numeric_thinking_scores(score_dict):
@@ -226,6 +228,14 @@ def render_thinking_score_caption(numeric_scores):
             for label, score in numeric_scores.items()
         )
     )
+
+
+def should_render_thinking_label_inside(label_text, width):
+    required_width = max(
+        THINKING_BAR_MIN_INSIDE_LABEL_WIDTH,
+        min(44, len(label_text) * 2.2),
+    )
+    return width >= required_width
 
 
 def render_thinking_stacked_bar(title, score_dict):
@@ -254,7 +264,11 @@ def render_thinking_stacked_bar(title, score_dict):
         width = value / scale * 100
         color = THINKING_BAR_COLORS[index % len(THINKING_BAR_COLORS)]
         label_text = f"{label} {format_score_percent(value)}"
-        segment_text = label_text if width >= THINKING_BAR_MIN_INSIDE_LABEL_WIDTH else ""
+        segment_text = (
+            label_text
+            if should_render_thinking_label_inside(label_text, width)
+            else ""
+        )
 
         if not segment_text:
             narrow_labels.append((label_text, color))
@@ -315,6 +329,237 @@ def render_thinking_stacked_bar(title, score_dict):
     render_thinking_score_caption(numeric_scores)
 
 
+def calculate_svg_pie_point(center_x, center_y, radius, angle):
+    angle_radians = math.radians(angle)
+    return (
+        center_x + radius * math.cos(angle_radians),
+        center_y + radius * math.sin(angle_radians),
+    )
+
+
+def build_svg_pie_slice_path(center_x, center_y, radius, start_angle, end_angle):
+    start_x, start_y = calculate_svg_pie_point(
+        center_x,
+        center_y,
+        radius,
+        start_angle,
+    )
+    end_x, end_y = calculate_svg_pie_point(
+        center_x,
+        center_y,
+        radius,
+        end_angle,
+    )
+    large_arc = 1 if end_angle - start_angle > 180 else 0
+
+    return (
+        f"M {center_x:.2f} {center_y:.2f} "
+        f"L {start_x:.2f} {start_y:.2f} "
+        f"A {radius:.2f} {radius:.2f} 0 {large_arc} 1 {end_x:.2f} {end_y:.2f} "
+        "Z"
+    )
+
+
+def adjust_pie_outside_label_positions(labels):
+    for side in ("left", "right"):
+        side_labels = sorted(
+            [label for label in labels if label["side"] == side],
+            key=lambda label: label["text_y"],
+        )
+        if not side_labels:
+            continue
+
+        for index in range(1, len(side_labels)):
+            previous_y = side_labels[index - 1]["text_y"]
+            if side_labels[index]["text_y"] < previous_y + 24:
+                side_labels[index]["text_y"] = previous_y + 24
+
+        overflow = side_labels[-1]["text_y"] - 270
+        if overflow > 0:
+            for label in side_labels:
+                label["text_y"] -= overflow
+
+        underflow = 32 - side_labels[0]["text_y"]
+        if underflow > 0:
+            for label in side_labels:
+                label["text_y"] += underflow
+
+
+def build_work_type_pie_svg(numeric_scores):
+    filtered_scores = {
+        label: value
+        for label, value in numeric_scores.items()
+        if value > 0
+    }
+    total = sum(filtered_scores.values())
+    center_x = 240
+    center_y = 150
+    radius = 86
+    start_angle = -90
+    slices = []
+    inside_labels = []
+    outside_labels = []
+
+    for index, (label, value) in enumerate(filtered_scores.items()):
+        percent = value / total * 100
+        end_angle = start_angle + (percent / 100 * 360)
+        middle_angle = (start_angle + end_angle) / 2
+        color = THINKING_BAR_COLORS[index % len(THINKING_BAR_COLORS)]
+        label_text = f"{label} {format_score_percent(percent)}"
+
+        slices.append(
+            "<path "
+            f"d=\"{build_svg_pie_slice_path(center_x, center_y, radius, start_angle, end_angle)}\" "
+            f"fill=\"{color}\" "
+            "stroke=\"#ffffff\" "
+            "stroke-width=\"2\" "
+            f"><title>{html.escape(label_text)}</title></path>"
+        )
+
+        middle_x, middle_y = calculate_svg_pie_point(
+            center_x,
+            center_y,
+            radius * 0.58,
+            middle_angle,
+        )
+        line_start_x, line_start_y = calculate_svg_pie_point(
+            center_x,
+            center_y,
+            radius * 0.94,
+            middle_angle,
+        )
+        line_end_x, line_end_y = calculate_svg_pie_point(
+            center_x,
+            center_y,
+            radius * 1.12,
+            middle_angle,
+        )
+
+        if percent >= THINKING_PIE_INSIDE_LABEL_MIN_PERCENT:
+            inside_labels.append(
+                {
+                    "label": label,
+                    "percent": format_score_percent(percent),
+                    "x": middle_x,
+                    "y": middle_y,
+                }
+            )
+        else:
+            is_right_side = math.cos(math.radians(middle_angle)) >= 0
+            text_x = 360 if is_right_side else 120
+            outside_labels.append(
+                {
+                    "label_text": label_text,
+                    "side": "right" if is_right_side else "left",
+                    "anchor": "start" if is_right_side else "end",
+                    "text_x": text_x,
+                    "text_y": line_end_y,
+                    "line_start_x": line_start_x,
+                    "line_start_y": line_start_y,
+                    "line_end_x": text_x - 8 if is_right_side else text_x + 8,
+                    "line_end_y": line_end_y,
+                }
+            )
+
+        start_angle = end_angle
+
+    adjust_pie_outside_label_positions(outside_labels)
+
+    inside_label_svg = "".join(
+        "<text "
+        f"x=\"{label['x']:.2f}\" "
+        f"y=\"{label['y']:.2f}\" "
+        "text-anchor=\"middle\" "
+        "dominant-baseline=\"middle\" "
+        "fill=\"#ffffff\" "
+        "font-size=\"12\" "
+        "font-weight=\"700\" "
+        "paint-order=\"stroke\" "
+        "stroke=\"rgba(0,0,0,0.25)\" "
+        "stroke-width=\"2\" "
+        "stroke-linejoin=\"round\""
+        ">"
+        f"<tspan x=\"{label['x']:.2f}\" dy=\"-0.35em\">{html.escape(label['label'])}</tspan>"
+        f"<tspan x=\"{label['x']:.2f}\" dy=\"1.25em\">{html.escape(label['percent'])}</tspan>"
+        "</text>"
+        for label in inside_labels
+    )
+    outside_label_svg = "".join(
+        "<g>"
+        "<polyline "
+        f"points=\"{label['line_start_x']:.2f},{label['line_start_y']:.2f} "
+        f"{label['line_end_x']:.2f},{label['text_y']:.2f}\" "
+        "fill=\"none\" "
+        "stroke=\"#6e7781\" "
+        "stroke-width=\"1.4\" "
+        "/>"
+        "<text "
+        f"x=\"{label['text_x']:.2f}\" "
+        f"y=\"{label['text_y']:.2f}\" "
+        f"text-anchor=\"{label['anchor']}\" "
+        "dominant-baseline=\"middle\" "
+        "fill=\"#24292f\" "
+        "font-size=\"12\" "
+        "font-weight=\"700\""
+        ">"
+        f"{html.escape(label['label_text'])}"
+        "</text>"
+        "</g>"
+        for label in outside_labels
+    )
+
+    return (
+        "<svg "
+        "viewBox=\"0 0 480 300\" "
+        "width=\"100%\" "
+        "role=\"img\" "
+        "aria-label=\"仕事4分類の円グラフ\" "
+        "style=\"max-width:520px;display:block;margin:0 auto;\""
+        ">"
+        "<rect x=\"0\" y=\"0\" width=\"480\" height=\"300\" fill=\"transparent\" />"
+        + "".join(slices)
+        + inside_label_svg
+        + outside_label_svg
+        + "</svg>"
+    )
+
+
+def render_work_type_pie_chart_for_mobile(title, score_dict):
+    st.markdown(f"#### {title}")
+
+    if not score_dict:
+        st.write("集計できるデータがありません。")
+        return
+
+    numeric_scores = to_numeric_thinking_scores(score_dict)
+    filtered_scores = {
+        label: value
+        for label, value in numeric_scores.items()
+        if value > 0
+    }
+
+    if not filtered_scores:
+        st.write("集計できるデータがありません。")
+        return
+
+    total = sum(filtered_scores.values())
+    st.markdown(
+        build_work_type_pie_svg(numeric_scores),
+        unsafe_allow_html=True,
+    )
+    label_table = pd.DataFrame(
+        {
+            "番号": [str(index + 1) for index in range(len(filtered_scores))],
+            "分類": list(filtered_scores.keys()),
+            "割合": [
+                format_score_percent(value / total * 100)
+                for value in filtered_scores.values()
+            ],
+        }
+    )
+    st.table(label_table)
+
+
 def render_juuni_unsei_thinking_charts_for_mobile(aggregated_scores):
     with st.expander("考え方の傾向グラフ"):
         brain_type_scores = fill_missing_scores(
@@ -342,7 +587,7 @@ def render_juuni_unsei_thinking_charts_for_mobile(aggregated_scores):
         render_thinking_stacked_bar("メリット型／デメリット型", merit_type_scores)
         render_thinking_stacked_bar("目標への向かい方", goal_type_scores)
         render_thinking_stacked_bar("原理原則型／応用拡大型", principle_type_scores)
-        show_pie_chart("仕事4分類", work_type_scores)
+        render_work_type_pie_chart_for_mobile("仕事4分類", work_type_scores)
 
 
 def render_juuni_unsei_thinking_tendency_for_mobile(
