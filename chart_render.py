@@ -20,13 +20,15 @@ from utils import format_score_percent
 
 CHART_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759"]
 GOGYO_RELATION_LAYOUT = [
-    {"label": "自我の星", "x": 210, "y": 56, "label_y": 20},
-    {"label": "表現の星", "x": 330, "y": 142, "label_y": 98},
-    {"label": "魅力の星", "x": 285, "y": 280, "label_y": 335},
-    {"label": "行動の星", "x": 135, "y": 280, "label_y": 335},
-    {"label": "知性の星", "x": 90, "y": 142, "label_y": 98},
+    {"label": "自我の星", "x": 210, "y": 90, "label_y": 32},
+    {"label": "表現の星", "x": 326, "y": 174, "label_y": 124},
+    {"label": "魅力の星", "x": 286, "y": 294, "label_y": 362},
+    {"label": "行動の星", "x": 134, "y": 294, "label_y": 362},
+    {"label": "知性の星", "x": 94, "y": 174, "label_y": 124},
 ]
 GOGYO_NODE_RADIUS = 36
+GOGYO_CHART_CENTER = (210, 220)
+GOGYO_SEISHO_CURVE_OFFSET = 44
 GOGYO_SEISHO_PATH = [0, 1, 2, 3, 4, 0]
 GOGYO_SEIKOKU_PATH = [0, 2, 4, 1, 3, 0]
 JAPANESE_FONT_CANDIDATES = [
@@ -433,6 +435,34 @@ def build_gogyo_arrow_paths(nodes, index_path, css_class):
     return "\n".join(paths)
 
 
+def build_gogyo_curved_arrow_paths(nodes, index_path, css_class):
+    paths = []
+    center_x, center_y = GOGYO_CHART_CENTER
+
+    for start_index, end_index in zip(index_path, index_path[1:]):
+        start = nodes[start_index]
+        end = nodes[end_index]
+        start_x, start_y, end_x, end_y = shorten_arrow(
+            (start["x"], start["y"]),
+            (end["x"], end["y"]),
+        )
+        mid_x = (start_x + end_x) / 2
+        mid_y = (start_y + end_y) / 2
+        outward_x = mid_x - center_x
+        outward_y = mid_y - center_y
+        outward_length = hypot(outward_x, outward_y) or 1
+        control_x = mid_x + outward_x / outward_length * GOGYO_SEISHO_CURVE_OFFSET
+        control_y = mid_y + outward_y / outward_length * GOGYO_SEISHO_CURVE_OFFSET
+        paths.append(
+            "<path "
+            f"class=\"{css_class}\" "
+            f"d=\"M {start_x:.1f} {start_y:.1f} Q {control_x:.1f} {control_y:.1f} {end_x:.1f} {end_y:.1f}\" "
+            "/>"
+        )
+
+    return "\n".join(paths)
+
+
 def build_gogyo_relationship_svg(scores, day_tenkan):
     chart_order = get_gogyo_chart_order(day_tenkan)
     nodes = []
@@ -461,11 +491,11 @@ def build_gogyo_relationship_svg(scores, day_tenkan):
             "</g>"
         )
 
-    seisho_paths = build_gogyo_arrow_paths(nodes, GOGYO_SEISHO_PATH, "gogyo-seisho")
+    seisho_paths = build_gogyo_curved_arrow_paths(nodes, GOGYO_SEISHO_PATH, "gogyo-seisho")
     seikoku_paths = build_gogyo_arrow_paths(nodes, GOGYO_SEIKOKU_PATH, "gogyo-seikoku")
 
     return (
-        "<svg class=\"gogyo-relationship-svg\" viewBox=\"0 0 420 360\" "
+        "<svg class=\"gogyo-relationship-svg\" viewBox=\"0 0 420 430\" "
         "role=\"img\" aria-label=\"五行バランス図\" xmlns=\"http://www.w3.org/2000/svg\">"
         "<defs>"
         "<marker id=\"gogyo-seisho-arrow\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" "
@@ -486,14 +516,14 @@ def build_gogyo_relationship_svg(scores, day_tenkan):
         ".gogyo-legend{font-size:13px;font-weight:700;fill:#57606a;text-anchor:start;dominant-baseline:middle;}"
         "</style>"
         "</defs>"
-        "<rect x=\"8\" y=\"8\" width=\"404\" height=\"344\" rx=\"8\" fill=\"#ffffff\" stroke=\"#d0d7de\" />"
+        "<rect x=\"8\" y=\"8\" width=\"404\" height=\"414\" rx=\"8\" fill=\"#ffffff\" stroke=\"#d0d7de\" />"
         f"{seisho_paths}"
         f"{seikoku_paths}"
         f"{''.join(node_markup)}"
-        "<line x1=\"22\" y1=\"338\" x2=\"54\" y2=\"338\" class=\"gogyo-seisho\" />"
-        "<text x=\"64\" y=\"338\" class=\"gogyo-legend\">相生</text>"
-        "<line x1=\"118\" y1=\"338\" x2=\"150\" y2=\"338\" class=\"gogyo-seikoku\" />"
-        "<text x=\"160\" y=\"338\" class=\"gogyo-legend\">相剋</text>"
+        "<line x1=\"120\" y1=\"402\" x2=\"152\" y2=\"402\" class=\"gogyo-seisho\" />"
+        "<text x=\"162\" y=\"402\" class=\"gogyo-legend\">相生</text>"
+        "<line x1=\"232\" y1=\"402\" x2=\"264\" y2=\"402\" class=\"gogyo-seikoku\" />"
+        "<text x=\"274\" y=\"402\" class=\"gogyo-legend\">相剋</text>"
         "</svg>"
     )
 
