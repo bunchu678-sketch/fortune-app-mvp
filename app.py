@@ -1607,6 +1607,16 @@ specific_datetime_result = (
     if specific_datetime_enabled
     else {"ok": True, "rows": [], "errors": []}
 )
+specific_datetime_rows = (
+    specific_datetime_result.get("rows", [])
+    if isinstance(specific_datetime_result, dict)
+    else []
+)
+show_specific_datetime_section = bool(
+    specific_datetime_enabled
+    and specific_datetime_candidates
+    and specific_datetime_rows
+)
 
 # =========================
 # 鑑定結果
@@ -1742,9 +1752,10 @@ if st.button("鑑定結果を表示する"):
         "十二運星から読み取れる考え方の傾向",
         "大運と接木運",
         "今年の運勢の流れ",
-        "特定日時での運勢",
-        "今年一年の総合運勢",
     ]
+    if show_specific_datetime_section:
+        comment_sections.append("特定日時での運勢")
+    comment_sections.append("今年一年の総合運勢")
     for section_title in comment_sections:
         st.subheader(section_title)
         if section_title == "特殊な命式":
