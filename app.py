@@ -603,6 +603,7 @@ def render_yearly_monthly_flow(yearly_flow_result):
         month_label = row.get("月", "")
         month_kanchi = row.get("月干支", "")
         tsuhensei = row.get("通変星", "")
+        keyword = row.get("キーワード", "")
         comment = row.get("コメント", "")
         error = row.get("error", "")
 
@@ -619,7 +620,10 @@ def render_yearly_monthly_flow(yearly_flow_result):
                     f"{kanchi_html}｜{html.escape(str(tsuhensei or ''))}",
                     unsafe_allow_html=True,
                 )
-                st.markdown(f"コメント：{comment}")
+                if keyword:
+                    st.markdown(f"キーワード：{html.escape(str(keyword))}")
+                if comment:
+                    st.markdown(f"コメント：{html.escape(str(comment))}")
         if index < len(rows) - 1:
             st.markdown(
                 '<div style="border-top: 1px dashed rgba(49, 51, 63, 0.25); margin: 1rem 0;"></div>',
