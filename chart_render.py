@@ -27,8 +27,7 @@ GOGYO_RELATION_LAYOUT = [
     {"label": "知性の星", "x": 82, "y": 198, "label_x": 82, "label_y": 140},
 ]
 GOGYO_NODE_RADIUS = 34
-GOGYO_CHART_CENTER = (220, 248)
-GOGYO_SEISHO_CURVE_OFFSET = 58
+GOGYO_SEISHO_ARC_RADIUS_SCALE = 1.55
 GOGYO_SEISHO_PATH = [0, 1, 2, 3, 4, 0]
 GOGYO_SEIKOKU_PATH = [0, 2, 4, 1, 3, 0]
 JAPANESE_FONT_CANDIDATES = [
@@ -435,9 +434,8 @@ def build_gogyo_arrow_paths(nodes, index_path, css_class):
     return "\n".join(paths)
 
 
-def build_gogyo_curved_arrow_paths(nodes, index_path, css_class):
+def build_gogyo_arc_arrow_paths(nodes, index_path, css_class):
     paths = []
-    center_x, center_y = GOGYO_CHART_CENTER
 
     for start_index, end_index in zip(index_path, index_path[1:]):
         start = nodes[start_index]
@@ -448,17 +446,12 @@ def build_gogyo_curved_arrow_paths(nodes, index_path, css_class):
             GOGYO_NODE_RADIUS + 4,
             GOGYO_NODE_RADIUS + 8,
         )
-        mid_x = (start_x + end_x) / 2
-        mid_y = (start_y + end_y) / 2
-        outward_x = mid_x - center_x
-        outward_y = mid_y - center_y
-        outward_length = hypot(outward_x, outward_y) or 1
-        control_x = mid_x + outward_x / outward_length * GOGYO_SEISHO_CURVE_OFFSET
-        control_y = mid_y + outward_y / outward_length * GOGYO_SEISHO_CURVE_OFFSET
+        distance = hypot(end_x - start_x, end_y - start_y)
+        radius = max(distance * GOGYO_SEISHO_ARC_RADIUS_SCALE, GOGYO_NODE_RADIUS * 2)
         paths.append(
             "<path "
             f"class=\"{css_class}\" "
-            f"d=\"M {start_x:.1f} {start_y:.1f} Q {control_x:.1f} {control_y:.1f} {end_x:.1f} {end_y:.1f}\" "
+            f"d=\"M {start_x:.1f} {start_y:.1f} A {radius:.1f} {radius:.1f} 0 0 1 {end_x:.1f} {end_y:.1f}\" "
             "/>"
         )
 
@@ -494,8 +487,7 @@ def build_gogyo_relationship_svg(scores, day_tenkan):
             "</g>"
         )
 
-    seisho_loop_paths = build_gogyo_curved_arrow_paths(nodes, GOGYO_SEISHO_PATH, "gogyo-seisho-loop")
-    seisho_paths = build_gogyo_curved_arrow_paths(nodes, GOGYO_SEISHO_PATH, "gogyo-seisho")
+    seisho_paths = build_gogyo_arc_arrow_paths(nodes, GOGYO_SEISHO_PATH, "gogyo-seisho")
     seikoku_paths = build_gogyo_arrow_paths(nodes, GOGYO_SEIKOKU_PATH, "gogyo-seikoku")
 
     return (
@@ -512,7 +504,6 @@ def build_gogyo_relationship_svg(scores, day_tenkan):
         "</marker>"
         "<style>"
         ".gogyo-relationship-svg{width:100%;max-width:480px;height:auto;display:block;margin:0 auto;}"
-        ".gogyo-seisho-loop{stroke:#8b949e;stroke-width:3.2;fill:none;opacity:.12;stroke-linecap:round;stroke-linejoin:round;}"
         ".gogyo-seisho{stroke:#8b949e;stroke-width:2.8;fill:none;marker-end:url(#gogyo-seisho-arrow);stroke-linecap:round;stroke-linejoin:round;}"
         ".gogyo-seikoku{stroke:#d97706;stroke-width:2.3;fill:none;marker-end:url(#gogyo-seikoku-arrow);stroke-linecap:round;}"
         ".gogyo-node{fill:#ffffff;stroke:#24292f;stroke-width:2.2;}"
@@ -522,7 +513,6 @@ def build_gogyo_relationship_svg(scores, day_tenkan):
         "</style>"
         "</defs>"
         "<rect x=\"8\" y=\"8\" width=\"424\" height=\"504\" rx=\"8\" fill=\"#ffffff\" stroke=\"#d0d7de\" />"
-        f"{seisho_loop_paths}"
         f"{seisho_paths}"
         f"{seikoku_paths}"
         f"{''.join(node_markup)}"
