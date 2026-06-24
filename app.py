@@ -11,7 +11,7 @@ from calendar_reference import (
     get_calendar_context_for_birth_year,
     get_development_calendar_context,
 )
-from chart_render import render_gogyo_balance
+from chart_render import render_gogyo_balance, show_pie_chart
 from daiun_logic import (
     build_daiun_table,
     get_daiun_tsuhensei_summary,
@@ -31,14 +31,19 @@ from meishiki_model import (
     select_effective_meishiki,
 )
 from personality_logic import (
+    BRAIN_TYPE_ORDER,
+    GOAL_TYPE_ORDER,
+    MERIT_TYPE_ORDER,
+    PRINCIPLE_TYPE_ORDER,
+    WORK_TYPE_ORDER,
     aggregate_juuni_unsei_thinking_tendency,
+    fill_missing_scores,
     get_month_pair_comment,
     get_kubou,
     get_juuni_unsei,
     get_tsuhensei,
     render_juuni_unsei_detail,
     render_juuni_unsei_summary_table,
-    render_juuni_unsei_thinking_charts,
     render_juuni_unsei_thinking_pillar_table,
     render_juuni_unsei_thinking_score_table,
     render_nikkan_public_comment,
@@ -53,6 +58,7 @@ from special_chart_logic import (
     format_ijou_kanshi_type,
 )
 from specific_datetime_logic import build_specific_datetime_fortunes
+from utils import format_score_percent
 from yearly_flow_logic import build_yearly_monthly_flow, is_kubou_branch
 from yearly_overall_logic import build_yearly_overall_fortune
 
@@ -197,6 +203,148 @@ def render_juuni_unsei_comments_for_mobile(juuni_unsei_display_data, comment_typ
         render_juuni_unsei_detail(data, comment_type)
 
 
+THINKING_BAR_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759"]
+THINKING_BAR_MIN_INSIDE_LABEL_WIDTH = 13
+
+
+def to_numeric_thinking_scores(score_dict):
+    numeric_scores = {}
+
+    for label, score in score_dict.items():
+        try:
+            numeric_scores[label] = float(score)
+        except (TypeError, ValueError):
+            numeric_scores[label] = 0
+
+    return numeric_scores
+
+
+def render_thinking_score_caption(numeric_scores):
+    st.caption(
+        " / ".join(
+            f"{label}: {format_score_percent(score)}"
+            for label, score in numeric_scores.items()
+        )
+    )
+
+
+def render_thinking_stacked_bar(title, score_dict):
+    st.markdown(f"#### {title}")
+
+    if not score_dict:
+        st.write("集計できるデータがありません。")
+        return
+
+    numeric_scores = to_numeric_thinking_scores(score_dict)
+    positive_total = sum(value for value in numeric_scores.values() if value > 0)
+
+    if positive_total <= 0:
+        st.write("集計できるデータがありません。")
+        render_thinking_score_caption(numeric_scores)
+        return
+
+    scale = 100 if positive_total <= 100 else positive_total
+    segments = []
+    narrow_labels = []
+
+    for index, (label, value) in enumerate(numeric_scores.items()):
+        if value <= 0:
+            continue
+
+        width = value / scale * 100
+        color = THINKING_BAR_COLORS[index % len(THINKING_BAR_COLORS)]
+        label_text = f"{label} {format_score_percent(value)}"
+        segment_text = label_text if width >= THINKING_BAR_MIN_INSIDE_LABEL_WIDTH else ""
+
+        if not segment_text:
+            narrow_labels.append((label_text, color))
+
+        segments.append(
+            "<div "
+            f"title=\"{html.escape(label_text)}\" "
+            "style=\""
+            f"width:{width:.2f}%;"
+            f"background:{color};"
+            "display:flex;"
+            "align-items:center;"
+            "justify-content:center;"
+            "color:white;"
+            "font-size:12px;"
+            "font-weight:700;"
+            "line-height:1.2;"
+            "min-height:30px;"
+            "padding:0 4px;"
+            "box-sizing:border-box;"
+            "white-space:nowrap;"
+            "overflow:hidden;"
+            "text-overflow:ellipsis;"
+            "\">"
+            f"{html.escape(segment_text)}"
+            "</div>"
+        )
+
+    st.markdown(
+        "<div style=\""
+        "width:100%;"
+        "height:30px;"
+        "display:flex;"
+        "overflow:hidden;"
+        "border:1px solid #d0d7de;"
+        "background:#f6f8fa;"
+        "border-radius:4px;"
+        "\">"
+        + "".join(segments)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    if narrow_labels:
+        st.markdown(
+            "<div style=\"display:flex;flex-wrap:wrap;gap:8px 12px;margin-top:6px;font-size:12px;\">"
+            + "".join(
+                "<span style=\"display:inline-flex;align-items:center;gap:5px;color:#24292f;\">"
+                f"<span style=\"width:10px;height:10px;background:{color};display:inline-block;border-radius:2px;\"></span>"
+                f"{html.escape(label_text)}"
+                "</span>"
+                for label_text, color in narrow_labels
+            )
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+
+    render_thinking_score_caption(numeric_scores)
+
+
+def render_juuni_unsei_thinking_charts_for_mobile(aggregated_scores):
+    with st.expander("考え方の傾向グラフ"):
+        brain_type_scores = fill_missing_scores(
+            aggregated_scores.get("brain_type", {}),
+            BRAIN_TYPE_ORDER,
+        )
+        merit_type_scores = fill_missing_scores(
+            aggregated_scores.get("merit_type", {}),
+            MERIT_TYPE_ORDER,
+        )
+        goal_type_scores = fill_missing_scores(
+            aggregated_scores.get("goal_type", {}),
+            GOAL_TYPE_ORDER,
+        )
+        principle_type_scores = fill_missing_scores(
+            aggregated_scores.get("principle_type", {}),
+            PRINCIPLE_TYPE_ORDER,
+        )
+        work_type_scores = fill_missing_scores(
+            aggregated_scores.get("work_type", {}),
+            WORK_TYPE_ORDER,
+        )
+
+        render_thinking_stacked_bar("左脳／右脳", brain_type_scores)
+        render_thinking_stacked_bar("メリット型／デメリット型", merit_type_scores)
+        render_thinking_stacked_bar("目標への向かい方", goal_type_scores)
+        render_thinking_stacked_bar("原理原則型／応用拡大型", principle_type_scores)
+        show_pie_chart("仕事4分類", work_type_scores)
+
+
 def render_juuni_unsei_thinking_tendency_for_mobile(
     pillar_juuni_unsei_data,
     is_private=False,
@@ -215,7 +363,7 @@ def render_juuni_unsei_thinking_tendency_for_mobile(
         with st.expander("集計結果", expanded=False):
             render_juuni_unsei_thinking_score_table(aggregated_scores)
 
-    render_juuni_unsei_thinking_charts(aggregated_scores)
+    render_juuni_unsei_thinking_charts_for_mobile(aggregated_scores)
 
 
 def format_kubou_marked_text(text, should_mark):

@@ -20,7 +20,7 @@ from fortune_data import (
 from utils import format_score_percent
 
 THINKING_CATEGORY_DEFINITIONS = [
-    ("brain_type", "右脳／左脳", ["左脳", "右脳"]),
+    ("brain_type", "左脳／右脳", ["左脳", "右脳"]),
     ("merit_type", "メリット型／デメリット型", ["メリット型", "デメリット型"]),
     ("work_type", "仕事4分類", ["現場型攻め", "現場型守り", "管理型ムードメーカー", "管理型アイデアマン"]),
     ("goal_type", "目標への向かい方", ["目標直進型", "目標変化型"]),
@@ -426,7 +426,7 @@ def render_juuni_unsei_thinking_pillar_table(pillar_juuni_unsei_data):
             "柱": pillar_meaning.get("label", pillar_key),
             "役割": pillar_meaning.get("title", "未登録"),
             "十二運星": juuni_unsei if juuni_unsei else "未入力",
-            "右脳／左脳": get_juuni_unsei_thinking_value(juuni_unsei, "brain_type"),
+            "左脳／右脳": get_juuni_unsei_thinking_value(juuni_unsei, "brain_type"),
             "メリット／デメリット": get_juuni_unsei_thinking_value(juuni_unsei, "merit_type"),
             "仕事4分類": get_juuni_unsei_thinking_value(juuni_unsei, "work_type"),
             "目標への向かい方": get_juuni_unsei_thinking_value(juuni_unsei, "goal_type"),
@@ -479,7 +479,7 @@ def render_juuni_unsei_thinking_charts(aggregated_scores):
             WORK_TYPE_ORDER,
         )
 
-        show_100_percent_stacked_bar("右脳／左脳", brain_type_scores)
+        show_100_percent_stacked_bar("左脳／右脳", brain_type_scores)
         show_100_percent_stacked_bar("メリット型／デメリット型", merit_type_scores)
         show_100_percent_stacked_bar("目標への向かい方", goal_type_scores)
         show_100_percent_stacked_bar("原理原則型／応用拡大型", principle_type_scores)
