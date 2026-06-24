@@ -64,6 +64,22 @@ from yearly_flow_logic import build_yearly_monthly_flow, is_kubou_branch
 from yearly_overall_logic import build_yearly_overall_fortune
 
 
+KUUBOU_HELP_TEXT = "自分を見失いやすいが、素直・反省・感謝を忘れずに慎重に行動すると吉。可能性は無限大に。"
+
+
+def render_help_popover(label, text):
+    with st.popover(label, type="secondary", help="説明を表示"):
+        st.write(text)
+
+
+def render_subheader_with_help(title, help_text):
+    title_col, help_col, _ = st.columns([0.28, 0.14, 0.58])
+    with title_col:
+        st.subheader(title)
+    with help_col:
+        render_help_popover("?", help_text)
+
+
 def format_day_ijou_kanshi_result(ijou_kanshi_data):
     for data in ijou_kanshi_data or []:
         if data.get("pillar_label") != "日柱":
@@ -2005,7 +2021,7 @@ if st.button("鑑定結果を表示する"):
         ],
     }
     st.table(meishiki_data)
-    st.subheader("空亡")
+    render_subheader_with_help("空亡", KUUBOU_HELP_TEXT)
     st.write(f"空亡：{display_kubou if display_kubou else '未入力'}")
     st.subheader("五行のバランス")
     render_gogyo_balance(gogyo_result, effective_day_tenkan)
