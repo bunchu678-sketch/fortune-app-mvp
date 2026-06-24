@@ -20,15 +20,15 @@ from utils import format_score_percent
 
 CHART_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759"]
 GOGYO_RELATION_LAYOUT = [
-    {"label": "自我の星", "x": 210, "y": 90, "label_y": 32},
-    {"label": "表現の星", "x": 326, "y": 174, "label_y": 124},
-    {"label": "魅力の星", "x": 286, "y": 294, "label_y": 362},
-    {"label": "行動の星", "x": 134, "y": 294, "label_y": 362},
-    {"label": "知性の星", "x": 94, "y": 174, "label_y": 124},
+    {"label": "自我の星", "x": 220, "y": 100, "label_x": 220, "label_y": 38},
+    {"label": "表現の星", "x": 358, "y": 198, "label_x": 358, "label_y": 140},
+    {"label": "魅力の星", "x": 305, "y": 338, "label_x": 305, "label_y": 410},
+    {"label": "行動の星", "x": 135, "y": 338, "label_x": 135, "label_y": 410},
+    {"label": "知性の星", "x": 82, "y": 198, "label_x": 82, "label_y": 140},
 ]
-GOGYO_NODE_RADIUS = 36
-GOGYO_CHART_CENTER = (210, 220)
-GOGYO_SEISHO_CURVE_OFFSET = 44
+GOGYO_NODE_RADIUS = 34
+GOGYO_CHART_CENTER = (220, 248)
+GOGYO_SEISHO_CURVE_OFFSET = 90
 GOGYO_SEISHO_PATH = [0, 1, 2, 3, 4, 0]
 GOGYO_SEIKOKU_PATH = [0, 2, 4, 1, 3, 0]
 JAPANESE_FONT_CANDIDATES = [
@@ -445,6 +445,8 @@ def build_gogyo_curved_arrow_paths(nodes, index_path, css_class):
         start_x, start_y, end_x, end_y = shorten_arrow(
             (start["x"], start["y"]),
             (end["x"], end["y"]),
+            GOGYO_NODE_RADIUS + 4,
+            GOGYO_NODE_RADIUS + 8,
         )
         mid_x = (start_x + end_x) / 2
         mid_y = (start_y + end_y) / 2
@@ -474,6 +476,7 @@ def build_gogyo_relationship_svg(scores, day_tenkan):
             "score": format_gogyo_node_score(scores.get(element, 0)),
             "x": layout["x"],
             "y": layout["y"],
+            "label_x": layout["label_x"],
             "label_y": layout["label_y"],
         })
 
@@ -481,7 +484,7 @@ def build_gogyo_relationship_svg(scores, day_tenkan):
     for node in nodes:
         node_markup.append(
             "<g>"
-            f"<text class=\"gogyo-role\" x=\"{node['x']}\" y=\"{node['label_y']}\">"
+            f"<text class=\"gogyo-role\" x=\"{node['label_x']}\" y=\"{node['label_y']}\">"
             f"{escape(node['label'])}"
             "</text>"
             f"<circle class=\"gogyo-node\" cx=\"{node['x']}\" cy=\"{node['y']}\" r=\"{GOGYO_NODE_RADIUS}\" />"
@@ -491,11 +494,12 @@ def build_gogyo_relationship_svg(scores, day_tenkan):
             "</g>"
         )
 
+    seisho_loop_paths = build_gogyo_curved_arrow_paths(nodes, GOGYO_SEISHO_PATH, "gogyo-seisho-loop")
     seisho_paths = build_gogyo_curved_arrow_paths(nodes, GOGYO_SEISHO_PATH, "gogyo-seisho")
     seikoku_paths = build_gogyo_arrow_paths(nodes, GOGYO_SEIKOKU_PATH, "gogyo-seikoku")
 
     return (
-        "<svg class=\"gogyo-relationship-svg\" viewBox=\"0 0 420 430\" "
+        "<svg class=\"gogyo-relationship-svg\" viewBox=\"0 0 440 520\" "
         "role=\"img\" aria-label=\"五行バランス図\" xmlns=\"http://www.w3.org/2000/svg\">"
         "<defs>"
         "<marker id=\"gogyo-seisho-arrow\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" "
@@ -508,22 +512,24 @@ def build_gogyo_relationship_svg(scores, day_tenkan):
         "</marker>"
         "<style>"
         ".gogyo-relationship-svg{width:100%;max-width:480px;height:auto;display:block;margin:0 auto;}"
-        ".gogyo-seisho{stroke:#8b949e;stroke-width:2.5;fill:none;marker-end:url(#gogyo-seisho-arrow);}"
-        ".gogyo-seikoku{stroke:#d97706;stroke-width:2.4;fill:none;marker-end:url(#gogyo-seikoku-arrow);}"
+        ".gogyo-seisho-loop{stroke:#8b949e;stroke-width:5;fill:none;opacity:.18;stroke-linecap:round;stroke-linejoin:round;}"
+        ".gogyo-seisho{stroke:#8b949e;stroke-width:2.8;fill:none;marker-end:url(#gogyo-seisho-arrow);stroke-linecap:round;stroke-linejoin:round;}"
+        ".gogyo-seikoku{stroke:#d97706;stroke-width:2.3;fill:none;marker-end:url(#gogyo-seikoku-arrow);stroke-linecap:round;}"
         ".gogyo-node{fill:#ffffff;stroke:#24292f;stroke-width:2.2;}"
         ".gogyo-role{font-size:15px;font-weight:700;fill:#24292f;text-anchor:middle;dominant-baseline:middle;}"
         ".gogyo-value{font-size:20px;font-weight:700;fill:#111827;text-anchor:middle;dominant-baseline:middle;}"
         ".gogyo-legend{font-size:13px;font-weight:700;fill:#57606a;text-anchor:start;dominant-baseline:middle;}"
         "</style>"
         "</defs>"
-        "<rect x=\"8\" y=\"8\" width=\"404\" height=\"414\" rx=\"8\" fill=\"#ffffff\" stroke=\"#d0d7de\" />"
+        "<rect x=\"8\" y=\"8\" width=\"424\" height=\"504\" rx=\"8\" fill=\"#ffffff\" stroke=\"#d0d7de\" />"
+        f"{seisho_loop_paths}"
         f"{seisho_paths}"
         f"{seikoku_paths}"
         f"{''.join(node_markup)}"
-        "<line x1=\"120\" y1=\"402\" x2=\"152\" y2=\"402\" class=\"gogyo-seisho\" />"
-        "<text x=\"162\" y=\"402\" class=\"gogyo-legend\">相生</text>"
-        "<line x1=\"232\" y1=\"402\" x2=\"264\" y2=\"402\" class=\"gogyo-seikoku\" />"
-        "<text x=\"274\" y=\"402\" class=\"gogyo-legend\">相剋</text>"
+        "<path d=\"M 118 482 Q 136 468 154 482\" class=\"gogyo-seisho\" />"
+        "<text x=\"166\" y=\"482\" class=\"gogyo-legend\">相生</text>"
+        "<line x1=\"242\" y1=\"482\" x2=\"276\" y2=\"482\" class=\"gogyo-seikoku\" />"
+        "<text x=\"288\" y=\"482\" class=\"gogyo-legend\">相剋</text>"
         "</svg>"
     )
 
