@@ -28,7 +28,7 @@ GOGYO_RELATION_LAYOUT = [
 ]
 GOGYO_NODE_RADIUS = 34
 GOGYO_CHART_CENTER = (220, 248)
-GOGYO_SEISHO_CURVE_OFFSET = 90
+GOGYO_SEISHO_CURVE_OFFSET = 58
 GOGYO_SEISHO_PATH = [0, 1, 2, 3, 4, 0]
 GOGYO_SEIKOKU_PATH = [0, 2, 4, 1, 3, 0]
 JAPANESE_FONT_CANDIDATES = [
@@ -512,7 +512,7 @@ def build_gogyo_relationship_svg(scores, day_tenkan):
         "</marker>"
         "<style>"
         ".gogyo-relationship-svg{width:100%;max-width:480px;height:auto;display:block;margin:0 auto;}"
-        ".gogyo-seisho-loop{stroke:#8b949e;stroke-width:5;fill:none;opacity:.18;stroke-linecap:round;stroke-linejoin:round;}"
+        ".gogyo-seisho-loop{stroke:#8b949e;stroke-width:3.2;fill:none;opacity:.12;stroke-linecap:round;stroke-linejoin:round;}"
         ".gogyo-seisho{stroke:#8b949e;stroke-width:2.8;fill:none;marker-end:url(#gogyo-seisho-arrow);stroke-linecap:round;stroke-linejoin:round;}"
         ".gogyo-seikoku{stroke:#d97706;stroke-width:2.3;fill:none;marker-end:url(#gogyo-seikoku-arrow);stroke-linecap:round;}"
         ".gogyo-node{fill:#ffffff;stroke:#24292f;stroke-width:2.2;}"
