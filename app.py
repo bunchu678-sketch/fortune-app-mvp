@@ -67,17 +67,82 @@ from yearly_overall_logic import build_yearly_overall_fortune
 KUUBOU_HELP_TEXT = "自分を見失いやすいが、素直・反省・感謝を忘れずに慎重に行動すると吉。可能性は無限大に。"
 
 
-def render_help_popover(label, text):
-    with st.popover(label, type="secondary", help="説明を表示"):
-        st.write(text)
+def render_inline_help_heading(title, help_text):
+    title_html = html.escape(str(title))
+    help_html = html.escape(str(help_text))
 
+    st.markdown(
+        f"""
+        <style>
+        .inline-help-heading {{
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: nowrap;
+            margin: 1.25rem 0 0.35rem;
+        }}
+        .inline-help-heading h3 {{
+            margin: 0;
+            padding: 0;
+            font-size: 1.5rem;
+            line-height: 1.3;
+            font-weight: 600;
+        }}
+        .inline-help-heading details {{
+            display: inline-block;
+        }}
+        .inline-help-heading summary {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.1rem;
+            height: 1.1rem;
+            border: 1px solid rgba(107, 114, 128, 0.55);
+            border-radius: 999px;
+            background: rgba(243, 244, 246, 0.85);
+            color: rgba(75, 85, 99, 0.86);
+            cursor: pointer;
+            font-size: 0.72rem;
+            font-weight: 600;
+            line-height: 1;
+            list-style: none;
+            user-select: none;
+        }}
+        .inline-help-heading summary::-webkit-details-marker {{
+            display: none;
+        }}
+        .inline-help-heading details[open] summary {{
+            background: rgba(229, 231, 235, 0.95);
+            color: rgba(55, 65, 81, 0.95);
+        }}
+        .inline-help-body {{
+            position: absolute;
+            z-index: 20;
+            left: 0;
+            top: calc(100% + 0.3rem);
+            width: min(28rem, calc(100vw - 2rem));
+            padding: 0.55rem 0.65rem;
+            border: 1px solid rgba(209, 213, 219, 0.9);
+            border-radius: 0.45rem;
+            background: rgba(249, 250, 251, 0.98);
+            color: rgba(55, 65, 81, 0.95);
+            box-shadow: 0 8px 18px rgba(17, 24, 39, 0.08);
+            font-size: 0.9rem;
+            line-height: 1.65;
+        }}
+        </style>
+        <div class="inline-help-heading">
+            <h3>{title_html}</h3>
+            <details>
+                <summary aria-label="{title_html}の説明">?</summary>
+                <div class="inline-help-body">{help_html}</div>
+            </details>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-def render_subheader_with_help(title, help_text):
-    title_col, help_col, _ = st.columns([0.28, 0.14, 0.58])
-    with title_col:
-        st.subheader(title)
-    with help_col:
-        render_help_popover("?", help_text)
 
 
 def format_day_ijou_kanshi_result(ijou_kanshi_data):
@@ -2021,7 +2086,7 @@ if st.button("鑑定結果を表示する"):
         ],
     }
     st.table(meishiki_data)
-    render_subheader_with_help("空亡", KUUBOU_HELP_TEXT)
+    render_inline_help_heading("空亡", KUUBOU_HELP_TEXT)
     st.write(f"空亡：{display_kubou if display_kubou else '未入力'}")
     st.subheader("五行のバランス")
     render_gogyo_balance(gogyo_result, effective_day_tenkan)
