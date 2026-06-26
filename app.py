@@ -88,19 +88,22 @@ def inject_app_styles():
         <style>
         :root {
             --fortune-ink: #f4efe6;
-            --fortune-muted: #b7b0a5;
-            --fortune-line: rgba(228, 214, 188, 0.18);
-            --fortune-panel: rgba(19, 23, 22, 0.92);
-            --fortune-panel-strong: #151a19;
-            --fortune-accent: #c5a46c;
-            --fortune-accent-soft: rgba(197, 164, 108, 0.14);
-            --fortune-green: #263c35;
-            --fortune-bg: #0c0f0e;
+            --fortune-muted: #c1bbb1;
+            --fortune-line: rgba(234, 229, 218, 0.17);
+            --fortune-panel: rgba(30, 33, 32, 0.92);
+            --fortune-panel-strong: #222625;
+            --fortune-accent: #aeb8ae;
+            --fortune-accent-soft: rgba(174, 184, 174, 0.14);
+            --fortune-button: #ece9e1;
+            --fortune-button-hover: #f5f2ea;
+            --fortune-button-text: #171a18;
+            --fortune-green: #2f423b;
+            --fortune-bg: #191c1b;
         }
 
         .stApp {
             background:
-                linear-gradient(180deg, #090b0b 0%, #0f1312 48%, #131611 100%);
+                linear-gradient(180deg, #161918 0%, #1b1e1d 52%, #20231f 100%);
             color: var(--fortune-ink);
         }
 
@@ -120,28 +123,32 @@ def inject_app_styles():
         }
 
         .fortune-brand-hero {
-            position: relative;
-            min-height: 9.2rem;
+            min-height: 9rem;
             padding: 1.05rem 0.1rem 1.2rem;
             margin: 0 0 1.1rem;
             border-bottom: 1px solid var(--fortune-line);
         }
 
+        .fortune-brand-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0.9rem;
+        }
+
         .fortune-brand-logo {
-            position: absolute;
-            top: 0.35rem;
-            right: 0.05rem;
-            width: 46px;
-            height: 46px;
+            width: clamp(62px, 18vw, 76px);
+            height: clamp(62px, 18vw, 76px);
+            flex: 0 0 auto;
             display: flex;
             align-items: center;
             justify-content: center;
-            opacity: 0.82;
+            opacity: 0.86;
         }
 
         .fortune-brand-logo img {
-            width: 42px;
-            height: 42px;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
             display: block;
         }
@@ -157,10 +164,10 @@ def inject_app_styles():
         .fortune-brand-title {
             margin: 0;
             color: var(--fortune-ink);
-            font-family: "Yu Mincho", "Hiragino Mincho ProN", "YuMincho", "Times New Roman", serif;
+            font-family: "Yu Gothic", "Yu Gothic UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
             font-size: 2.15rem;
             line-height: 1.08;
-            font-weight: 600;
+            font-weight: 700;
         }
 
         .fortune-brand-title span {
@@ -221,9 +228,9 @@ def inject_app_styles():
         div[data-testid="stButton"] button {
             width: 100%;
             border-radius: 8px;
-            border: 1px solid rgba(197, 164, 108, 0.42);
-            background: var(--fortune-accent);
-            color: #171a18;
+            border: 1px solid rgba(244, 239, 230, 0.36);
+            background: var(--fortune-button);
+            color: var(--fortune-button-text);
             font-weight: 700;
             min-height: 2.7rem;
             box-shadow: none;
@@ -231,7 +238,7 @@ def inject_app_styles():
 
         div[data-testid="stButton"] button:hover {
             border-color: rgba(244, 239, 230, 0.7);
-            background: #d1b37a;
+            background: var(--fortune-button-hover);
             color: #101312;
         }
 
@@ -288,19 +295,18 @@ def inject_app_styles():
             }
 
             .fortune-brand-hero {
-                min-height: 8.55rem;
+                min-height: 8.35rem;
                 padding: 0.85rem 0 1rem;
                 margin-bottom: 0.95rem;
             }
 
-            .fortune-brand-logo {
-                width: 40px;
-                height: 40px;
+            .fortune-brand-title-row {
+                gap: 0.72rem;
             }
 
-            .fortune-brand-logo img {
-                width: 36px;
-                height: 36px;
+            .fortune-brand-logo {
+                width: 60px;
+                height: 60px;
             }
 
             .fortune-brand-title {
@@ -328,10 +334,12 @@ def render_app_header():
     st.markdown(
         f"""
         <div class="fortune-brand-hero">
-            <div class="fortune-brand-logo">{logo_html}</div>
             <div>
                 <p class="fortune-brand-kicker">命式を静かに読む</p>
-                <h1 class="fortune-brand-title"><span>四柱推命</span><span>鑑定アプリ</span></h1>
+                <div class="fortune-brand-title-row">
+                    <h1 class="fortune-brand-title"><span>四柱推命</span><span>鑑定アプリ</span></h1>
+                    <div class="fortune-brand-logo">{logo_html}</div>
+                </div>
                 <div class="fortune-brand-rule"></div>
             </div>
         </div>
