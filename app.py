@@ -88,15 +88,12 @@ def inject_app_styles():
         <style>
         :root {
             --fortune-ink: #f4efe6;
-            --fortune-title-ink: #fff7ec;
             --fortune-muted: #c1bbb1;
             --fortune-line: rgba(234, 229, 218, 0.17);
             --fortune-panel: rgba(30, 33, 32, 0.92);
             --fortune-panel-strong: #222625;
             --fortune-accent: #aeb8ae;
             --fortune-accent-soft: rgba(174, 184, 174, 0.14);
-            --fortune-logo-bg: rgba(255, 247, 236, 0.1);
-            --fortune-logo-line: rgba(255, 247, 236, 0.22);
             --fortune-button: #ece9e1;
             --fortune-button-hover: #f5f2ea;
             --fortune-button-text: #171a18;
@@ -144,16 +141,10 @@ def inject_app_styles():
             height: clamp(78px, 22vw, 96px);
             margin-top: 2.32rem;
             flex: 0 0 auto;
-            box-sizing: border-box;
             display: flex;
             align-items: center;
             justify-content: center;
             opacity: 0.86;
-            padding: 0.46rem;
-            border: 1px solid var(--fortune-logo-line);
-            border-radius: 999px;
-            background: var(--fortune-logo-bg);
-            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
         }
 
         .fortune-brand-logo img {
@@ -165,29 +156,23 @@ def inject_app_styles():
 
         .fortune-brand-title {
             margin: 0;
-            color: var(--fortune-title-ink);
+            color: var(--fortune-ink);
             font-family: "Hiragino Maru Gothic ProN", "Yu Gothic UI", "BIZ UDPGothic", "Meiryo", "Yu Gothic", sans-serif;
             font-size: 2.15rem;
             line-height: 1.08;
-            font-weight: 700;
-            text-shadow: 0 2px 14px rgba(255, 247, 236, 0.12);
+            font-weight: 650;
         }
 
         .fortune-brand-title span {
             display: block;
         }
 
-        .fortune-brand-title span + span {
-            margin-top: 0.1rem;
-        }
-
         .fortune-brand-rule {
-            width: 4.4rem;
-            height: 2px;
-            margin-top: 1rem;
-            border-radius: 999px;
-            background: rgba(255, 247, 236, 0.48);
-            opacity: 0.9;
+            width: 3.8rem;
+            height: 1px;
+            margin-top: 1.1rem;
+            background: var(--fortune-accent);
+            opacity: 0.8;
         }
 
         h1, h2, h3 {
