@@ -350,14 +350,20 @@ def render_juuni_unsei_detail(data, comment_type):
     pillar_label = data["pillar_label"]
     juuni_unsei = data["juuni_unsei"]
     juuni_unsei_display = get_juuni_unsei_display_name(juuni_unsei)
-    expander_title = (
-        f"{pillar_label}：{juuni_unsei_display} から読み取れる性格"
-        if comment_type == "public"
-        else f"{pillar_label}：{juuni_unsei_display} の鑑定メモ"
-    )
+    personality_heading = data.get("personality_heading", "")
+    if personality_heading:
+        expander_title = f"{personality_heading}：{juuni_unsei_display}"
+        heading_text = expander_title
+    else:
+        expander_title = (
+            f"{pillar_label}：{juuni_unsei_display} から読み取れる性格"
+            if comment_type == "public"
+            else f"{pillar_label}：{juuni_unsei_display} の鑑定メモ"
+        )
+        heading_text = f"{pillar_label}：{juuni_unsei_display}"
 
     with st.expander(expander_title):
-        st.write(f"{pillar_label}：{juuni_unsei_display}")
+        st.write(heading_text)
 
         if comment_type != "public":
             st.markdown("**読み解きテーマ：**")
@@ -457,7 +463,7 @@ def render_juuni_unsei_thinking_score_table(aggregated_scores):
 
 
 def render_juuni_unsei_thinking_charts(aggregated_scores):
-    with st.expander("考え方の傾向グラフ"):
+    with st.expander("考え方の傾向（グラフ）"):
         brain_type_scores = fill_missing_scores(
             aggregated_scores["brain_type"],
             BRAIN_TYPE_ORDER,
@@ -488,7 +494,7 @@ def render_juuni_unsei_thinking_charts(aggregated_scores):
 
 def render_juuni_unsei_thinking_tendency(pillar_juuni_unsei_data, is_private=False):
     if is_private:
-        st.markdown("#### 十二運星から読み取れる考え方の傾向メモ")
+        st.markdown("#### 考え方の傾向メモ")
 
     st.markdown("#### 四柱ごとの分類表")
     render_juuni_unsei_thinking_pillar_table(pillar_juuni_unsei_data)

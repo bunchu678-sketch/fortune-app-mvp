@@ -157,7 +157,7 @@ def format_japanese_date(value):
 def format_birth_time_for_client(value):
     if value is None:
         return "出生時刻不明"
-    return f"{value.hour}時{value.minute}分生まれ"
+    return f"{value.hour}時{value.minute:02d}分生まれ"
 
 
 def calculate_full_age(birth_date_value, reference_date_value):
@@ -386,13 +386,36 @@ def inject_date_input_keyboard_guard():
     )
 
 
+JUUNI_UNSEI_PERSONALITY_PIE_ITEMS = [
+    ("year", "意思", "年柱", 15),
+    ("month", "表面", "月柱", 30),
+    ("day", "本質", "日柱", 50),
+    ("hour", "希望", "時柱", 5),
+]
+JUUNI_UNSEI_PERSONALITY_PIE_COLORS = ["#6b7280", "#8aa3b8", "#d08c60", "#91a36f"]
+
+
+def get_juuni_unsei_by_pillar(juuni_unsei_display_data):
+    return {
+        data.get("pillar_key", ""): data.get("juuni_unsei", "")
+        for data in juuni_unsei_display_data
+    }
+
+
 def render_juuni_unsei_comments_for_mobile(juuni_unsei_display_data, comment_type):
+    render_juuni_unsei_personality_pie_chart_for_mobile(juuni_unsei_display_data)
+
     if comment_type != "public":
         with st.expander("十二運星から読み取れる性格メモの詳細表", expanded=False):
             render_juuni_unsei_summary_table(juuni_unsei_display_data)
 
     for data in juuni_unsei_display_data:
         render_juuni_unsei_detail(data, comment_type)
+
+    render_juuni_unsei_thinking_tendency_for_mobile(
+        get_juuni_unsei_by_pillar(juuni_unsei_display_data),
+        is_private=(comment_type != "public"),
+    )
 
 
 THINKING_BAR_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759"]
@@ -611,6 +634,109 @@ def build_work_type_pie_svg(numeric_scores):
     )
 
 
+def build_juuni_unsei_personality_pie_svg(juuni_unsei_display_data):
+    juuni_unsei_by_pillar = get_juuni_unsei_by_pillar(juuni_unsei_display_data)
+    center_x = 140
+    center_y = 132
+    radius = 92
+    start_angle = -90
+    slices = []
+
+    for index, (pillar_key, role_label, pillar_label, percent) in enumerate(
+        JUUNI_UNSEI_PERSONALITY_PIE_ITEMS
+    ):
+        juuni_unsei = juuni_unsei_by_pillar.get(pillar_key, "") or "未入力"
+        end_angle = start_angle + (percent / 100 * 360)
+        middle_angle = (start_angle + end_angle) / 2
+        color = JUUNI_UNSEI_PERSONALITY_PIE_COLORS[
+            index % len(JUUNI_UNSEI_PERSONALITY_PIE_COLORS)
+        ]
+        label_text = f"{role_label}（{pillar_label}：{juuni_unsei}）：{percent}%"
+
+        slices.append(
+            "<path "
+            f"d=\"{build_svg_pie_slice_path(center_x, center_y, radius, start_angle, end_angle)}\" "
+            f"fill=\"{color}\" "
+            "stroke=\"#ffffff\" "
+            "stroke-width=\"2\" "
+            f"><title>{html.escape(label_text)}</title></path>"
+        )
+
+        if percent >= 10:
+            label_x, label_y = calculate_svg_pie_point(
+                center_x,
+                center_y,
+                radius * 0.58,
+                middle_angle,
+            )
+            slices.append(
+                "<text "
+                f"x=\"{label_x:.2f}\" "
+                f"y=\"{label_y:.2f}\" "
+                "text-anchor=\"middle\" "
+                "dominant-baseline=\"middle\" "
+                "fill=\"#ffffff\" "
+                "font-size=\"12\" "
+                "font-weight=\"700\" "
+                "paint-order=\"stroke\" "
+                "stroke=\"rgba(0,0,0,0.25)\" "
+                "stroke-width=\"2\" "
+                "stroke-linejoin=\"round\""
+                ">"
+                f"{percent}%"
+                "</text>"
+            )
+
+        start_angle = end_angle
+
+    return (
+        "<svg "
+        "viewBox=\"0 0 280 264\" "
+        "width=\"100%\" "
+        "role=\"img\" "
+        "aria-label=\"十二運星から読み取れる性格の円グラフ\" "
+        "style=\"max-width:320px;display:block;margin:0.15rem auto 0.35rem;\""
+        ">"
+        "<rect x=\"0\" y=\"0\" width=\"280\" height=\"264\" fill=\"transparent\" />"
+        + "".join(slices)
+        + "</svg>"
+    )
+
+
+def render_juuni_unsei_personality_pie_legend(juuni_unsei_display_data):
+    juuni_unsei_by_pillar = get_juuni_unsei_by_pillar(juuni_unsei_display_data)
+    legend_rows = []
+
+    for index, (pillar_key, role_label, pillar_label, percent) in enumerate(
+        JUUNI_UNSEI_PERSONALITY_PIE_ITEMS
+    ):
+        color = JUUNI_UNSEI_PERSONALITY_PIE_COLORS[
+            index % len(JUUNI_UNSEI_PERSONALITY_PIE_COLORS)
+        ]
+        juuni_unsei = juuni_unsei_by_pillar.get(pillar_key, "") or "未入力"
+        legend_rows.append(
+            "<span style=\"display:inline-flex;align-items:center;gap:6px;color:#24292f;\">"
+            f"<span style=\"width:10px;height:10px;background:{color};display:inline-block;border-radius:50%;\"></span>"
+            f"{html.escape(role_label)}（{html.escape(pillar_label)}：{html.escape(juuni_unsei)}）：{percent}%"
+            "</span>"
+        )
+
+    st.markdown(
+        "<div style=\"display:flex;flex-wrap:wrap;gap:7px 12px;margin:0 0 0.75rem;font-size:12px;line-height:1.45;\">"
+        + "".join(legend_rows)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_juuni_unsei_personality_pie_chart_for_mobile(juuni_unsei_display_data):
+    st.markdown(
+        build_juuni_unsei_personality_pie_svg(juuni_unsei_display_data),
+        unsafe_allow_html=True,
+    )
+    render_juuni_unsei_personality_pie_legend(juuni_unsei_display_data)
+
+
 def render_work_type_pie_legend(filtered_scores):
     total = sum(filtered_scores.values())
     legend_rows = []
@@ -671,7 +797,7 @@ def render_work_type_pie_chart_for_mobile(title, score_dict):
 
 
 def render_juuni_unsei_thinking_charts_for_mobile(aggregated_scores):
-    with st.expander("考え方の傾向グラフ"):
+    with st.expander("考え方の傾向（グラフ）"):
         brain_type_scores = fill_missing_scores(
             aggregated_scores.get("brain_type", {}),
             BRAIN_TYPE_ORDER,
@@ -705,7 +831,7 @@ def render_juuni_unsei_thinking_tendency_for_mobile(
     is_private=False,
 ):
     if is_private:
-        st.markdown("#### 十二運星から読み取れる考え方の傾向メモ")
+        st.markdown("#### 考え方の傾向メモ")
 
     aggregated_scores = aggregate_juuni_unsei_thinking_tendency(
         pillar_juuni_unsei_data
@@ -2015,7 +2141,7 @@ if birth_time_unknown:
 else:
     birth_hour = st.selectbox("時", hour_options, key="birth_hour")
     birth_minute = st.selectbox("分", minute_options, key="birth_minute")
-    birth_time_display = f"{birth_hour}:{birth_minute}"
+    birth_time_display = f"{int(birth_hour)}時{int(birth_minute):02d}分生まれ"
 prefectures = [
     "未選択",
     "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
@@ -2394,38 +2520,35 @@ if st.button("鑑定結果を表示する"):
     ]
     juuni_unsei_display_data = [
         {
-            "pillar_key": "hour",
-            "pillar_label": "時柱",
-            "juuni_unsei": hour_juuni_unsei,
-        },
-        {
-            "pillar_key": "day",
-            "pillar_label": "日柱",
-            "juuni_unsei": day_juuni_unsei,
+            "pillar_key": "year",
+            "pillar_label": "年柱",
+            "personality_heading": "意思決定の時の自分",
+            "juuni_unsei": year_juuni_unsei,
         },
         {
             "pillar_key": "month",
             "pillar_label": "月柱",
+            "personality_heading": "初対面の人と会った時の自分",
             "juuni_unsei": month_juuni_unsei,
         },
         {
-            "pillar_key": "year",
-            "pillar_label": "年柱",
-            "juuni_unsei": year_juuni_unsei,
+            "pillar_key": "day",
+            "pillar_label": "日柱",
+            "personality_heading": "一人の時の自分",
+            "juuni_unsei": day_juuni_unsei,
+        },
+        {
+            "pillar_key": "hour",
+            "pillar_label": "時柱",
+            "personality_heading": "どんな老後を過ごしたいか",
+            "juuni_unsei": hour_juuni_unsei,
         },
     ]
-    pillar_juuni_unsei_data = {
-        "hour": hour_juuni_unsei,
-        "day": day_juuni_unsei,
-        "month": month_juuni_unsei,
-        "year": year_juuni_unsei,
-    }
     public_comment_sections = [
         "特殊な命式",
         "日干から読み取れる性格",
         "通変星・蔵干通変星から読み取れる性格",
         "十二運星から読み取れる性格",
-        "十二運星から読み取れる考え方の傾向",
         "大運と接木運",
         "今年の運勢の流れ",
     ]
@@ -2439,7 +2562,6 @@ if st.button("鑑定結果を表示する"):
         "通変星・蔵干通変星から読み取れる性格",
         "十二運星から読み取れる性格",
         "総合的に読み取れる性格",
-        "十二運星から読み取れる考え方の傾向",
         "大運と接木運",
         "今年の運勢の流れ",
     ]
@@ -2464,8 +2586,6 @@ if st.button("鑑定結果を表示する"):
                 juuni_unsei_display_data,
                 "public",
             )
-        elif section_title == "十二運星から読み取れる考え方の傾向":
-            render_juuni_unsei_thinking_tendency_for_mobile(pillar_juuni_unsei_data)
         elif section_title == "大運と接木運":
             render_client_daiun_table(daiun_result, display_kubou)
         elif section_title == "今年の運勢の流れ":
@@ -2509,11 +2629,6 @@ if st.button("鑑定結果を表示する"):
                 render_juuni_unsei_comments_for_mobile(
                     juuni_unsei_display_data,
                     "private",
-                )
-            elif section_title == "十二運星から読み取れる考え方の傾向":
-                render_juuni_unsei_thinking_tendency_for_mobile(
-                    pillar_juuni_unsei_data,
-                    is_private=True,
                 )
             elif section_title == "大運と接木運":
                 render_daiun_table(daiun_result, display_kubou)
