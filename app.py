@@ -641,6 +641,7 @@ def build_juuni_unsei_personality_pie_svg(juuni_unsei_display_data):
     radius = 92
     start_angle = -90
     slices = []
+    percent_labels = []
 
     for index, (pillar_key, role_label, pillar_label, percent) in enumerate(
         JUUNI_UNSEI_PERSONALITY_PIE_ITEMS
@@ -662,30 +663,30 @@ def build_juuni_unsei_personality_pie_svg(juuni_unsei_display_data):
             f"><title>{html.escape(label_text)}</title></path>"
         )
 
-        if percent >= 10:
-            label_x, label_y = calculate_svg_pie_point(
-                center_x,
-                center_y,
-                radius * 0.58,
-                middle_angle,
-            )
-            slices.append(
-                "<text "
-                f"x=\"{label_x:.2f}\" "
-                f"y=\"{label_y:.2f}\" "
-                "text-anchor=\"middle\" "
-                "dominant-baseline=\"middle\" "
-                "fill=\"#ffffff\" "
-                "font-size=\"12\" "
-                "font-weight=\"700\" "
-                "paint-order=\"stroke\" "
-                "stroke=\"rgba(0,0,0,0.25)\" "
-                "stroke-width=\"2\" "
-                "stroke-linejoin=\"round\""
-                ">"
-                f"{percent}%"
-                "</text>"
-            )
+        label_radius = radius * (1.14 if percent < 10 else 0.58)
+        label_x, label_y = calculate_svg_pie_point(
+            center_x,
+            center_y,
+            label_radius,
+            middle_angle,
+        )
+        percent_labels.append(
+            "<text "
+            f"x=\"{label_x:.2f}\" "
+            f"y=\"{label_y:.2f}\" "
+            "text-anchor=\"middle\" "
+            "dominant-baseline=\"middle\" "
+            f"fill=\"{'#374151' if percent < 10 else '#ffffff'}\" "
+            "font-size=\"12\" "
+            "font-weight=\"700\" "
+            "paint-order=\"stroke\" "
+            f"stroke=\"{'#ffffff' if percent < 10 else 'rgba(0,0,0,0.25)'}\" "
+            "stroke-width=\"2\" "
+            "stroke-linejoin=\"round\""
+            ">"
+            f"{percent}%"
+            "</text>"
+        )
 
         start_angle = end_angle
 
@@ -699,6 +700,7 @@ def build_juuni_unsei_personality_pie_svg(juuni_unsei_display_data):
         ">"
         "<rect x=\"0\" y=\"0\" width=\"280\" height=\"264\" fill=\"transparent\" />"
         + "".join(slices)
+        + "".join(percent_labels)
         + "</svg>"
     )
 

@@ -345,12 +345,22 @@ def render_juuni_unsei_summary_table(juuni_unsei_display_data):
     })
 
 
+JUUNI_UNSEI_PERSONALITY_HEADINGS = {
+    "year": "意思決定の時の自分",
+    "month": "初対面の人と会った時の自分",
+    "day": "一人の時の自分",
+    "hour": "どんな老後を過ごしたいか",
+}
+
+
 def render_juuni_unsei_detail(data, comment_type):
     pillar_key = data["pillar_key"]
     pillar_label = data["pillar_label"]
     juuni_unsei = data["juuni_unsei"]
     juuni_unsei_display = get_juuni_unsei_display_name(juuni_unsei)
-    personality_heading = data.get("personality_heading", "")
+    personality_heading = data.get("personality_heading", "") or (
+        JUUNI_UNSEI_PERSONALITY_HEADINGS.get(pillar_key, "")
+    )
     if personality_heading:
         expander_title = f"{personality_heading}：{juuni_unsei_display}"
         heading_text = expander_title
