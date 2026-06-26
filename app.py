@@ -69,7 +69,7 @@ from yearly_overall_logic import build_yearly_overall_fortune
 
 
 KUUBOU_HELP_TEXT = "自分を見失いやすいが、素直・反省・感謝を忘れずに慎重に行動すると吉。可能性は無限大に。"
-APP_LOGO_PATH = Path(__file__).resolve().parent / "assets" / "logo_black.png"
+APP_LOGO_PATH = Path(__file__).resolve().parent / "assets" / "logo_white.png"
 
 
 def get_image_data_uri(image_path):
@@ -87,18 +87,20 @@ def inject_app_styles():
         """
         <style>
         :root {
-            --fortune-ink: #1e2326;
-            --fortune-muted: #626c64;
-            --fortune-line: rgba(34, 44, 39, 0.13);
-            --fortune-panel: rgba(255, 255, 255, 0.92);
-            --fortune-panel-strong: #ffffff;
-            --fortune-accent: #9a7a45;
-            --fortune-green: #2f493c;
-            --fortune-bg: #f5f7f2;
+            --fortune-ink: #f4efe6;
+            --fortune-muted: #b7b0a5;
+            --fortune-line: rgba(228, 214, 188, 0.18);
+            --fortune-panel: rgba(19, 23, 22, 0.92);
+            --fortune-panel-strong: #151a19;
+            --fortune-accent: #c5a46c;
+            --fortune-accent-soft: rgba(197, 164, 108, 0.14);
+            --fortune-green: #263c35;
+            --fortune-bg: #0c0f0e;
         }
 
         .stApp {
-            background: var(--fortune-bg);
+            background:
+                linear-gradient(180deg, #090b0b 0%, #0f1312 48%, #131611 100%);
             color: var(--fortune-ink);
         }
 
@@ -108,7 +110,7 @@ def inject_app_styles():
 
         [data-testid="stAppViewContainer"] > .main .block-container {
             max-width: 720px;
-            padding: 0.9rem 0.95rem 3rem;
+            padding: 1rem 0.95rem 3rem;
         }
 
         @media (min-width: 768px) {
@@ -118,47 +120,59 @@ def inject_app_styles():
         }
 
         .fortune-brand-hero {
-            display: flex;
-            align-items: center;
-            gap: 0.72rem;
-            padding: 0.25rem 0 0.85rem;
-            margin: 0 0 0.75rem;
+            position: relative;
+            min-height: 9.2rem;
+            padding: 1.05rem 0.1rem 1.2rem;
+            margin: 0 0 1.1rem;
             border-bottom: 1px solid var(--fortune-line);
         }
 
         .fortune-brand-logo {
-            width: 44px;
-            height: 44px;
-            flex: 0 0 44px;
+            position: absolute;
+            top: 0.35rem;
+            right: 0.05rem;
+            width: 46px;
+            height: 46px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 7px;
-            background: rgba(255, 255, 255, 0.66);
-            border: 1px solid rgba(34, 44, 39, 0.08);
+            opacity: 0.82;
         }
 
         .fortune-brand-logo img {
-            width: 32px;
-            height: 32px;
+            width: 42px;
+            height: 42px;
             object-fit: contain;
             display: block;
         }
 
         .fortune-brand-kicker {
-            margin: 0 0 0.2rem;
+            margin: 0 0 0.95rem;
             color: var(--fortune-accent);
-            font-size: 0.68rem;
-            font-weight: 700;
+            font-size: 0.72rem;
+            font-weight: 600;
             letter-spacing: 0;
         }
 
         .fortune-brand-title {
             margin: 0;
             color: var(--fortune-ink);
-            font-size: 1.22rem;
-            line-height: 1.25;
-            font-weight: 700;
+            font-family: "Yu Mincho", "Hiragino Mincho ProN", "YuMincho", "Times New Roman", serif;
+            font-size: 2.15rem;
+            line-height: 1.08;
+            font-weight: 600;
+        }
+
+        .fortune-brand-title span {
+            display: block;
+        }
+
+        .fortune-brand-rule {
+            width: 3.8rem;
+            height: 1px;
+            margin-top: 1.1rem;
+            background: var(--fortune-accent);
+            opacity: 0.8;
         }
 
         h1, h2, h3 {
@@ -167,10 +181,10 @@ def inject_app_styles():
         }
 
         h2 {
-            padding-top: 0.35rem;
-            font-size: 1.2rem;
+            padding-top: 0.65rem;
+            font-size: 1.17rem;
             border-bottom: 1px solid var(--fortune-line);
-            padding-bottom: 0.42rem;
+            padding-bottom: 0.5rem;
         }
 
         h3 {
@@ -182,9 +196,22 @@ def inject_app_styles():
         div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
         div[data-testid="stTextArea"] textarea {
             border-radius: 8px;
-            border-color: rgba(42, 48, 56, 0.18);
+            border-color: rgba(228, 214, 188, 0.18);
             background: var(--fortune-panel-strong);
+            color: var(--fortune-ink);
             box-shadow: none;
+        }
+
+        div[data-testid="stTextInput"] label,
+        div[data-testid="stDateInput"] label,
+        div[data-testid="stSelectbox"] label,
+        div[data-testid="stTextArea"] label,
+        div[data-testid="stCheckbox"] label {
+            color: var(--fortune-muted);
+        }
+
+        div[data-baseweb="select"] span {
+            color: var(--fortune-ink);
         }
 
         div[data-testid="stTextArea"] textarea {
@@ -194,18 +221,18 @@ def inject_app_styles():
         div[data-testid="stButton"] button {
             width: 100%;
             border-radius: 8px;
-            border: 1px solid rgba(47, 73, 60, 0.2);
-            background: var(--fortune-green);
-            color: #fff;
+            border: 1px solid rgba(197, 164, 108, 0.42);
+            background: var(--fortune-accent);
+            color: #171a18;
             font-weight: 700;
             min-height: 2.7rem;
             box-shadow: none;
         }
 
         div[data-testid="stButton"] button:hover {
-            border-color: rgba(154, 122, 69, 0.75);
-            background: #263f33;
-            color: #fff;
+            border-color: rgba(244, 239, 230, 0.7);
+            background: #d1b37a;
+            color: #101312;
         }
 
         div[data-testid="stExpander"] {
@@ -216,6 +243,11 @@ def inject_app_styles():
             box-shadow: none;
         }
 
+        div[data-testid="stExpander"] details summary,
+        div[data-testid="stExpander"] p {
+            color: var(--fortune-ink);
+        }
+
         div[data-testid="stTable"],
         div[data-testid="stDataFrame"] {
             border-radius: 8px;
@@ -224,9 +256,25 @@ def inject_app_styles():
             box-shadow: none;
         }
 
+        div[data-testid="stTable"] table {
+            background: var(--fortune-panel);
+            color: var(--fortune-ink);
+        }
+
+        div[data-testid="stTable"] th,
+        div[data-testid="stTable"] td {
+            background: transparent;
+            color: var(--fortune-ink);
+            border-color: var(--fortune-line);
+        }
+
         .stMarkdown p,
         div[data-testid="stCaptionContainer"] {
             color: var(--fortune-muted);
+        }
+
+        .stMarkdown strong {
+            color: var(--fortune-ink);
         }
 
         .inline-help-heading h3 {
@@ -240,24 +288,23 @@ def inject_app_styles():
             }
 
             .fortune-brand-hero {
-                gap: 0.65rem;
-                padding: 0.2rem 0 0.7rem;
-                margin-bottom: 0.7rem;
+                min-height: 8.55rem;
+                padding: 0.85rem 0 1rem;
+                margin-bottom: 0.95rem;
             }
 
             .fortune-brand-logo {
                 width: 40px;
                 height: 40px;
-                flex-basis: 40px;
             }
 
             .fortune-brand-logo img {
-                width: 29px;
-                height: 29px;
+                width: 36px;
+                height: 36px;
             }
 
             .fortune-brand-title {
-                font-size: 1.05rem;
+                font-size: 1.88rem;
             }
 
             h2 {
@@ -275,7 +322,7 @@ def render_app_header():
     logo_html = (
         f'<img src="{logo_uri}" alt="占いロゴ">'
         if logo_uri
-        else '<span style="color:#1e2326;font-weight:700;">四</span>'
+        else '<span style="color:#f4efe6;font-weight:700;">四</span>'
     )
 
     st.markdown(
@@ -283,8 +330,9 @@ def render_app_header():
         <div class="fortune-brand-hero">
             <div class="fortune-brand-logo">{logo_html}</div>
             <div>
-                <p class="fortune-brand-kicker">四柱推命</p>
-                <h1 class="fortune-brand-title">鑑定補助アプリ</h1>
+                <p class="fortune-brand-kicker">命式を静かに読む</p>
+                <h1 class="fortune-brand-title"><span>四柱推命</span><span>鑑定アプリ</span></h1>
+                <div class="fortune-brand-rule"></div>
             </div>
         </div>
         """,
