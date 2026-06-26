@@ -123,22 +123,22 @@ def inject_app_styles():
         }
 
         .fortune-brand-hero {
-            min-height: 9rem;
-            padding: 1.05rem 0.1rem 1.2rem;
+            min-height: 8rem;
+            padding: 1.1rem 0.1rem 1.2rem;
             margin: 0 0 1.1rem;
             border-bottom: 1px solid var(--fortune-line);
         }
 
         .fortune-brand-title-row {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: flex-start;
-            gap: 0.9rem;
+            gap: 1rem;
         }
 
         .fortune-brand-logo {
-            width: clamp(62px, 18vw, 76px);
-            height: clamp(62px, 18vw, 76px);
+            width: clamp(78px, 22vw, 96px);
+            height: clamp(78px, 22vw, 96px);
             flex: 0 0 auto;
             display: flex;
             align-items: center;
@@ -153,21 +153,13 @@ def inject_app_styles():
             display: block;
         }
 
-        .fortune-brand-kicker {
-            margin: 0 0 0.95rem;
-            color: var(--fortune-accent);
-            font-size: 0.72rem;
-            font-weight: 600;
-            letter-spacing: 0;
-        }
-
         .fortune-brand-title {
             margin: 0;
             color: var(--fortune-ink);
-            font-family: "Yu Gothic", "Yu Gothic UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+            font-family: "Hiragino Maru Gothic ProN", "Yu Gothic UI", "BIZ UDPGothic", "Meiryo", "Yu Gothic", sans-serif;
             font-size: 2.15rem;
             line-height: 1.08;
-            font-weight: 700;
+            font-weight: 650;
         }
 
         .fortune-brand-title span {
@@ -295,8 +287,8 @@ def inject_app_styles():
             }
 
             .fortune-brand-hero {
-                min-height: 8.35rem;
-                padding: 0.85rem 0 1rem;
+                min-height: 7.65rem;
+                padding: 0.95rem 0 1rem;
                 margin-bottom: 0.95rem;
             }
 
@@ -305,8 +297,8 @@ def inject_app_styles():
             }
 
             .fortune-brand-logo {
-                width: 60px;
-                height: 60px;
+                width: 78px;
+                height: 78px;
             }
 
             .fortune-brand-title {
@@ -335,7 +327,6 @@ def render_app_header():
         f"""
         <div class="fortune-brand-hero">
             <div>
-                <p class="fortune-brand-kicker">命式を静かに読む</p>
                 <div class="fortune-brand-title-row">
                     <h1 class="fortune-brand-title"><span>四柱推命</span><span>鑑定アプリ</span></h1>
                     <div class="fortune-brand-logo">{logo_html}</div>
