@@ -139,6 +139,7 @@ def inject_app_styles():
         .fortune-brand-logo {
             width: clamp(78px, 22vw, 96px);
             height: clamp(78px, 22vw, 96px);
+            margin-top: 2.32rem;
             flex: 0 0 auto;
             display: flex;
             align-items: center;
@@ -299,6 +300,7 @@ def inject_app_styles():
             .fortune-brand-logo {
                 width: 78px;
                 height: 78px;
+                margin-top: 2.03rem;
             }
 
             .fortune-brand-title {
