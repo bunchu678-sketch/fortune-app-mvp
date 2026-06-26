@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import base64
 import html
 import math
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from datetime import date, datetime, time as datetime_time
+from pathlib import Path
 
 from calendar_logic import calculate_auto_meishiki
 from calendar_reference import (
@@ -67,6 +69,249 @@ from yearly_overall_logic import build_yearly_overall_fortune
 
 
 KUUBOU_HELP_TEXT = "自分を見失いやすいが、素直・反省・感謝を忘れずに慎重に行動すると吉。可能性は無限大に。"
+APP_LOGO_PATH = Path(__file__).resolve().parent / "assets" / "logo_white.png"
+
+
+def get_image_data_uri(image_path):
+    try:
+        image_bytes = image_path.read_bytes()
+    except OSError:
+        return ""
+
+    encoded_image = base64.b64encode(image_bytes).decode("ascii")
+    return f"data:image/png;base64,{encoded_image}"
+
+
+def inject_app_styles():
+    st.markdown(
+        """
+        <style>
+        :root {
+            --fortune-ink: #20242a;
+            --fortune-muted: #646a73;
+            --fortune-line: rgba(61, 67, 75, 0.13);
+            --fortune-panel: rgba(255, 255, 255, 0.86);
+            --fortune-panel-strong: rgba(255, 255, 255, 0.96);
+            --fortune-gold: #b58b4a;
+            --fortune-green: #6f7f65;
+        }
+
+        .stApp {
+            background: linear-gradient(180deg, #f8f5ef 0%, #f4f3ee 42%, #faf9f5 100%);
+            color: var(--fortune-ink);
+        }
+
+        [data-testid="stHeader"] {
+            background: transparent;
+        }
+
+        [data-testid="stAppViewContainer"] > .main .block-container {
+            max-width: 760px;
+            padding: 1.1rem 1rem 3rem;
+        }
+
+        @media (min-width: 768px) {
+            [data-testid="stAppViewContainer"] > .main .block-container {
+                padding-top: 1.8rem;
+            }
+        }
+
+        .fortune-brand-hero {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.05rem;
+            margin: 0 0 1.15rem;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 8px;
+            background:
+                linear-gradient(135deg, rgba(21, 24, 28, 0.98), rgba(42, 44, 43, 0.96)),
+                #171a1d;
+            box-shadow: 0 18px 34px rgba(26, 25, 22, 0.16);
+        }
+
+        .fortune-brand-logo {
+            width: 58px;
+            height: 58px;
+            flex: 0 0 58px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .fortune-brand-logo img {
+            width: 42px;
+            height: 42px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .fortune-brand-kicker {
+            margin: 0 0 0.2rem;
+            color: rgba(239, 231, 211, 0.78);
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+
+        .fortune-brand-title {
+            margin: 0;
+            color: #ffffff;
+            font-size: 1.35rem;
+            line-height: 1.25;
+            font-weight: 700;
+        }
+
+        .fortune-brand-caption {
+            margin: 0.25rem 0 0;
+            color: rgba(255, 255, 255, 0.66);
+            font-size: 0.82rem;
+            line-height: 1.55;
+        }
+
+        h1, h2, h3 {
+            color: var(--fortune-ink);
+            letter-spacing: 0;
+        }
+
+        h2 {
+            padding-top: 0.25rem;
+            font-size: 1.32rem;
+            border-bottom: 1px solid var(--fortune-line);
+            padding-bottom: 0.45rem;
+        }
+
+        h3 {
+            font-size: 1.08rem;
+        }
+
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stDateInput"] input,
+        div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+        div[data-testid="stTextArea"] textarea {
+            border-radius: 8px;
+            border-color: rgba(42, 48, 56, 0.18);
+            background: var(--fortune-panel-strong);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65) inset;
+        }
+
+        div[data-testid="stTextArea"] textarea {
+            min-height: 104px;
+        }
+
+        div[data-testid="stButton"] button {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid rgba(32, 36, 42, 0.22);
+            background: linear-gradient(135deg, #20242a, #3b403b);
+            color: #fff;
+            font-weight: 700;
+            min-height: 2.7rem;
+            box-shadow: 0 12px 22px rgba(32, 36, 42, 0.16);
+        }
+
+        div[data-testid="stButton"] button:hover {
+            border-color: rgba(181, 139, 74, 0.75);
+            color: #fff;
+        }
+
+        div[data-testid="stExpander"] {
+            border: 1px solid var(--fortune-line);
+            border-radius: 8px;
+            background: var(--fortune-panel);
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(34, 31, 26, 0.05);
+        }
+
+        div[data-testid="stTable"],
+        div[data-testid="stDataFrame"] {
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--fortune-line);
+            box-shadow: 0 8px 20px rgba(34, 31, 26, 0.04);
+        }
+
+        .stMarkdown p,
+        div[data-testid="stCaptionContainer"] {
+            color: var(--fortune-muted);
+        }
+
+        .fortune-brand-hero .fortune-brand-kicker {
+            color: rgba(239, 231, 211, 0.78);
+        }
+
+        .fortune-brand-hero .fortune-brand-caption {
+            color: rgba(255, 255, 255, 0.66);
+        }
+
+        .inline-help-heading h3 {
+            font-size: 1.12rem;
+        }
+
+        @media (max-width: 520px) {
+            [data-testid="stAppViewContainer"] > .main .block-container {
+                padding-left: 0.72rem;
+                padding-right: 0.72rem;
+            }
+
+            .fortune-brand-hero {
+                gap: 0.75rem;
+                padding: 0.85rem;
+                margin-bottom: 0.95rem;
+            }
+
+            .fortune-brand-logo {
+                width: 50px;
+                height: 50px;
+                flex-basis: 50px;
+            }
+
+            .fortune-brand-logo img {
+                width: 36px;
+                height: 36px;
+            }
+
+            .fortune-brand-title {
+                font-size: 1.14rem;
+            }
+
+            .fortune-brand-caption {
+                font-size: 0.76rem;
+            }
+
+            h2 {
+                font-size: 1.16rem;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_app_header():
+    logo_uri = get_image_data_uri(APP_LOGO_PATH)
+    logo_html = (
+        f'<img src="{logo_uri}" alt="占いロゴ">'
+        if logo_uri
+        else '<span style="color:#fff;font-weight:700;">四</span>'
+    )
+
+    st.markdown(
+        f"""
+        <div class="fortune-brand-hero">
+            <div class="fortune-brand-logo">{logo_html}</div>
+            <div>
+                <p class="fortune-brand-kicker">四柱推命</p>
+                <h1 class="fortune-brand-title">鑑定補助アプリ</h1>
+                <p class="fortune-brand-caption">命式と運勢の流れを、落ち着いて確認するための画面です。</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_inline_help_heading(title, help_text):
@@ -1997,9 +2242,8 @@ st.set_page_config(
     page_icon="🔮",
     layout="wide",
 )
-st.title("四柱推命 鑑定補助アプリ")
-st.caption("開発中の鑑定補助アプリです")
-st.write("生年月日などの基本情報から、鑑定の参考情報を表示します。")
+inject_app_styles()
+render_app_header()
 inject_mobile_input_styles()
 
 SHOW_DEVELOPMENT_PANELS = False
