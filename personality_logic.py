@@ -352,6 +352,13 @@ JUUNI_UNSEI_PERSONALITY_HEADINGS = {
     "hour": "どんな老後を過ごしたいか",
 }
 
+JUUNI_UNSEI_PERSONALITY_WEIGHTS = {
+    "year": "15%",
+    "month": "30%",
+    "day": "50%",
+    "hour": "5%",
+}
+
 
 def render_juuni_unsei_detail(data, comment_type):
     pillar_key = data["pillar_key"]
@@ -361,8 +368,10 @@ def render_juuni_unsei_detail(data, comment_type):
     personality_heading = data.get("personality_heading", "") or (
         JUUNI_UNSEI_PERSONALITY_HEADINGS.get(pillar_key, "")
     )
+    personality_weight = JUUNI_UNSEI_PERSONALITY_WEIGHTS.get(pillar_key, "")
     if personality_heading:
-        expander_title = f"{personality_heading}：{juuni_unsei_display}"
+        weight_text = f"（{personality_weight}）" if personality_weight else ""
+        expander_title = f"{personality_heading}：{juuni_unsei_display}{weight_text}"
         heading_text = expander_title
     else:
         expander_title = (

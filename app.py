@@ -386,15 +386,6 @@ def inject_date_input_keyboard_guard():
     )
 
 
-JUUNI_UNSEI_PERSONALITY_PIE_ITEMS = [
-    ("year", "意思", "年柱", 15),
-    ("month", "表面", "月柱", 30),
-    ("day", "本質", "日柱", 50),
-    ("hour", "希望", "時柱", 5),
-]
-JUUNI_UNSEI_PERSONALITY_PIE_COLORS = ["#6b7280", "#8aa3b8", "#d08c60", "#91a36f"]
-
-
 def get_juuni_unsei_by_pillar(juuni_unsei_display_data):
     return {
         data.get("pillar_key", ""): data.get("juuni_unsei", "")
@@ -403,8 +394,6 @@ def get_juuni_unsei_by_pillar(juuni_unsei_display_data):
 
 
 def render_juuni_unsei_comments_for_mobile(juuni_unsei_display_data, comment_type):
-    render_juuni_unsei_personality_pie_chart_for_mobile(juuni_unsei_display_data)
-
     if comment_type != "public":
         with st.expander("十二運星から読み取れる性格メモの詳細表", expanded=False):
             render_juuni_unsei_summary_table(juuni_unsei_display_data)
@@ -632,111 +621,6 @@ def build_work_type_pie_svg(numeric_scores):
         + percent_label_svg
         + "</svg>"
     )
-
-
-def build_juuni_unsei_personality_pie_svg(juuni_unsei_display_data):
-    juuni_unsei_by_pillar = get_juuni_unsei_by_pillar(juuni_unsei_display_data)
-    center_x = 140
-    center_y = 132
-    radius = 92
-    start_angle = -90
-    slices = []
-    percent_labels = []
-
-    for index, (pillar_key, role_label, pillar_label, percent) in enumerate(
-        JUUNI_UNSEI_PERSONALITY_PIE_ITEMS
-    ):
-        juuni_unsei = juuni_unsei_by_pillar.get(pillar_key, "") or "未入力"
-        end_angle = start_angle + (percent / 100 * 360)
-        middle_angle = (start_angle + end_angle) / 2
-        color = JUUNI_UNSEI_PERSONALITY_PIE_COLORS[
-            index % len(JUUNI_UNSEI_PERSONALITY_PIE_COLORS)
-        ]
-        label_text = f"{role_label}（{pillar_label}：{juuni_unsei}）：{percent}%"
-
-        slices.append(
-            "<path "
-            f"d=\"{build_svg_pie_slice_path(center_x, center_y, radius, start_angle, end_angle)}\" "
-            f"fill=\"{color}\" "
-            "stroke=\"#ffffff\" "
-            "stroke-width=\"2\" "
-            f"><title>{html.escape(label_text)}</title></path>"
-        )
-
-        label_radius = radius * (1.14 if percent < 10 else 0.58)
-        label_x, label_y = calculate_svg_pie_point(
-            center_x,
-            center_y,
-            label_radius,
-            middle_angle,
-        )
-        percent_labels.append(
-            "<text "
-            f"x=\"{label_x:.2f}\" "
-            f"y=\"{label_y:.2f}\" "
-            "text-anchor=\"middle\" "
-            "dominant-baseline=\"middle\" "
-            f"fill=\"{'#374151' if percent < 10 else '#ffffff'}\" "
-            "font-size=\"12\" "
-            "font-weight=\"700\" "
-            "paint-order=\"stroke\" "
-            f"stroke=\"{'#ffffff' if percent < 10 else 'rgba(0,0,0,0.25)'}\" "
-            "stroke-width=\"2\" "
-            "stroke-linejoin=\"round\""
-            ">"
-            f"{percent}%"
-            "</text>"
-        )
-
-        start_angle = end_angle
-
-    return (
-        "<svg "
-        "viewBox=\"0 0 280 264\" "
-        "width=\"100%\" "
-        "role=\"img\" "
-        "aria-label=\"十二運星から読み取れる性格の円グラフ\" "
-        "style=\"max-width:320px;display:block;margin:0.15rem auto 0.35rem;\""
-        ">"
-        "<rect x=\"0\" y=\"0\" width=\"280\" height=\"264\" fill=\"transparent\" />"
-        + "".join(slices)
-        + "".join(percent_labels)
-        + "</svg>"
-    )
-
-
-def render_juuni_unsei_personality_pie_legend(juuni_unsei_display_data):
-    juuni_unsei_by_pillar = get_juuni_unsei_by_pillar(juuni_unsei_display_data)
-    legend_rows = []
-
-    for index, (pillar_key, role_label, pillar_label, percent) in enumerate(
-        JUUNI_UNSEI_PERSONALITY_PIE_ITEMS
-    ):
-        color = JUUNI_UNSEI_PERSONALITY_PIE_COLORS[
-            index % len(JUUNI_UNSEI_PERSONALITY_PIE_COLORS)
-        ]
-        juuni_unsei = juuni_unsei_by_pillar.get(pillar_key, "") or "未入力"
-        legend_rows.append(
-            "<span style=\"display:inline-flex;align-items:center;gap:6px;color:#24292f;\">"
-            f"<span style=\"width:10px;height:10px;background:{color};display:inline-block;border-radius:50%;\"></span>"
-            f"{html.escape(role_label)}（{html.escape(pillar_label)}：{html.escape(juuni_unsei)}）：{percent}%"
-            "</span>"
-        )
-
-    st.markdown(
-        "<div style=\"display:flex;flex-wrap:wrap;gap:7px 12px;margin:0 0 0.75rem;font-size:12px;line-height:1.45;\">"
-        + "".join(legend_rows)
-        + "</div>",
-        unsafe_allow_html=True,
-    )
-
-
-def render_juuni_unsei_personality_pie_chart_for_mobile(juuni_unsei_display_data):
-    st.markdown(
-        build_juuni_unsei_personality_pie_svg(juuni_unsei_display_data),
-        unsafe_allow_html=True,
-    )
-    render_juuni_unsei_personality_pie_legend(juuni_unsei_display_data)
 
 
 def render_work_type_pie_legend(filtered_scores):
