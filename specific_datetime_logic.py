@@ -2,22 +2,52 @@ from __future__ import annotations
 
 from datetime import date, datetime, time as datetime_time
 
-from calendar_logic import calculate_day_pillar
+from calendar_logic import calculate_day_pillar, calculate_hour_pillar
 from calendar_reference import get_calendar_context_for_birth_year
 from personality_logic import get_tsuhensei
 
 
-SPECIFIC_DATETIME_KEYWORDS = {
-    "比肩": "自分で決めて動く日。開始・決断・独立的な行動に向く。独断になりすぎないよう注意。",
-    "劫財": "人との連携や交渉が鍵になる日。仲間づくり、調整、巻き込みに向く。浪費や勢い任せに注意。",
-    "食神": "楽しさ、発信、交流に向く日。会食、PR、紹介、体験づくりに良い。気の緩みやうっかりに注意。",
-    "傷官": "感性や表現が鋭くなる日。企画、文章、改善提案に向く。言葉が強くなりすぎないよう注意。",
-    "偏財": "出会い、営業、情報収集に向く日。人脈づくりや外向きの行動に良い。広げすぎには注意。",
-    "正財": "堅実に形を作る日。契約、整理、金銭管理、積み上げに向く。慎重になりすぎて動きが遅れないよう注意。",
-    "偏官": "動きと突破の日。挑戦、移動、決断、環境を変える行動に向く。焦りや強引さに注意。",
-    "正官": "信頼、責任、正式な場に向く日。面談、契約、申請、約束事に良い。形式や礼儀を大切に。",
-    "偏印": "発想、見直し、方向転換の日。企画、学び直し、整理、違う視点を得る行動に向く。迷いすぎに注意。",
-    "印綬": "学び、準備、相談に向く日。先生・専門家への相談、情報整理、計画作成に良い。受け身になりすぎないよう注意。",
+SPECIFIC_DATETIME_TSUHENSEI_COMMENTS = {
+    "比肩": {
+        "keyword": "決断、出発",
+        "comment": "新しいことを始めるのに向いているとき。自分で決めて一歩進めることが大切。",
+    },
+    "劫財": {
+        "keyword": "仲間、調整",
+        "comment": "人との関わりに向いているとき。一方で、予定外の出費や気疲れに注意。",
+    },
+    "食神": {
+        "keyword": "研鑽、健康管理",
+        "comment": "仕事や研鑽に向いているとき。体調も良いが、うっかりミスに注意。",
+    },
+    "傷官": {
+        "keyword": "直観、感性",
+        "comment": "感性が鋭くなるとき。違和感や改善点に気づきやすいが、その分イライラに注意。",
+    },
+    "偏財": {
+        "keyword": "出会い、人脈、情報収集",
+        "comment": "人との出会いに向いているとき。外に出ることで流れが広がりやすい。",
+    },
+    "正財": {
+        "keyword": "収穫、努力",
+        "comment": "努力の成果が出てくるとき。努力した分だけ成果が得られるチャンス到来。",
+    },
+    "偏官": {
+        "keyword": "転換、拡大",
+        "comment": "思い切った行動を取りやすいとき。今までできなかったことに挑戦する機会。",
+    },
+    "正官": {
+        "keyword": "責任、名誉",
+        "comment": "長期計画を立てるのに向いたとき。冷静に正しい判断ができる。実利より名誉を大切に。",
+    },
+    "偏印": {
+        "keyword": "変化、整理",
+        "comment": "気分的にすっきりしないとき。迷いや悩みが出てくるが、慌てずに考えを整理整頓しよう。",
+    },
+    "印綬": {
+        "keyword": "反省、研究",
+        "comment": "反省すべき点をきちんと振り返るのに向いたとき。信頼できる人に相談すると、学びの吸収力がアップ。",
+    },
 }
 
 
@@ -45,6 +75,36 @@ def format_specific_datetime_label(target_datetime):
     )
 
 
+def format_specific_day_label(target_datetime):
+    return f"{target_datetime.day}日"
+
+
+def format_specific_time_label(target_datetime):
+    return f"{target_datetime.hour}時{target_datetime.minute}分"
+
+
+def get_specific_datetime_comment(tsuhensei):
+    return SPECIFIC_DATETIME_TSUHENSEI_COMMENTS.get(
+        tsuhensei,
+        {"keyword": "", "comment": "コメント未設定"},
+    )
+
+
+def build_specific_datetime_part(display_name, kanchi, tenkan, chishi, base_day_tenkan):
+    tsuhensei = get_tsuhensei(base_day_tenkan, tenkan)
+    comment_data = get_specific_datetime_comment(tsuhensei)
+
+    return {
+        "display_name": display_name,
+        "kanchi": kanchi,
+        "tenkan": tenkan,
+        "chishi": chishi,
+        "tsuhensei": tsuhensei,
+        "keyword": comment_data.get("keyword", ""),
+        "comment": comment_data.get("comment", ""),
+    }
+
+
 def build_specific_datetime_fortune(candidate, day_tenkan, label=""):
     target_datetime = normalize_candidate_datetime(candidate)
     if target_datetime is None:
@@ -58,6 +118,8 @@ def build_specific_datetime_fortune(candidate, day_tenkan, label=""):
             "chishi": "",
             "tsuhensei": "",
             "keyword": "",
+            "comment": "",
+            "parts": [],
             "error": "日時を確認できませんでした。",
         }
 
@@ -82,9 +144,33 @@ def build_specific_datetime_fortune(candidate, day_tenkan, label=""):
             "日干支を計算できませんでした。",
         )
 
+    try:
+        hour_result = calculate_hour_pillar(target_datetime, day_result["tenkan"])
+    except Exception:
+        return build_specific_datetime_error(
+            label,
+            target_datetime,
+            "時干支を計算できませんでした。",
+        )
+
     tenkan = day_result.get("tenkan", "")
     chishi = day_result.get("chishi", "")
     tsuhensei = get_tsuhensei(day_tenkan, tenkan)
+    comment_data = get_specific_datetime_comment(tsuhensei)
+    day_part = build_specific_datetime_part(
+        format_specific_day_label(target_datetime),
+        day_result.get("day_kanchi", ""),
+        tenkan,
+        chishi,
+        day_tenkan,
+    )
+    hour_part = build_specific_datetime_part(
+        format_specific_time_label(target_datetime),
+        hour_result.get("hour_kanchi", ""),
+        hour_result.get("tenkan", ""),
+        hour_result.get("chishi", ""),
+        day_tenkan,
+    )
 
     return {
         "ok": True,
@@ -95,7 +181,9 @@ def build_specific_datetime_fortune(candidate, day_tenkan, label=""):
         "tenkan": tenkan,
         "chishi": chishi,
         "tsuhensei": tsuhensei,
-        "keyword": SPECIFIC_DATETIME_KEYWORDS.get(tsuhensei, ""),
+        "keyword": comment_data.get("keyword", ""),
+        "comment": comment_data.get("comment", ""),
+        "parts": [day_part, hour_part],
         "error": "",
     }
 
@@ -111,6 +199,8 @@ def build_specific_datetime_error(label, target_datetime, message):
         "chishi": "",
         "tsuhensei": "",
         "keyword": "",
+        "comment": "",
+        "parts": [],
         "error": message,
     }
 

@@ -981,26 +981,37 @@ def render_specific_datetime_fortunes(specific_datetime_result, is_enabled):
         return
 
     st.caption(
-        "※入力日時の日干支をもとにした簡易的な鑑定補助です。"
+        "※入力日時の日・時刻をもとにした簡易的な鑑定補助です。"
         "具体的な判断は相談内容と合わせて確認してください。"
     )
     for index, row in enumerate(rows):
-        display_datetime = row.get("display_datetime", "")
-        day_kanchi = row.get("day_kanchi", "")
-        tsuhensei = row.get("tsuhensei", "")
-        keyword = row.get("keyword", "")
         error = row.get("error", "")
+        parts = row.get("parts", [])
 
         with st.container():
-            st.markdown(f"**{html.escape(str(display_datetime or ''))}**")
+            if row.get("label"):
+                st.markdown(f"**{html.escape(str(row.get('label')))}**")
             if error:
                 st.caption(error)
             else:
-                st.markdown(
-                    f"{html.escape(str(day_kanchi or ''))}｜"
-                    f"{html.escape(str(tsuhensei or ''))}"
-                )
-                st.markdown(f"キーワード：{keyword}")
+                for part_index, part in enumerate(parts):
+                    display_name = part.get("display_name", "")
+                    kanchi = part.get("kanchi", "")
+                    tsuhensei = part.get("tsuhensei", "")
+                    keyword = part.get("keyword", "")
+                    comment = part.get("comment", "")
+
+                    st.markdown(
+                        f"**{html.escape(str(display_name or ''))}　"
+                        f"{html.escape(str(kanchi or ''))}｜"
+                        f"{html.escape(str(tsuhensei or ''))}**"
+                    )
+                    if keyword:
+                        st.markdown(f"キーワード：{html.escape(str(keyword))}")
+                    if comment:
+                        st.write(comment)
+                    if part_index < len(parts) - 1:
+                        st.markdown("")
 
         if index < len(rows) - 1:
             st.markdown(
