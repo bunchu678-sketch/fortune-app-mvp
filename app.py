@@ -968,6 +968,36 @@ def render_yearly_overall_fortune(yearly_overall_result):
             st.markdown(comment.replace("\n", "  \n"))
 
 
+def format_specific_candidate_heading(row):
+    label = html.escape(str(row.get("label") or ""))
+    target_datetime = row.get("datetime")
+    if not isinstance(target_datetime, datetime):
+        return label
+
+    return (
+        f"{label}："
+        f"{target_datetime.month}月{target_datetime.day}日　"
+        f"{target_datetime.hour}時{target_datetime.minute:02d}分"
+    )
+
+
+def format_specific_part_heading(part, part_index):
+    if part_index == 0:
+        display_name = "日の運勢"
+    elif part_index == 1:
+        display_name = "時間の運勢"
+    else:
+        display_name = part.get("display_name", "")
+
+    kanchi = part.get("kanchi", "")
+    tsuhensei = part.get("tsuhensei", "")
+    return (
+        f"**{html.escape(str(display_name or ''))}　"
+        f"{html.escape(str(kanchi or ''))}｜"
+        f"{html.escape(str(tsuhensei or ''))}**"
+    )
+
+
 def render_specific_datetime_fortunes(specific_datetime_result, is_enabled):
     if not is_enabled:
         return
@@ -989,23 +1019,17 @@ def render_specific_datetime_fortunes(specific_datetime_result, is_enabled):
         parts = row.get("parts", [])
 
         with st.container():
-            if row.get("label"):
-                st.markdown(f"**{html.escape(str(row.get('label')))}**")
+            candidate_heading = format_specific_candidate_heading(row)
+            if candidate_heading:
+                st.markdown(f"**{candidate_heading}**")
             if error:
                 st.caption(error)
             else:
                 for part_index, part in enumerate(parts):
-                    display_name = part.get("display_name", "")
-                    kanchi = part.get("kanchi", "")
-                    tsuhensei = part.get("tsuhensei", "")
                     keyword = part.get("keyword", "")
                     comment = part.get("comment", "")
 
-                    st.markdown(
-                        f"**{html.escape(str(display_name or ''))}　"
-                        f"{html.escape(str(kanchi or ''))}｜"
-                        f"{html.escape(str(tsuhensei or ''))}**"
-                    )
+                    st.markdown(format_specific_part_heading(part, part_index))
                     if keyword:
                         st.markdown(f"キーワード：{html.escape(str(keyword))}")
                     if comment:
