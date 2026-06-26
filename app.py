@@ -780,6 +780,74 @@ def render_daiun_table(daiun_result, kubou=""):
         st.caption(message)
 
 
+def format_daiun_expander_label(row):
+    daiun_label = str(row.get("大運", "") or "")
+    kanchi = f"{row.get('天干', '')}{row.get('地支', '')}"
+    age_range = f"{row.get('開始年齢', '')}〜{row.get('終了年齢', '')}"
+
+    label_parts = []
+    if daiun_label:
+        label_parts.append(daiun_label)
+    if kanchi:
+        label_parts.append(kanchi)
+    if age_range != "〜":
+        label_parts.append(age_range)
+
+    if not label_parts:
+        return "大運"
+    if len(label_parts) == 1:
+        return label_parts[0]
+
+    return f"{label_parts[0]}：{' '.join(label_parts[1:])}"
+
+
+def render_daiun_row_content(row, kubou):
+    daiun_label = row.get("大運", "")
+    start_age = row.get("開始年齢", "")
+    end_age = row.get("終了年齢", "")
+    kanchi = f"{row.get('天干', '')}{row.get('地支', '')}"
+    kanchi_html = format_kubou_marked_text(
+        kanchi,
+        is_kubou_branch(row.get("地支", ""), kubou),
+    )
+    tsuhensei = row.get("通変星", "")
+    summary = get_daiun_tsuhensei_summary(tsuhensei)
+    period = row.get("周期") or summary.get("period") or "—"
+    keywords = row.get("キーワード") or summary.get("keywords") or "—"
+
+    st.markdown(f"**{daiun_label}　{start_age}〜{end_age}**")
+    st.markdown(
+        f"{kanchi_html}｜{html.escape(str(tsuhensei or ''))}",
+        unsafe_allow_html=True,
+    )
+    st.markdown(f"周期：{html.escape(str(period))}")
+    st.markdown(f"キーワード：{html.escape(str(keywords))}")
+
+
+def render_client_daiun_table(daiun_result, kubou=""):
+    rows = daiun_result.get("rows", []) if isinstance(daiun_result, dict) else []
+    if rows:
+        direction_label = daiun_result.get("direction_label", "")
+        kigun_age = daiun_result.get("kigun_age")
+        if direction_label and kigun_age:
+            st.caption(f"{direction_label} / 起運 {format_age(kigun_age)}")
+        render_kubou_note()
+        for index, row in enumerate(rows):
+            with st.expander(format_daiun_expander_label(row), expanded=False):
+                render_daiun_row_content(row, kubou)
+            if index < len(rows) - 1:
+                render_daiun_transition_separator(row)
+        return
+
+    message = (
+        daiun_result.get("message")
+        if isinstance(daiun_result, dict)
+        else ""
+    )
+    if message:
+        st.caption(message)
+
+
 def render_yearly_monthly_flow(yearly_flow_result):
     rows = (
         yearly_flow_result.get("rows", [])
@@ -820,6 +888,63 @@ def render_yearly_monthly_flow(yearly_flow_result):
                 '<div style="border-top: 1px dashed rgba(49, 51, 63, 0.25); margin: 1rem 0;"></div>',
                 unsafe_allow_html=True,
             )
+
+
+def format_yearly_month_expander_label(row):
+    month_label = str(row.get("月", "") or "")
+    month_kanchi = str(row.get("月干支", "") or "")
+    tsuhensei = str(row.get("通変星", "") or "")
+
+    if month_kanchi and tsuhensei:
+        detail = f"{month_kanchi}｜{tsuhensei}"
+    else:
+        detail = month_kanchi or tsuhensei
+
+    if month_label and detail:
+        return f"{month_label}：{detail}"
+    return month_label or detail or "月別運勢"
+
+
+def render_yearly_month_row_content(row):
+    month_label = row.get("月", "")
+    month_kanchi = row.get("月干支", "")
+    tsuhensei = row.get("通変星", "")
+    keyword = row.get("キーワード", "")
+    comment = row.get("コメント", "")
+    error = row.get("error", "")
+
+    st.markdown(f"**{html.escape(str(month_label or ''))}**")
+    if error:
+        st.caption(error)
+        return
+
+    kanchi_html = format_kubou_marked_text(
+        month_kanchi,
+        row.get("空亡", False),
+    )
+    st.markdown(
+        f"{kanchi_html}｜{html.escape(str(tsuhensei or ''))}",
+        unsafe_allow_html=True,
+    )
+    if keyword:
+        st.markdown(f"キーワード：{html.escape(str(keyword))}")
+    if comment:
+        st.markdown(f"コメント：{html.escape(str(comment))}")
+
+
+def render_client_yearly_monthly_flow(yearly_flow_result):
+    rows = (
+        yearly_flow_result.get("rows", [])
+        if isinstance(yearly_flow_result, dict)
+        else []
+    )
+    if not rows:
+        return
+
+    render_kubou_note()
+    for row in rows:
+        with st.expander(format_yearly_month_expander_label(row), expanded=False):
+            render_yearly_month_row_content(row)
 
 
 def render_yearly_overall_fortune(yearly_overall_result):
@@ -2288,16 +2413,6 @@ if st.button("鑑定結果を表示する"):
     private_comment_sections.append("今年一年の総合運勢")
 
     for section_title in public_comment_sections:
-        if section_title == "大運と接木運":
-            with st.expander(section_title, expanded=False):
-                render_daiun_table(daiun_result, display_kubou)
-            continue
-
-        if section_title == "今年の運勢の流れ":
-            with st.expander(section_title, expanded=False):
-                render_yearly_monthly_flow(yearly_flow_result)
-            continue
-
         st.subheader(section_title)
         if section_title == "特殊な命式":
             render_special_meishiki(ijou_kanshi_data, gogyo_result)
@@ -2316,6 +2431,10 @@ if st.button("鑑定結果を表示する"):
             )
         elif section_title == "十二運星から読み取れる考え方の傾向":
             render_juuni_unsei_thinking_tendency_for_mobile(pillar_juuni_unsei_data)
+        elif section_title == "大運と接木運":
+            render_client_daiun_table(daiun_result, display_kubou)
+        elif section_title == "今年の運勢の流れ":
+            render_client_yearly_monthly_flow(yearly_flow_result)
         elif section_title == "特定日時での運勢":
             render_specific_datetime_fortunes(
                 specific_datetime_result,
