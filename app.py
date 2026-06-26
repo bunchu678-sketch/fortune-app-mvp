@@ -12,12 +12,13 @@ from calendar_reference import (
     get_calendar_context_for_birth_year,
     get_development_calendar_context,
 )
-from chart_render import render_gogyo_balance
+from chart_render import render_gogyo_balance, show_gogyo_relationship_chart
 from daiun_logic import (
     build_daiun_table,
     get_daiun_tsuhensei_summary,
 )
-from gogyou_logic import calculate_gogyo_scores_from_meishiki
+from fortune_data import GOGYO_ORDER
+from gogyou_logic import calculate_gogyo_scores_from_meishiki, init_gogyo_scores
 from meishiki_validation import (
     format_validation_summary_text,
     run_auto_meishiki_logic_smoke_test,
@@ -43,6 +44,7 @@ from personality_logic import (
     get_kubou,
     get_juuni_unsei,
     get_tsuhensei,
+    get_tsuhensei_display_name,
     render_juuni_unsei_detail,
     render_juuni_unsei_summary_table,
     render_juuni_unsei_thinking_pillar_table,
@@ -50,7 +52,7 @@ from personality_logic import (
     render_nikkan_public_comment,
     render_private_month_pair_comment,
     render_private_tsuhensei_comments,
-    render_public_tsuhensei_comments,
+    write_tsuhensei_comment,
 )
 from special_chart_logic import (
     SPECIAL_CHART_EMPTY_MESSAGE,
@@ -144,6 +146,133 @@ def render_inline_help_heading(title, help_text):
     )
 
 
+def format_japanese_date(value):
+    if isinstance(value, datetime):
+        value = value.date()
+    if isinstance(value, date):
+        return f"{value.year}年{value.month}月{value.day}日"
+    return str(value or "")
+
+
+def format_birth_time_for_client(value):
+    if value is None:
+        return "出生時刻不明"
+    return f"{value.hour}時{value.minute}分生まれ"
+
+
+def calculate_full_age(birth_date_value, reference_date_value):
+    if not isinstance(birth_date_value, date) or not isinstance(reference_date_value, date):
+        return None
+
+    age = reference_date_value.year - birth_date_value.year
+    if (reference_date_value.month, reference_date_value.day) < (
+        birth_date_value.month,
+        birth_date_value.day,
+    ):
+        age -= 1
+
+    if age < 0:
+        return None
+    return age
+
+
+def build_client_basic_info_rows(
+    name_text,
+    furigana_text,
+    birth_date_value,
+    birth_time_value,
+    birth_place_text,
+    gender_text,
+    consultation_text,
+    reading_date_value,
+):
+    rows = []
+    if name_text.strip():
+        rows.append({"項目": "氏名", "内容": name_text})
+    if furigana_text.strip():
+        rows.append({"項目": "ふりがな", "内容": furigana_text})
+
+    rows.append({"項目": "生年月日", "内容": format_japanese_date(birth_date_value)})
+    rows.append({"項目": "出生時刻", "内容": format_birth_time_for_client(birth_time_value)})
+
+    age = calculate_full_age(birth_date_value, reading_date_value)
+    if age is not None:
+        rows.append({"項目": "年齢", "内容": f"{age}歳"})
+
+    if birth_place_text and birth_place_text != "未選択":
+        rows.append({"項目": "出生地", "内容": birth_place_text})
+    if gender_text and gender_text != "未選択":
+        rows.append({"項目": "性別", "内容": gender_text})
+    if consultation_text.strip():
+        rows.append({"項目": "相談内容", "内容": consultation_text})
+    rows.append({"項目": "鑑定日", "内容": format_japanese_date(reading_date_value)})
+
+    return rows
+
+
+def render_public_gogyo_balance(gogyo_result, day_tenkan):
+    if not isinstance(gogyo_result, dict):
+        gogyo_result = {}
+
+    scores = gogyo_result.get("scores", init_gogyo_scores())
+    ordered_scores = {element: scores.get(element, 0) for element in GOGYO_ORDER}
+    kantei_year = gogyo_result.get("kantei_year", {})
+    kantei_year_tenkan = kantei_year.get("tenkan", "")
+    kantei_year_chishi = kantei_year.get("chishi", "")
+
+    if kantei_year_tenkan and kantei_year_chishi:
+        st.caption(f"鑑定年の干支（作用判定用）：{kantei_year_tenkan}{kantei_year_chishi}")
+
+    show_gogyo_relationship_chart(ordered_scores, day_tenkan)
+
+
+def format_month_pair_effect_title(zokkan_tsuhensei, tsuhensei):
+    return f"{tsuhensei}から{zokkan_tsuhensei}へ与える効果"
+
+
+def render_public_month_pair_effect_for_audience(zokkan_tsuhensei, tsuhensei):
+    if (
+        not zokkan_tsuhensei
+        or not tsuhensei
+        or zokkan_tsuhensei == "－"
+        or tsuhensei == "－"
+    ):
+        return
+
+    comment_text = get_month_pair_comment(zokkan_tsuhensei, tsuhensei, "public")
+    if not comment_text:
+        return
+
+    st.markdown(f"**{format_month_pair_effect_title(zokkan_tsuhensei, tsuhensei)}**")
+    st.write(f"蔵干通変星：{zokkan_tsuhensei}")
+    st.write(f"通変星：{tsuhensei}")
+    st.write(comment_text)
+
+
+def render_public_tsuhensei_comments_for_audience(
+    life_stage_tsuhensei_data,
+    month_zokkan_tsuhensei,
+    month_tsuhensei,
+):
+    for stage_data in life_stage_tsuhensei_data:
+        stage = stage_data["stage"]
+        outer = stage_data["outer"]
+        inner = stage_data["inner"]
+        with st.expander(f"▼ {stage}の傾向"):
+            st.markdown(f"**外側に見せている自分像：{get_tsuhensei_display_name(outer)}**")
+            if outer != "－":
+                write_tsuhensei_comment(outer, "public")
+
+            st.markdown(f"**本来の自分像：{get_tsuhensei_display_name(inner)}**")
+            write_tsuhensei_comment(inner, "public")
+
+            if stage == "30〜64歳":
+                render_public_month_pair_effect_for_audience(
+                    month_zokkan_tsuhensei,
+                    month_tsuhensei,
+                )
+
+
 
 def format_day_ijou_kanshi_result(ijou_kanshi_data):
     for data in ijou_kanshi_data or []:
@@ -185,25 +314,6 @@ def render_special_meishiki(ijou_kanshi_data, gogyo_result):
         return
 
     st.table(pd.DataFrame(rows))
-
-
-def render_public_month_pair_comment_for_audience(zokkan_tsuhensei, tsuhensei):
-    if (
-        not zokkan_tsuhensei
-        or not tsuhensei
-        or zokkan_tsuhensei == "－"
-        or tsuhensei == "－"
-    ):
-        return
-
-    comment_text = get_month_pair_comment(zokkan_tsuhensei, tsuhensei, "public")
-    if not comment_text:
-        return
-
-    with st.expander("月柱の蔵干通変星と通変星から読み取れる性格", expanded=False):
-        st.write(f"蔵干通変星：{zokkan_tsuhensei}")
-        st.write(f"通変星：{tsuhensei}")
-        st.write(comment_text)
 
 
 def inject_mobile_input_styles():
@@ -2041,7 +2151,17 @@ if st.button("鑑定結果を表示する"):
     if consultation.strip():
         basic_info_rows.append({"項目": "相談内容", "内容": consultation})
     basic_info_rows.append({"項目": "鑑定日", "内容": reading_date})
-    st.table(pd.DataFrame(basic_info_rows))
+    client_basic_info_rows = build_client_basic_info_rows(
+        name,
+        furigana,
+        birth_date,
+        birth_time_for_model,
+        birth_place_display,
+        gender,
+        consultation,
+        reading_date,
+    )
+    st.table(pd.DataFrame(client_basic_info_rows))
     st.subheader("命式表")
     meishiki_data = {
         "項目": [
@@ -2089,7 +2209,7 @@ if st.button("鑑定結果を表示する"):
     render_inline_help_heading("空亡", KUUBOU_HELP_TEXT)
     st.write(f"空亡：{display_kubou if display_kubou else '未入力'}")
     st.subheader("五行のバランス")
-    render_gogyo_balance(gogyo_result, effective_day_tenkan)
+    render_public_gogyo_balance(gogyo_result, effective_day_tenkan)
     life_stage_tsuhensei_data = [
         {
             "stage": "0〜4歳",
@@ -2140,7 +2260,20 @@ if st.button("鑑定結果を表示する"):
         "month": month_juuni_unsei,
         "year": year_juuni_unsei,
     }
-    comment_sections = [
+    public_comment_sections = [
+        "特殊な命式",
+        "日干から読み取れる性格",
+        "通変星・蔵干通変星から読み取れる性格",
+        "十二運星から読み取れる性格",
+        "十二運星から読み取れる考え方の傾向",
+        "大運と接木運",
+        "今年の運勢の流れ",
+    ]
+    if show_specific_datetime_section:
+        public_comment_sections.append("特定日時での運勢")
+    public_comment_sections.append("今年一年の総合運勢")
+
+    private_comment_sections = [
         "特殊な命式",
         "日干から読み取れる性格",
         "通変星・蔵干通変星から読み取れる性格",
@@ -2151,17 +2284,28 @@ if st.button("鑑定結果を表示する"):
         "今年の運勢の流れ",
     ]
     if show_specific_datetime_section:
-        comment_sections.append("特定日時での運勢")
-    comment_sections.append("今年一年の総合運勢")
-    for section_title in comment_sections:
+        private_comment_sections.append("特定日時での運勢")
+    private_comment_sections.append("今年一年の総合運勢")
+
+    for section_title in public_comment_sections:
+        if section_title == "大運と接木運":
+            with st.expander(section_title, expanded=False):
+                render_daiun_table(daiun_result, display_kubou)
+            continue
+
+        if section_title == "今年の運勢の流れ":
+            with st.expander(section_title, expanded=False):
+                render_yearly_monthly_flow(yearly_flow_result)
+            continue
+
         st.subheader(section_title)
         if section_title == "特殊な命式":
             render_special_meishiki(ijou_kanshi_data, gogyo_result)
         elif section_title == "日干から読み取れる性格":
             render_nikkan_public_comment(effective_day_tenkan)
         elif section_title == "通変星・蔵干通変星から読み取れる性格":
-            render_public_tsuhensei_comments(life_stage_tsuhensei_data)
-            render_public_month_pair_comment_for_audience(
+            render_public_tsuhensei_comments_for_audience(
+                life_stage_tsuhensei_data,
                 month_zokkan_tsuhensei,
                 month_tsuhensei,
             )
@@ -2172,10 +2316,6 @@ if st.button("鑑定結果を表示する"):
             )
         elif section_title == "十二運星から読み取れる考え方の傾向":
             render_juuni_unsei_thinking_tendency_for_mobile(pillar_juuni_unsei_data)
-        elif section_title == "大運と接木運":
-            render_daiun_table(daiun_result, display_kubou)
-        elif section_title == "今年の運勢の流れ":
-            render_yearly_monthly_flow(yearly_flow_result)
         elif section_title == "特定日時での運勢":
             render_specific_datetime_fortunes(
                 specific_datetime_result,
@@ -2199,7 +2339,7 @@ if st.button("鑑定結果を表示する"):
         st.subheader("五行のバランス")
         render_gogyo_balance(gogyo_result, effective_day_tenkan)
 
-        for section_title in comment_sections:
+        for section_title in private_comment_sections:
             st.subheader(section_title)
             if section_title == "特殊な命式":
                 render_special_meishiki(ijou_kanshi_data, gogyo_result)
