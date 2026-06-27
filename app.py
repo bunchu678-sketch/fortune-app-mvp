@@ -70,6 +70,7 @@ from yearly_overall_logic import build_yearly_overall_fortune
 
 KUUBOU_HELP_TEXT = "自分を見失いやすいが、素直・反省・感謝を忘れずに慎重に行動すると吉。可能性は無限大に。"
 APP_LOGO_PATH = Path(__file__).resolve().parent / "assets" / "logo_white.png"
+UNKNOWN_BIRTH_TIME_CALCULATION_TIME = datetime_time(12, 0)
 
 
 def get_image_data_uri(image_path):
@@ -430,6 +431,28 @@ def format_birth_time_for_client(value):
     if value is None:
         return "出生時刻不明"
     return f"{value.hour}時{value.minute:02d}分生まれ"
+
+
+def get_birth_time_for_calculation(birth_time_unknown, birth_time_value):
+    if birth_time_unknown:
+        return UNKNOWN_BIRTH_TIME_CALCULATION_TIME
+    return birth_time_value
+
+
+def clear_hour_pillar_for_unknown_birth_time(meishiki):
+    if not isinstance(meishiki, dict):
+        return meishiki
+
+    cleared_meishiki = {
+        pillar_key: dict(pillar) if isinstance(pillar, dict) else pillar
+        for pillar_key, pillar in meishiki.items()
+    }
+    cleared_meishiki["hour"] = {
+        "tenkan": "",
+        "chishi": "",
+        "zokkan": "",
+    }
+    return cleared_meishiki
 
 
 def calculate_full_age(birth_date_value, reference_date_value):
@@ -2318,14 +2341,21 @@ birth_country_for_model = "日本"
 birth_time_for_model = None
 if not birth_time_unknown:
     birth_time_for_model = datetime_time(int(birth_hour), int(birth_minute))
+birth_time_for_calculation = get_birth_time_for_calculation(
+    birth_time_unknown,
+    birth_time_for_model,
+)
+birth_place_for_calculation = None if birth_time_unknown else birth_place_for_model
 birth_info = build_birth_info(
     birth_date=birth_date,
-    birth_time=birth_time_for_model,
-    birth_place=birth_place_for_model,
+    birth_time=birth_time_for_calculation,
+    birth_place=birth_place_for_calculation,
     birth_country=birth_country_for_model,
     time_adjustment_enabled=False,
     time_adjustment_minutes=0,
 )
+birth_info["birth_time_unknown"] = bool(birth_time_unknown)
+birth_info["display_birth_place"] = birth_place_for_model or ""
 adjusted_birth_datetime = birth_info.get("adjusted_birth_datetime")
 calculation_birth_date = (
     adjusted_birth_datetime.date()
@@ -2486,6 +2516,9 @@ else:
             auto_calculation_errors.extend(effective_meishiki_result.get("errors", []))
     except Exception as exc:
         auto_calculation_errors.append(str(exc))
+
+if birth_time_unknown:
+    effective_meishiki = clear_hour_pillar_for_unknown_birth_time(effective_meishiki)
 
 effective_hour_tenkan = get_manual_pillar_value(effective_meishiki, "hour", "tenkan")
 effective_day_tenkan = get_manual_pillar_value(effective_meishiki, "day", "tenkan")
