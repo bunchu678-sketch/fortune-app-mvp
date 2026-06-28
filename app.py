@@ -723,7 +723,7 @@ def render_thinking_score_legend(numeric_scores):
     for index, (label, value) in enumerate(numeric_scores.items()):
         color = THINKING_BAR_COLORS[index % len(THINKING_BAR_COLORS)]
         legend_rows.append(
-            "<span style=\"display:inline-flex;align-items:center;gap:6px;color:#24292f;\">"
+            "<span style=\"display:inline-flex;align-items:center;gap:6px;color:#f4efe6;\">"
             f"<span style=\"width:10px;height:10px;background:{color};display:inline-block;border-radius:2px;\"></span>"
             f"{html.escape(label)} {html.escape(format_score_percent(value))}"
             "</span>"
@@ -926,7 +926,7 @@ def render_work_type_pie_legend(filtered_scores):
         color = THINKING_BAR_COLORS[index % len(THINKING_BAR_COLORS)]
         percent = format_score_percent(value / total * 100)
         legend_rows.append(
-            "<span style=\"display:inline-flex;align-items:center;gap:6px;color:#24292f;\">"
+            "<span style=\"display:inline-flex;align-items:center;gap:6px;color:#f4efe6;\">"
             f"<span style=\"width:10px;height:10px;background:{color};display:inline-block;border-radius:2px;\"></span>"
             f"{index + 1}. {html.escape(label)} {html.escape(percent)}"
             "</span>"
