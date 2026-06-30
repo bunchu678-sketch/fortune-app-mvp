@@ -4,7 +4,7 @@ from datetime import date, datetime, time as datetime_time
 
 from calendar_logic import calculate_month_pillar, calculate_year_pillar
 from calendar_reference import get_calendar_context_for_birth_year
-from personality_logic import get_tsuhensei
+from fortune_core_logic import get_tsuhensei
 
 
 CHISHI_SET = {"子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"}

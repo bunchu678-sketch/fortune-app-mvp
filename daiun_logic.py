@@ -254,7 +254,7 @@ def is_setsuboku_transition(current_branch, next_branch, direction):
 
 def _get_tsuhensei(day_tenkan, target_tenkan):
     try:
-        from personality_logic import get_tsuhensei
+        from fortune_core_logic import get_tsuhensei
 
         return get_tsuhensei(day_tenkan, target_tenkan)
     except Exception:
@@ -263,7 +263,7 @@ def _get_tsuhensei(day_tenkan, target_tenkan):
 
 def _get_juuni_unsei(day_tenkan, chishi):
     try:
-        from personality_logic import get_juuni_unsei
+        from fortune_core_logic import get_juuni_unsei
 
         return get_juuni_unsei(day_tenkan, chishi)
     except Exception:

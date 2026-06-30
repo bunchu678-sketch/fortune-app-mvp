@@ -4,7 +4,7 @@ from datetime import date, datetime, time as datetime_time
 
 from calendar_logic import calculate_year_pillar
 from calendar_reference import get_calendar_context_for_birth_year
-from personality_logic import get_tsuhensei
+from fortune_core_logic import get_tsuhensei
 
 
 YEARLY_OVERALL_COMMENTS = {

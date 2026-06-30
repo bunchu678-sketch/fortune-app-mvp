@@ -1,0 +1,634 @@
+:root {
+  --bg: #151816;
+  --bg-soft: #1d211f;
+  --panel: #232825;
+  --panel-strong: #2c332f;
+  --line: rgba(244, 239, 230, 0.16);
+  --ink: #f4efe6;
+  --muted: #c6beb2;
+  --soft: #9fa99f;
+  --accent: #9eb9a8;
+  --accent-2: #d7a96b;
+  --accent-3: #c87566;
+  --blue: #7aa7b0;
+  --button: #ece6d8;
+  --button-text: #171a18;
+  --danger: #e7998d;
+  --shadow: rgba(0, 0, 0, 0.22);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #141715 0%, #1a1e1b 48%, #20241f 100%);
+  color: var(--ink);
+  font-family:
+    "Yu Gothic UI",
+    "Hiragino Sans",
+    "BIZ UDPGothic",
+    Meiryo,
+    sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+main {
+  min-height: 100vh;
+}
+
+.appShell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 18px 14px 44px;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 2px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brandMark {
+  flex: 0 0 auto;
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+}
+
+.brandMark img {
+  object-fit: contain;
+}
+
+.topBar p {
+  margin: 0 0 5px;
+  color: var(--soft);
+  font-size: 0.86rem;
+}
+
+.topBar h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.55rem, 5vw, 2.35rem);
+  line-height: 1.12;
+  font-weight: 700;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding-top: 18px;
+}
+
+.inputPanel,
+.outputPanel {
+  border: 1px solid var(--line);
+  background: rgba(31, 36, 33, 0.9);
+  box-shadow: 0 18px 42px var(--shadow);
+}
+
+.inputPanel {
+  position: sticky;
+  top: 12px;
+  display: grid;
+  gap: 13px;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.outputPanel {
+  min-height: 620px;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.panelTitle,
+.buttonRow button,
+.memoPanel summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panelTitle h2 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(244, 239, 230, 0.18);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--ink);
+  padding: 9px 11px;
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(158, 185, 168, 0.95);
+  box-shadow: 0 0 0 3px rgba(158, 185, 168, 0.12);
+}
+
+input:disabled {
+  color: rgba(244, 239, 230, 0.42);
+  background: rgba(44, 51, 47, 0.58);
+}
+
+textarea {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.fieldPair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.timeLine {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.checkLine {
+  min-height: 42px;
+  display: inline-flex;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+
+.checkLine input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  accent-color: var(--accent);
+}
+
+.prominent {
+  padding: 10px 11px;
+  border: 1px solid rgba(158, 185, 168, 0.28);
+  border-radius: 8px;
+  background: rgba(158, 185, 168, 0.08);
+}
+
+.candidateBox {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(244, 239, 230, 0.12);
+  border-radius: 8px;
+  background: rgba(20, 23, 21, 0.42);
+}
+
+.buttonRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.buttonRow button {
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid rgba(244, 239, 230, 0.28);
+  border-radius: 8px;
+  background: var(--button);
+  color: var(--button-text);
+  font-weight: 700;
+}
+
+.buttonRow .ghostButton {
+  width: 48px;
+  background: transparent;
+  color: var(--ink);
+}
+
+.buttonRow .ghostButton svg + * {
+  display: none;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.formError {
+  margin: 0;
+  color: var(--danger);
+  line-height: 1.6;
+}
+
+.emptyState {
+  min-height: 540px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.emptyState h2,
+.emptyState p {
+  margin: 0;
+}
+
+.resultStack {
+  display: grid;
+  gap: 16px;
+}
+
+.resultSummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.resultSummary div,
+.infoCard,
+.miniPanel,
+.timelineItem,
+.monthCard,
+.textBlock {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(35, 40, 37, 0.82);
+}
+
+.resultSummary div {
+  min-height: 76px;
+  padding: 12px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+}
+
+.resultSummary span,
+.cardEyebrow,
+.sectionHeading span,
+.timelineItem span,
+.monthCard span {
+  color: var(--soft);
+  font-size: 0.78rem;
+}
+
+.resultSummary b {
+  font-size: 1.06rem;
+  color: var(--ink);
+}
+
+.section {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.sectionHeading {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sectionHeading h2 {
+  margin: 0;
+  font-size: 1.16rem;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 520px;
+  background: rgba(24, 28, 26, 0.48);
+}
+
+th,
+td {
+  padding: 10px 11px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--accent);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+td {
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.62;
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
+.empty {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.gogyoGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.gogyoRow {
+  display: grid;
+  grid-template-columns: 3rem 1fr 2.2rem;
+  gap: 10px;
+  align-items: center;
+}
+
+.gogyoLabel,
+.gogyoValue {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.gogyoTrack,
+.scoreTrack {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(244, 239, 230, 0.1);
+  overflow: hidden;
+}
+
+.gogyoFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+
+.textBlock {
+  padding: 14px;
+}
+
+.textBlock h3,
+.infoCard h3,
+.miniPanel h3,
+.timelineItem h3,
+.monthCard h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.textBlock p,
+.infoCard p,
+.timelineItem p,
+.monthCard p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.75;
+  white-space: pre-line;
+}
+
+.keyword {
+  margin-top: 8px !important;
+  color: var(--accent-2) !important;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.infoCard,
+.miniPanel,
+.timelineItem,
+.monthCard {
+  padding: 14px;
+}
+
+.thinkingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.miniPanel.wide {
+  grid-column: 1 / -1;
+}
+
+.scoreLine {
+  display: grid;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.scoreMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+}
+
+.scoreTrack div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--blue), var(--accent));
+}
+
+.workGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.workTile {
+  min-height: 72px;
+  display: grid;
+  gap: 4px;
+  place-items: center;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(122, 167, 176, 0.12);
+  text-align: center;
+}
+
+.workTile span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.workTile b {
+  color: var(--ink);
+  font-size: 1.18rem;
+}
+
+.timeline,
+.monthGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.timelineItem small,
+.monthCard small {
+  display: block;
+  margin-top: 8px;
+  color: var(--accent);
+  line-height: 1.55;
+}
+
+.monthGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.monthCard.marked {
+  border-color: rgba(199, 117, 102, 0.55);
+  background: rgba(199, 117, 102, 0.1);
+}
+
+.memoPanel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(24, 28, 26, 0.58);
+}
+
+.memoPanel summary {
+  min-height: 46px;
+  padding: 0 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.memoContent {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+@media (max-width: 920px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .inputPanel {
+    position: static;
+  }
+
+  .resultSummary,
+  .monthGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .appShell {
+    padding: 12px 10px 32px;
+  }
+
+  .topBar {
+    align-items: flex-end;
+    gap: 12px;
+  }
+
+  .brandMark {
+    width: 64px;
+    height: 64px;
+  }
+
+  .workspace {
+    padding-top: 12px;
+    gap: 12px;
+  }
+
+  .inputPanel,
+  .outputPanel {
+    padding: 13px;
+  }
+
+  .fieldPair,
+  .resultSummary,
+  .cardGrid,
+  .thinkingGrid,
+  .monthGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .timeLine {
+    grid-template-columns: 1fr;
+  }
+
+  .buttonRow {
+    grid-template-columns: 1fr 48px;
+  }
+
+  .workGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  table {
+    min-width: 460px;
+  }
+}
