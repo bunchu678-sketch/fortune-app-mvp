@@ -194,6 +194,7 @@ def inject_app_styles():
 
         div[data-testid="stTextInput"] input,
         div[data-testid="stDateInput"] input,
+        div[data-testid="stTimeInput"] input,
         div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
         div[data-testid="stTextArea"] textarea {
             border-radius: 8px;
@@ -205,10 +206,29 @@ def inject_app_styles():
 
         div[data-testid="stTextInput"] label,
         div[data-testid="stDateInput"] label,
+        div[data-testid="stTimeInput"] label,
         div[data-testid="stSelectbox"] label,
-        div[data-testid="stTextArea"] label,
-        div[data-testid="stCheckbox"] label {
+        div[data-testid="stTextArea"] label {
             color: var(--fortune-muted);
+        }
+
+        div[data-testid="stTextInput"] label p,
+        div[data-testid="stDateInput"] label p,
+        div[data-testid="stTimeInput"] label p,
+        div[data-testid="stSelectbox"] label p,
+        div[data-testid="stTextArea"] label p,
+        div[data-testid="stTextInput"] label span,
+        div[data-testid="stDateInput"] label span,
+        div[data-testid="stTimeInput"] label span,
+        div[data-testid="stSelectbox"] label span,
+        div[data-testid="stTextArea"] label span {
+            color: var(--fortune-muted);
+        }
+
+        div[data-testid="stCheckbox"] label,
+        div[data-testid="stCheckbox"] label p,
+        div[data-testid="stCheckbox"] label span {
+            color: var(--fortune-ink) !important;
         }
 
         div[data-baseweb="select"] span {
