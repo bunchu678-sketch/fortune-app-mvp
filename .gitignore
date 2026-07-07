@@ -18,6 +18,7 @@ Thumbs.db
 *.log
 *.bak
 *.backup
+*.backup_*
 *.tmp
 
 # Internal development notes and diagnostic files
