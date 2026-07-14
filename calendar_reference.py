@@ -3,11 +3,13 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from sekki_data import (
-    get_risshun_datetime_by_year,
-    get_sekki_entries_around_year,
-    get_sekki_entries_by_year,
     get_supported_birth_year_range,
     is_supported_birth_year,
+)
+from taizan_sekki_correction import (
+    get_corrected_risshun_datetime,
+    get_corrected_taizan_sekki_entries_around_year,
+    get_corrected_taizan_sekki_entries_by_year,
 )
 
 
@@ -49,11 +51,12 @@ def get_development_calendar_context() -> dict:
     将来的には、国立天文台ベースの節入り日時、正確な日柱基準日、
     泰山流万年暦との照合結果に差し替える。
     """
+    sekki_entries = get_corrected_taizan_sekki_entries_by_year(DEVELOPMENT_SEKKI_YEAR)
     return {
         "ok": True,
         "label": "開発用・検証用カレンダー設定",
-        "risshun_datetime": DEVELOPMENT_RISSHUN_DATETIME,
-        "sekki_entries": get_sekki_entries_by_year(DEVELOPMENT_SEKKI_YEAR),
+        "risshun_datetime": get_corrected_risshun_datetime(DEVELOPMENT_SEKKI_YEAR),
+        "sekki_entries": sekki_entries,
         "sekki_year": DEVELOPMENT_SEKKI_YEAR,
         "base_date": DEVELOPMENT_BASE_DATE,
         "base_day_kanchi": DEVELOPMENT_BASE_DAY_KANCHI,
@@ -87,8 +90,21 @@ def get_calendar_context_for_birth_year(birth_year: int) -> dict:
             "errors": [get_supported_birth_year_message()],
         }
 
-    risshun_datetime = get_risshun_datetime_by_year(year)
-    sekki_entries = get_sekki_entries_around_year(year)
+    try:
+        risshun_datetime = get_corrected_risshun_datetime(year)
+        sekki_entries = get_corrected_taizan_sekki_entries_around_year(year)
+    except RuntimeError as error:
+        return {
+            "ok": False,
+            "label": f"{year}年生年月日用カレンダー設定",
+            "risshun_datetime": None,
+            "sekki_entries": [],
+            "sekki_year": year,
+            "base_date": DEVELOPMENT_BASE_DATE,
+            "base_day_kanchi": DEVELOPMENT_BASE_DAY_KANCHI,
+            "warnings": get_development_calendar_warnings(),
+            "errors": [str(error)],
+        }
     errors = []
     if risshun_datetime is None:
         errors.append(f"{year}年の立春データを取得できません。")

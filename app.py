@@ -1733,6 +1733,21 @@ def render_smoke_warnings(warnings):
         st.write(f"- {warning}")
 
 
+def render_taizan_sekki_boundary_warnings(warnings):
+    """自動命式が返した節入り境界警告を、判定結果を変えずに表示する。"""
+    for warning in warnings or []:
+        if not isinstance(warning, dict):
+            continue
+        message = warning.get("message", "節入り境界に関する注意があります。")
+        term_name = warning.get("term_name") or "節気"
+        boundary_datetime = warning.get("boundary_datetime")
+        detail = f"対象節気: {term_name} / 境界: {format_datetime_for_display(boundary_datetime)}"
+        if warning.get("code") == "TAIZAN_SEKKI_TIME_SYSTEM_CANDIDATE":
+            st.error(f"{message}\n\n{detail}")
+        else:
+            st.warning(f"{message}\n\n{detail}")
+
+
 def get_manual_pillar_value(manual_meishiki, pillar_key, value_key):
     pillar = manual_meishiki.get(pillar_key, {})
     if not isinstance(pillar, dict):
@@ -2513,6 +2528,7 @@ effective_meishiki_source_label = "自動計算命式"
 
 calendar_context = get_calendar_context_for_birth_year(calculation_birth_date.year)
 auto_calculation_errors = []
+taizan_sekki_boundary_warnings = []
 if not calendar_context.get("ok"):
     auto_calculation_errors.extend(calendar_context.get("errors", []))
 else:
@@ -2523,6 +2539,10 @@ else:
             sekki_entries=calendar_context["sekki_entries"],
             base_date=calendar_context["base_date"],
             base_day_kanchi=calendar_context["base_day_kanchi"],
+        )
+        taizan_sekki_boundary_warnings = auto_effective_meishiki.get(
+            "sekki_boundary_warnings",
+            [],
         )
         effective_meishiki_result = select_effective_meishiki(
             input_mode="auto",
@@ -2632,6 +2652,7 @@ if st.button("鑑定結果を表示する"):
         for error in auto_calculation_errors:
             st.write(f"- {error}")
         st.stop()
+    render_taizan_sekki_boundary_warnings(taizan_sekki_boundary_warnings)
     st.subheader("基本情報")
     basic_info_rows = []
     if name.strip():

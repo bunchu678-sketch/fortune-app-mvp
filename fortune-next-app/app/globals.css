@@ -297,6 +297,26 @@ textarea {
   gap: 16px;
 }
 
+.sekkiWarningList {
+  display: grid;
+  gap: 8px;
+}
+
+.sekkiWarning {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #9a7a32;
+  border-radius: 8px;
+  background: rgba(122, 93, 31, 0.18);
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.sekkiWarning.strong {
+  border-color: var(--danger);
+  background: rgba(169, 68, 57, 0.2);
+}
+
 .resultSummary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

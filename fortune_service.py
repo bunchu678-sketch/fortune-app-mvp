@@ -320,6 +320,7 @@ def calculate_fortune(payload):
     )
     calendar_context = get_calendar_context_for_birth_year(calculation_birth_date.year)
     auto_calculation_errors = []
+    sekki_boundary_warnings = []
     effective_meishiki = build_empty_meishiki()
     source_label = "自動計算命式"
 
@@ -334,6 +335,7 @@ def calculate_fortune(payload):
                 base_date=calendar_context["base_date"],
                 base_day_kanchi=calendar_context["base_day_kanchi"],
             )
+            sekki_boundary_warnings = auto_meishiki.get("sekki_boundary_warnings", [])
             selected = select_effective_meishiki(
                 input_mode="auto",
                 manual_meishiki=build_empty_meishiki(),
@@ -358,6 +360,7 @@ def calculate_fortune(payload):
             "calendar": {
                 "label": calendar_context.get("label", ""),
                 "warnings": calendar_context.get("warnings", []),
+                "boundary_warnings": sekki_boundary_warnings,
             },
         })
 
@@ -430,6 +433,7 @@ def calculate_fortune(payload):
         "calendar": {
             "label": calendar_context.get("label", ""),
             "warnings": calendar_context.get("warnings", []),
+            "boundary_warnings": sekki_boundary_warnings,
         },
         "meishiki": effective_meishiki,
         "meishiki_table": build_meishiki_table_data(effective_meishiki, star_data),

@@ -18,9 +18,20 @@ type FortuneForm = {
   specificDatetimeCandidates: Array<{ date: string; time: string }>;
 };
 
+type SekkiBoundaryWarning = {
+  code: string;
+  level: string;
+  message: string;
+  term_name?: string;
+  boundary_datetime?: string;
+};
+
 type FortuneResult = {
   ok?: boolean;
   errors?: string[];
+  calendar?: {
+    boundary_warnings?: SekkiBoundaryWarning[];
+  };
   [key: string]: any;
 };
 
@@ -185,6 +196,7 @@ function ResultView({ result }: { result: FortuneResult }) {
   const specificRows = asRows(result.specific_datetime?.rows);
   const juuniRows = asRows(result.personality?.juuni_unsei?.rows);
   const lifeStageRows = asRows(result.personality?.life_stage_tsuhensei);
+  const sekkiWarnings = result.calendar?.boundary_warnings ?? [];
 
   return (
     <div className="resultStack">
@@ -206,6 +218,20 @@ function ResultView({ result }: { result: FortuneResult }) {
           <b>{result.source_label || "自動計算命式"}</b>
         </div>
       </div>
+
+      {sekkiWarnings.length ? (
+        <div className="sekkiWarningList" aria-live="polite">
+          {sekkiWarnings.map((warning, index) => (
+            <p
+              className={warning.code === "TAIZAN_SEKKI_TIME_SYSTEM_CANDIDATE" ? "sekkiWarning strong" : "sekkiWarning"}
+              key={`${warning.code}-${warning.term_name ?? index}`}
+            >
+              {warning.message}
+              {warning.term_name ? ` 対象節気: ${warning.term_name}` : ""}
+            </p>
+          ))}
+        </div>
+      ) : null}
 
       <Section title="基本情報">
         <PlainTable rows={asRows(result.basic_info)} />

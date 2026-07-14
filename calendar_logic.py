@@ -13,6 +13,7 @@ from fortune_data import (
     TENKAN_ORDER,
 )
 from meishiki_model import build_auto_meishiki_record
+from taizan_sekki_correction import get_taizan_sekki_boundary_warnings
 
 YEAR_KANCHI_BASE_YEAR = 1984
 YEAR_KANCHI_BASE = "甲子"
@@ -825,12 +826,17 @@ def calculate_auto_meishiki(
         "day": get_taizan_hidden_stem(day_result["chishi"], hidden_stem_day_count),
         "hour": get_taizan_hidden_stem(hour_result["chishi"], hidden_stem_day_count),
     }
+    sekki_boundary_warnings = get_taizan_sekki_boundary_warnings(
+        calculation_datetime,
+        sekki_entries,
+    )
 
     return {
         "birth_info": birth_info,
         "calculation_datetime": calculation_datetime,
         "hidden_stem_day_count": hidden_stem_day_count,
         "hidden_stem_latest_sekki_datetime": month_result["matched_sekki_datetime"],
+        "sekki_boundary_warnings": sekki_boundary_warnings,
         "year": build_auto_pillar_result(
             "year_kanchi",
             year_result,
