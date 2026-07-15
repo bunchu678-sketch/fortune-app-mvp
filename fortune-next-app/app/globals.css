@@ -312,11 +312,6 @@ textarea {
   line-height: 1.6;
 }
 
-.sekkiWarning.strong {
-  border-color: var(--danger);
-  background: rgba(169, 68, 57, 0.2);
-}
-
 .resultSummary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
 from sekki_data import TARGET_SEKKI_TERMS
@@ -13,20 +13,13 @@ except ImportError:  # pragma: no cover - exercised through application setup.
 
 
 NORMAL_BOUNDARY_WINDOW = timedelta(minutes=3)
-TIME_SYSTEM_CANDIDATE_WINDOW = timedelta(minutes=90)
-TIME_SYSTEM_CANDIDATE_YEAR = 1950
-TIME_SYSTEM_CANDIDATE_TERMS = frozenset({"芒種", "小暑", "立秋", "白露"})
+FIXED_JST = timezone(timedelta(hours=9), name="JST")
 
 NORMAL_BOUNDARY_WARNING_CODE = "TAIZAN_SEKKI_BOUNDARY_NEAR"
-TIME_SYSTEM_CANDIDATE_WARNING_CODE = "TAIZAN_SEKKI_TIME_SYSTEM_CANDIDATE"
 
 NORMAL_BOUNDARY_WARNING_MESSAGE = (
     "節入り時刻に非常に近いため、流派資料によって月柱・年柱が変わる可能性があります。"
     "必要に応じて原資料で確認してください。"
-)
-TIME_SYSTEM_CANDIDATE_WARNING_MESSAGE = (
-    "この時期の節入りは、夏時間・時刻制度差分の影響候補が確認されています。"
-    "境界付近の場合、泰山流資料での個別確認が必要です。"
 )
 
 
@@ -36,13 +29,29 @@ def round_eacal_datetime_to_minute(value: datetime) -> datetime:
         raise TypeError("value must be a datetime.")
 
     rounded = value.replace(second=0, microsecond=0)
-    if value.second >= 30:
+    elapsed_in_minute = timedelta(seconds=value.second, microseconds=value.microsecond)
+    if elapsed_in_minute >= timedelta(seconds=30):
         rounded += timedelta(minutes=1)
     return rounded
 
 
-def _legacy_local_datetime(value: datetime) -> datetime:
-    """既存アプリのnaiveな日本ローカル時刻比較用にtimezone情報だけを外す。"""
+def convert_eacal_datetime_to_fixed_jst(value: datetime) -> datetime:
+    """EACALのaware datetimeを、常時UTC+09:00の固定JSTへ実変換する。"""
+    if not isinstance(value, datetime):
+        raise TypeError("value must be a datetime.")
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("EACAL datetime must be timezone-aware.")
+    return value.astimezone(FIXED_JST)
+
+
+def correct_eacal_datetime_for_taizan(value: datetime) -> datetime:
+    """固定JSTへ実変換したEACAL時刻を、泰山流の分境界へ丸める。"""
+    fixed_jst_datetime = convert_eacal_datetime_to_fixed_jst(value)
+    return round_eacal_datetime_to_minute(fixed_jst_datetime)
+
+
+def _to_legacy_naive_datetime(value: datetime) -> datetime:
+    """固定JSTの時計表示を維持し、既存アプリ比較用のnaive datetimeへ変換する。"""
     return value.replace(tzinfo=None) if value.tzinfo is not None else value
 
 
@@ -64,8 +73,8 @@ def _build_corrected_entries(year: int) -> tuple[dict, ...]:
         if original_eacal_datetime is None:
             raise RuntimeError(f"{year}年のEACAL節気データに{term_name}がありません。")
 
-        corrected_eacal_datetime = round_eacal_datetime_to_minute(original_eacal_datetime)
-        corrected_sekki_datetime = _legacy_local_datetime(corrected_eacal_datetime)
+        corrected_eacal_datetime = correct_eacal_datetime_for_taizan(original_eacal_datetime)
+        corrected_sekki_datetime = _to_legacy_naive_datetime(corrected_eacal_datetime)
         entries.append(
             {
                 "year": int(year),
@@ -75,8 +84,8 @@ def _build_corrected_entries(year: int) -> tuple[dict, ...]:
                 "original_eacal_datetime": original_eacal_datetime,
                 "corrected_eacal_datetime": corrected_eacal_datetime,
                 "month_branch": month_branch,
-                "source": "EACAL基準・泰山流分四捨五入",
-                "note": "EACAL時刻を秒30以上で分繰り上げ。既存のnaiveローカル時刻判定へ渡す。",
+                "source": "EACAL基準・固定JST変換・泰山流分四捨五入",
+                "note": "EACAL aware時刻を固定JSTへ実変換後、秒30以上で分繰り上げし、naive境界へ渡す。",
             }
         )
     return tuple(entries)
@@ -106,9 +115,9 @@ def get_corrected_risshun_datetime(year: int) -> datetime | None:
 def _difference_seconds(target_datetime: datetime, boundary_datetime: datetime) -> float:
     """既存アプリのnaive入力とEACAL aware値を安全に比較する。"""
     if target_datetime.tzinfo is None and boundary_datetime.tzinfo is not None:
-        boundary_datetime = _legacy_local_datetime(boundary_datetime)
+        boundary_datetime = _to_legacy_naive_datetime(boundary_datetime)
     elif target_datetime.tzinfo is not None and boundary_datetime.tzinfo is None:
-        target_datetime = _legacy_local_datetime(target_datetime)
+        target_datetime = _to_legacy_naive_datetime(target_datetime)
     return (target_datetime - boundary_datetime).total_seconds()
 
 
@@ -116,7 +125,7 @@ def get_taizan_sekki_boundary_warnings(
     target_datetime: datetime,
     sekki_entries: list[dict],
 ) -> list[dict]:
-    """補正後境界の近接警告と1950年の制度差分候補警告を返す。"""
+    """固定JST補正後境界の前後3分以内に通常警告を返す。"""
     if not isinstance(target_datetime, datetime):
         raise TypeError("target_datetime must be a datetime.")
 
@@ -140,40 +149,6 @@ def get_taizan_sekki_boundary_warnings(
                     "boundary_datetime": corrected_datetime,
                     "difference_seconds": corrected_difference_seconds,
                     "comparison_basis": "corrected_sekki_datetime",
-                }
-            )
-
-        if (
-            entry.get("year") != TIME_SYSTEM_CANDIDATE_YEAR
-            or entry.get("name") not in TIME_SYSTEM_CANDIDATE_TERMS
-        ):
-            continue
-
-        original_datetime = entry.get("original_eacal_datetime")
-        original_difference_seconds = (
-            _difference_seconds(target_datetime, original_datetime)
-            if isinstance(original_datetime, datetime)
-            else None
-        )
-        within_original_window = (
-            original_difference_seconds is not None
-            and abs(original_difference_seconds) <= TIME_SYSTEM_CANDIDATE_WINDOW.total_seconds()
-        )
-        within_corrected_window = (
-            abs(corrected_difference_seconds) <= TIME_SYSTEM_CANDIDATE_WINDOW.total_seconds()
-        )
-        if within_original_window or within_corrected_window:
-            warnings.append(
-                {
-                    "code": TIME_SYSTEM_CANDIDATE_WARNING_CODE,
-                    "level": "warning",
-                    "message": TIME_SYSTEM_CANDIDATE_WARNING_MESSAGE,
-                    "term_name": entry.get("name"),
-                    "boundary_datetime": corrected_datetime,
-                    "original_eacal_datetime": original_datetime,
-                    "difference_seconds": corrected_difference_seconds,
-                    "original_difference_seconds": original_difference_seconds,
-                    "comparison_basis": "original_eacal_datetime_or_corrected_sekki_datetime",
                 }
             )
 

@@ -1742,10 +1742,7 @@ def render_taizan_sekki_boundary_warnings(warnings):
         term_name = warning.get("term_name") or "節気"
         boundary_datetime = warning.get("boundary_datetime")
         detail = f"対象節気: {term_name} / 境界: {format_datetime_for_display(boundary_datetime)}"
-        if warning.get("code") == "TAIZAN_SEKKI_TIME_SYSTEM_CANDIDATE":
-            st.error(f"{message}\n\n{detail}")
-        else:
-            st.warning(f"{message}\n\n{detail}")
+        st.warning(f"{message}\n\n{detail}")
 
 
 def get_manual_pillar_value(manual_meishiki, pillar_key, value_key):

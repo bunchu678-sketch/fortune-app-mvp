@@ -222,10 +222,7 @@ function ResultView({ result }: { result: FortuneResult }) {
       {sekkiWarnings.length ? (
         <div className="sekkiWarningList" aria-live="polite">
           {sekkiWarnings.map((warning, index) => (
-            <p
-              className={warning.code === "TAIZAN_SEKKI_TIME_SYSTEM_CANDIDATE" ? "sekkiWarning strong" : "sekkiWarning"}
-              key={`${warning.code}-${warning.term_name ?? index}`}
-            >
+            <p className="sekkiWarning" key={`${warning.code}-${warning.term_name ?? index}`}>
               {warning.message}
               {warning.term_name ? ` 対象節気: ${warning.term_name}` : ""}
             </p>
