@@ -35,7 +35,7 @@ type FortuneResult = {
   [key: string]: any;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_FORTUNE_API_URL ?? "http://127.0.0.1:8765";
+const API_BASE = (process.env.NEXT_PUBLIC_FORTUNE_API_URL ?? "").replace(/\/+$/, "");
 
 const prefectures = [
   "未選択",

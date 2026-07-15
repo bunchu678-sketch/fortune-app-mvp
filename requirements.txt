@@ -7,3 +7,5 @@ pyephem==9.99
 ephem==4.2.1
 pytz==2026.2
 jdcal==1.4.1
+fastapi==0.139.0
+uvicorn==0.51.0

@@ -1440,7 +1440,7 @@ def format_development_calendar_caption(calendar_context):
         "使用する暦設定: "
         f"{calendar_context['label']} / "
         f"立春={format_datetime_for_display(calendar_context['risshun_datetime'])} / "
-        f"節入り={calendar_context['sekki_year']}年検証用サンプル / "
+        f"節入り={calendar_context['sekki_year']}年 / "
         f"日柱基準={calendar_context['base_date']} "
         f"{calendar_context['base_day_kanchi']}"
     )
@@ -1451,8 +1451,6 @@ def render_auto_meishiki_validation_development_panel():
         calendar_context = get_development_calendar_context()
         st.warning(
             "これは開発確認用の表示です。\n"
-            "現在の節入り日時データと日柱基準日は検証用であり、"
-            "本番の命式計算としてはまだ使用しません。\n"
             "既存の手入力命式や鑑定結果には接続していません。"
         )
         st.caption(format_development_calendar_caption(calendar_context))
@@ -1490,8 +1488,6 @@ def render_auto_meishiki_input_test_development_panel():
         calendar_context = get_development_calendar_context()
         st.warning(
             "これは開発確認用の自動命式計算テストです。\n"
-            "現在の節入り日時データと日柱基準日は検証用であり、"
-            "本番の命式計算としてはまだ使用しません。\n"
             "ここで計算した結果は、既存の手入力命式や鑑定結果には反映されません。"
         )
         st.caption(format_development_calendar_caption(calendar_context))
@@ -1892,7 +1888,6 @@ def render_auto_meishiki_table_preview_development_panel():
         st.warning(
             "これは開発確認用の自動命式表プレビューです。\n"
             "自動計算結果を既存meishiki形式に変換し、命式表の形で確認します。\n"
-            "現在の節入り日時データ、日柱基準日、蔵干は検証用です。\n"
             "ここで表示した命式は、既存の手入力命式や鑑定結果には反映されません。"
         )
         st.caption(format_development_calendar_caption(calendar_context))
@@ -1996,7 +1991,6 @@ def render_auto_meishiki_reading_preview_development_panel():
             "これは開発確認用の鑑定結果プレビューです。\n"
             "自動計算された命式を既存meishiki形式に変換し、"
             "既存ロジックでどのような鑑定結果になるかを確認します。\n"
-            "現在の節入り日時データ、日柱基準日、蔵干は検証用です。\n"
             "ここで表示した内容は、既存の手入力命式や通常の鑑定結果には反映されません。"
         )
         st.caption(format_development_calendar_caption(calendar_context))
@@ -2112,7 +2106,6 @@ def render_manual_auto_meishiki_comparison_development_panel(current_manual_meis
         st.warning(
             "これは開発確認用の比較表示です。\n"
             "現在の手入力命式と、自動計算された命式を比較します。\n"
-            "自動命式の節入り日時データ、日柱基準日、蔵干は検証用です。\n"
             "比較結果は既存の命式表や鑑定結果には反映されません。"
         )
         st.caption(format_development_calendar_caption(calendar_context))
