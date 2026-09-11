@@ -84,5 +84,69 @@ class HarnessTests(unittest.TestCase):
         self.assertNotEqual(reference["get_tsuhensei"]("甲","甲"),
                             comparison.core.get_tsuhensei("甲","甲"))
 
+
+    def test_reference_integrity_rejects_missing_duplicate_and_wrong_provenance(self):
+        import sekki_reference as ref
+        original = ref.load()
+        def duplicate(data):
+            data["records"][1] = deepcopy(data["records"][0])
+        def provenance(data):
+            row = next(r for r in data["records"] if r["year"] == 1950)
+            row["source"].remove("representative")
+        for mutate in (lambda d:d["records"].pop(), duplicate, provenance):
+            data = deepcopy(original)
+            mutate(data)
+            with self.assertRaises(ValueError):
+                ref.validate(data)
+
+    def test_reference_integrity_protects_verified_values_missing_and_exception(self):
+        import sekki_reference as ref
+        original = ref.load()
+        changes = [
+            ((2049,"啓蟄"), "confirmation_status", "unverified"),
+            ((2049,"啓蟄"), "expected_tolerance", 120),
+            ((2049,"啓蟄"), "reference_datetime", "2049-03-05 12:43"),
+            ((1940,"小寒"), "reference_datetime", "1940-01-06 00:00"),
+            ((1975,"啓蟄"), "reference_datetime", "1975-03-06 14:06"),
+        ]
+        for key,field,value in changes:
+            data = deepcopy(original)
+            row = next(r for r in data["records"] if (r["year"],r["term_name"]) == key)
+            row[field] = value
+            with self.subTest(key=key,field=field):
+                with self.assertRaises(ValueError):
+                    ref.validate(data)
+
+    def test_reference_accuracy_rejects_engine_outside_tolerance(self):
+        import sekki_reference as ref
+        from datetime import datetime, timedelta
+        row = next(r for r in ref.verified_records() if r["test_status"] == "tier_a_accuracy")
+        entry = deepcopy(ref.actual_entry(row))
+        entry["datetime"] = datetime.fromisoformat(row["reference_datetime"]) + timedelta(seconds=61)
+        with patch.object(ref,"actual_entry",return_value=entry):
+            with self.assertRaises(AssertionError):
+                ref.check_accuracy(row)
+
+    def test_known_exception_improvement_and_worsening_require_review(self):
+        import sekki_reference as ref
+        row = next(r for r in ref.verified_records() if r["test_status"] == "known_exception")
+        for changed_delta in (-180,-60,0):
+            with patch.object(ref,"delta_seconds",return_value=changed_delta):
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    count,errors = check.run_cases("B",[("exception",lambda:ref.check_known_exception(row))])
+                self.assertEqual((count,len(errors),check.exit_code([],errors)),(1,1,2))
+                self.assertIn("REVIEW",output.getvalue())
+
+    def test_reference_source_paths_are_not_runtime_dependencies(self):
+        import sekki_reference as ref
+        from pathlib import Path
+        real_read_text = Path.read_text
+        def only_p_fixture(path, *args, **kwargs):
+            self.assertEqual(path.resolve(),(check.ROOT / "tests/fixtures/sekki_reference.json").resolve())
+            return real_read_text(path,*args,**kwargs)
+        with patch.object(Path,"read_text",only_p_fixture):
+            self.assertEqual(len(list(ref.accuracy_cases())),195)
+            self.assertEqual(len(list(ref.exception_cases())),1)
+
 if __name__=="__main__":
     unittest.main()

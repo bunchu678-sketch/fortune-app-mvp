@@ -200,3 +200,6 @@ def cases():
 
     from specific_datetime_guard import observed_cases
     yield from observed_cases()
+
+    from sekki_reference import exception_cases
+    yield from exception_cases()

@@ -1,4 +1,4 @@
-"""Adopted specifications. Evidence for every case is in fixtures/formal.json."""
+"""Adopted specifications from formal.json and the verified sekki reference ledger."""
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
@@ -20,20 +20,7 @@ def auto_at(value):
 
 def check_case(case):
     kind, inp, expected = case["kind"], case["input"], case["expected"]
-    if kind == "reference":
-        entries = sekki.get_corrected_taizan_sekki_entries_by_year(inp["year"])
-        equal(len(entries), 12)
-        entry = next(e for e in entries if e["name"] == inp["term"])
-        actual = entry["datetime"]
-        delta = abs((actual - datetime.fromisoformat(expected["datetime"])).total_seconds())
-        if delta > expected["tolerance_seconds"]:
-            raise AssertionError(f'{inp}: delta={delta}s > {expected["tolerance_seconds"]}s')
-        original = entry["original_eacal_datetime"]
-        equal(entry["corrected_eacal_datetime"].utcoffset(), timedelta(hours=9))
-        equal(sekki.convert_eacal_datetime_to_fixed_jst(original).timestamp(), original.timestamp())
-        equal(actual.tzinfo, None)
-        equal(actual, sekki.correct_eacal_datetime_for_taizan(original).replace(tzinfo=None))
-    elif kind == "round":
+    if kind == "round":
         actual = sekki.round_eacal_datetime_to_minute(datetime.fromisoformat(inp))
         equal(actual.isoformat(), expected)
     elif kind == "timezone":
@@ -97,3 +84,6 @@ def cases():
 
     from specific_datetime_guard import formal_cases
     yield from formal_cases()
+
+    from sekki_reference import accuracy_cases
+    yield from accuracy_cases()

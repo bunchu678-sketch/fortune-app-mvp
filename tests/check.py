@@ -70,6 +70,8 @@ def main(argv=None):
         print(f"Python: {sys.executable} ({sys.version.split()[0]})")
         for name in ("eacal", "ephem", "pytz", "fastapi", "uvicorn"):
             print(f"{name}: {importlib.metadata.version(name)}")
+        import sekki_reference
+        sekki_reference.verified_records()
         import tier_a
         import tier_b
         import tier_c
@@ -84,6 +86,7 @@ def main(argv=None):
         else:
             print("S comparison: NOT RUN (optional; not counted as PASS)")
         issues = tier_c.probe_all()
+        sekki_reference.print_summary()
         print(f"Tier A: {'FAIL' if a_errors else 'PASS'} {a_count-len(a_errors)}/{a_count}")
         print(f"Tier B: observation {b_count}; matched {b_count-len(b_errors)}; REVIEW {len(b_errors)}")
         print(f"Tier C: informational {len(issues)}; non-blocking")
