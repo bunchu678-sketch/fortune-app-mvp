@@ -197,3 +197,6 @@ def cases():
         ("B-api-notfound","GET","/absent",{},404),
     ):
         yield case_id, lambda m=method,p=path,b=payload,s=status: api_check(m,p,b,s)
+
+    from specific_datetime_guard import observed_cases
+    yield from observed_cases()

@@ -10,7 +10,6 @@ ISSUES = [
     ("K04", "2050 monthly edge", "Next January 2051 is outside current supported range"),
     ("K05", "S/W presentation differences", "SVG, abnormal pillars, setsu, kubou, target time, private text"),
     ("K06", "Historical reference boundary", "2021 source 23:58 versus adopted engine 23:59"),
-    ("K07", "Disabled candidates still parsed", "Malformed candidate can fail when disabled"),
 ]
 
 def probe(case_id):
@@ -40,13 +39,6 @@ def probe(case_id):
     if case_id=="K06":
         actual=get_calendar_context_for_birth_year(2021)["risshun_datetime"]
         return actual!=datetime(2021,2,3,23,58)
-    if case_id=="K07":
-        try:
-            service(specificDatetimeEnabled=False,
-                    specificDatetimeCandidates=[{"date":"invalid","time":"12:00"}])
-        except ValueError:
-            return True
-        return False
     raise ValueError(case_id)
 
 def classify(present):
@@ -63,4 +55,5 @@ def probe_all():
             state=f"UNVERIFIED ({type(exc).__name__}: {exc})"
         print(f"Tier C {case_id}: {state}; {title}: {description}")
         results.append((case_id,state))
+    print("K07: RESOLVED; OFF isolation protected by Tier A A-K07-off-* (blocking)")
     return results

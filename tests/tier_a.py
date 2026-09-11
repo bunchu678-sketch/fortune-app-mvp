@@ -94,3 +94,6 @@ def cases():
             raise ValueError("Formal source ID is not defined")
         ids.add(case["id"])
         yield case["id"], lambda c=case: check_case(c)
+
+    from specific_datetime_guard import formal_cases
+    yield from formal_cases()

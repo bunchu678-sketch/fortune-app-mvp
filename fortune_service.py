@@ -393,12 +393,11 @@ def calculate_fortune(payload):
         day_tenkan=star_data["day_tenkan"],
     )
     specific_datetime_enabled = bool(payload.get("specificDatetimeEnabled"))
-    specific_candidates = normalize_specific_candidates(payload.get("specificDatetimeCandidates", []))
-    specific_datetime_result = (
-        build_specific_datetime_fortunes(specific_candidates, star_data["day_tenkan"])
-        if specific_datetime_enabled
-        else {"ok": True, "rows": [], "errors": []}
-    )
+    if specific_datetime_enabled:
+        specific_candidates = normalize_specific_candidates(payload.get("specificDatetimeCandidates", []))
+        specific_datetime_result = build_specific_datetime_fortunes(specific_candidates, star_data["day_tenkan"])
+    else:
+        specific_datetime_result = {"ok": True, "rows": [], "errors": []}
 
     life_stage_data = build_life_stage_tsuhensei_data(star_data)
     juuni_unsei_display_data = build_juuni_unsei_display_data(star_data)
