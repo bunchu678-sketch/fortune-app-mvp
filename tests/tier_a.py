@@ -90,3 +90,6 @@ def cases():
 
     from gogyou_priority import cases as gogyou_priority_cases
     yield from gogyou_priority_cases()
+
+    from gogyou_priority import formal_cases as gogyou_formal_cases
+    yield from gogyou_formal_cases()

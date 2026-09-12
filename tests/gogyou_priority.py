@@ -103,3 +103,193 @@ def cases():
     for stem in ("","戊"):
         yield f"A-gogyou-priority-analysis-stem-{stem or 'absent'}",lambda s=stem:check_analysis_stem(s)
     yield "A-gogyou-priority-transformed-analysis-branch",check_transformed_analysis_branch
+
+
+# Additional formal rules: user instruction e0b2cbcd-48cb-4be1-9a09-47f548b80b84,
+# sections 7-18, 20, 23, 25. Expectations below are specification arithmetic.
+# Empty pillars isolate an effect; they are engine inputs, not calendar fixtures.
+# Do not import production tables to construct the oracle.
+def assert_formal_result(result, expected_scores, expected_branches):
+    equal(result["scores"], {e: expected_scores.get(e, 0) for e in ("木", "火", "土", "金", "水")})
+    for label, expected in expected_branches.items():
+        equal(branch_points(result, label), expected)
+    equal({r["対象"] for r in result["details"]},
+          {"年干", "月干", "日干", "時干", "年支", "月支", "日支", "時支"})
+    for element in ("木", "火", "土", "金", "水"):
+        equal(sum(r["点数"] for r in result["details"] if r["五行"] == element), result["scores"][element])
+
+
+def check_stem_mapping(stem, element):
+    result = g.calculate_gogyo_scores(stem, stem, stem, stem, "", "", "", "")
+    assert_formal_result(result, {element: 4}, {})
+    equal([(r["対象"], r["五行"], r["点数"]) for r in result["details"][:4]],
+          [(label, element, 1) for label in ("年干", "月干", "日干", "時干")])
+
+
+def check_hidden_stems_ignored():
+    from copy import deepcopy
+    from meishiki_model import build_meishiki_from_manual_input
+    chart = build_meishiki_from_manual_input("甲", "丙", "庚", "壬", "寅", "巳", "戌", "丑")
+    expected = {"木": 2, "火": 4, "土": 2, "金": 1, "水": 1}
+    baseline = g.calculate_gogyo_scores_from_meishiki(chart)
+    assert_formal_result(baseline, expected, {})
+    for hidden in ("甲", "戊", "癸"):
+        changed = deepcopy(chart)
+        for pillar in changed.values():
+            pillar["zokkan"] = hidden
+        # In particular, hidden 戊 must not trigger extra earth points for 巳.
+        actual = g.calculate_gogyo_scores_from_meishiki(changed)
+        assert_formal_result(actual, expected, {})
+        equal(actual, baseline)
+
+
+def check_base_points():
+    result = g.calculate_gogyo_scores("", "", "", "", "寅", "巳", "戌", "丑")
+    assert_formal_result(result, {"木": 1, "火": 3, "土": 2},
+                        {"年支": [("木", 1)], "月支": [("火", 3)],
+                         "日支": [("土", 1)], "時支": [("土", 1)]})
+    equal(result["special_flags"]["hangou"], [])
+    for flag in ("sango", "hougou"):
+        equal(result["special_flags"][flag]["formed"], False)
+    equal(result["special_flags"]["chong"]["has_chong"], False)
+
+
+def check_isolated_storage(storage):
+    result = g.calculate_gogyo_scores("", "", "", "", storage, "", "", "")
+    assert_formal_result(result, {"土": 1}, {"年支": [("土", 1)]})
+
+
+def check_storage_half(storage, partner, element):
+    result = g.calculate_gogyo_scores("", "", "", "", storage, partner, "", "")
+    assert_formal_result(result, {element: 5},
+                        {"年支": [(element, 2)], "月支": [(element, 3)]})
+    equal([(r["element"], set(r["members"])) for r in result["special_flags"]["hangou"]],
+          [(element, {storage, partner})])
+
+
+def check_full_relation(kind, members, element, analysis=False):
+    branches = (members[0], "", members[1], "") if analysis else (*members, "")
+    result = g.calculate_gogyo_scores("", "", "", "", *branches,
+                                     kantei_year_chishi=members[2] if analysis else "")
+    labels = ("年支", "日支") if analysis else ("年支", "月支", "日支")
+    assert_formal_result(result, {element: 6 if analysis else 9},
+                        {label: [(element, 3)] for label in labels})
+    relation = result["special_flags"][kind]
+    equal((relation["formed"], relation["element"], set(relation["members"])),
+          (True, element, set(members)))
+
+
+def check_analysis_half(storage, partner, element):
+    result = g.calculate_gogyo_scores("", "", "", "", storage, "", "", "",
+                                     kantei_year_chishi=partner)
+    assert_formal_result(result, {element: 2}, {"年支": [(element, 2)]})
+    equal([(r["element"], set(r["members"])) for r in result["special_flags"]["hangou"]],
+          [(element, {storage, partner})])
+
+
+def check_chong_remaining(kind):
+    # 子 -> 午 is already confirmed by A-gogyou-priority-chong-fire-fallback.
+    members = ("申", "子", "辰") if kind == "sango" else ("亥", "子", "丑")
+    result = g.calculate_gogyo_scores("", "", "", "", *members, "午")
+    assert_formal_result(result, {"水": 9},
+                        {"年支": [("水", 3)], "月支": [("水", 3)],
+                         "日支": [("水", 3)], "時支": [("火", 0)]})
+    equal(result["special_flags"]["chong"]["zero_score_targets"], ["午"])
+    equal(result["special_flags"][kind]["formed"], True)
+
+
+def check_analysis_chong():
+    result = g.calculate_gogyo_scores("", "", "", "", "午", "寅", "辰", "",
+                                     kantei_year_chishi="子")
+    assert_formal_result(result, {"木": 5},
+                        {"年支": [("火", 0)], "月支": [("木", 3)], "日支": [("木", 2)]})
+    equal(result["special_flags"]["chong"]["zero_score_targets"], ["午"])
+    equal([(r["element"], set(r["members"])) for r in result["special_flags"]["hangou"]],
+          [("木", {"寅", "辰"})])
+
+
+def check_earth_half(natal, analysis):
+    # 巳 at year = fire2, 未 at month = fire3; qualifying stem adds earth5,
+    # and only a natal stem additionally contributes its own earth1.
+    stems = (natal, "", "", "") if natal != "己" else ("", "", natal, "")
+    result = g.calculate_gogyo_scores(*stems, "巳", "未", "", "", kantei_year_tenkan=analysis)
+    active = bool(natal or analysis)
+    assert_formal_result(result, {"火": 5, "土": (5 if active else 0) + (1 if natal else 0)},
+                        {"年支": [("火", 2)] + ([("土", 2)] if active else []),
+                         "月支": [("火", 3)] + ([("土", 3)] if active else [])})
+
+
+def check_earth_full():
+    result = g.calculate_gogyo_scores("戊", "", "", "", "巳", "午", "未", "")
+    assert_formal_result(result, {"火": 9, "土": 10},
+                        {label: [("火", 3), ("土", 3)] for label in ("年支", "月支", "日支")})
+
+
+def check_earth_transformed_out():
+    result = g.calculate_gogyo_scores("戊", "", "", "", "巳", "酉", "丑", "")
+    assert_formal_result(result, {"金": 9, "土": 1},
+                        {label: [("金", 3)] for label in ("年支", "月支", "日支")})
+
+
+def check_earth_fire_sango():
+    result = g.calculate_gogyo_scores("戊", "", "", "", "寅", "午", "戌", "")
+    assert_formal_result(result, {"火": 9, "土": 4},
+                        {"年支": [("火", 3)], "月支": [("火", 3), ("土", 3)], "日支": [("火", 3)]})
+
+
+def check_trigger_only():
+    result = g.calculate_gogyo_scores("", "", "", "", "", "", "", "",
+                                     kantei_year_tenkan="己", kantei_year_chishi="午")
+    assert_formal_result(result, {}, {})
+    equal(all(r["点数"] == 0 for r in result["details"]), True)
+
+
+def formal_cases():
+    for stem, element in zip("甲乙丙丁戊己庚辛壬癸", "木木火火土土金金水水"):
+        yield f"A-gogyou-formal-stem-{stem}", lambda s=stem, e=element: check_stem_mapping(s, e)
+    yield "A-gogyou-formal-hidden-ignored", check_hidden_stems_ignored
+    yield "A-gogyou-formal-base-points", check_base_points
+    for storage in "辰未戌丑":
+        yield f"A-gogyou-formal-isolated-{storage}", lambda s=storage: check_isolated_storage(s)
+    for storage, partners, element in (("未", "巳午", "火"), ("戌", "申酉", "金"), ("丑", "亥子", "水")):
+        for partner in partners:
+            yield f"A-gogyou-formal-half-{partner}{storage}", lambda s=storage, p=partner, e=element: check_storage_half(s, p, e)
+    for element, members in (("木", "寅卯辰"), ("火", "巳午未"), ("金", "申酉戌"), ("水", "亥子丑")):
+        for analysis in (False, True):
+            yield f"A-gogyou-formal-hougou-{element}-{'year' if analysis else 'natal'}", lambda m=members, e=element, a=analysis: check_full_relation("hougou", m, e, a)
+        yield f"A-gogyou-formal-half-{element}-year", lambda m=members, e=element: check_analysis_half(m[2], m[0], e)
+    for element, members in (("木", "亥卯未"), ("火", "寅午戌"), ("金", "巳酉丑"), ("水", "申子辰")):
+        yield f"A-gogyou-formal-sango-{element}", lambda m=members, e=element: check_full_relation("sango", m, e)
+    for kind in ("sango", "hougou"):
+        yield f"A-gogyou-formal-chong-keeps-{kind}", lambda k=kind: check_chong_remaining(k)
+    yield "A-gogyou-formal-analysis-chong", check_analysis_chong
+    for natal, analysis in (("", ""), ("戊", ""), ("己", ""), ("", "己")):
+        yield f"A-gogyou-formal-earth-half-{natal or 'none'}-{analysis or 'none'}", lambda n=natal, a=analysis: check_earth_half(n, a)
+    yield "A-gogyou-formal-earth-full", check_earth_full
+    yield "A-gogyou-formal-earth-transformed-out", check_earth_transformed_out
+    yield "A-gogyou-formal-earth-fire-sango", check_earth_fire_sango
+    yield "A-gogyou-formal-trigger-only", check_trigger_only
+    for element, branches in (("木", "亥卯未辰"), ("水", "申子辰丑")):
+        yield f"A-gogyou-formal-same-element-{element}", lambda e=element, b=branches: check_remaining_same_element(e, b)
+    yield "A-gogyou-formal-meishiki-context", check_meishiki_context
+
+
+def check_remaining_same_element(element, branches):
+    result = g.calculate_gogyo_scores("", "", "", "", *branches)
+    assert_formal_result(result, {element: 11},
+                        {"年支": [(element, 3)], "月支": [(element, 3)],
+                         "日支": [(element, 3)], "時支": [(element, 2)]})
+    equal(result["special_flags"]["sango"]["element"], element)
+    equal([(r["element"], r["same_as_sango"]) for r in result["special_flags"]["hangou"]], [(element, True)])
+
+
+def check_meishiki_context():
+    from meishiki_model import build_meishiki_from_manual_input
+    chart = build_meishiki_from_manual_input("甲", "甲", "甲", "甲", *MAIN[4:])
+    # Already supplied context only: no Gregorian/risshun policy assertion.
+    result = g.calculate_gogyo_scores_from_meishiki(chart,
+               {"target_year_tenkan": "己", "target_year_chishi": "午"})
+    assert_formal_result(result, {"木": 4, "火": 8, "土": 3},
+                        {"年支": [("土", 1)], "月支": [("火", 3)],
+                         "日支": [("火", 3)], "時支": [("火", 2), ("土", 2)]})
+    equal(result["kantei_year"], {"tenkan": "己", "chishi": "午"})
