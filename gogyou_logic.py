@@ -210,7 +210,16 @@ def build_chishi_scoring(
         pillar_key = data["pillar_key"]
         chishi = data["chishi"]
         base_points = BASE_CHISHI_POINTS.get(pillar_key, 1)
-        element = resolve_normal_chishi_element(chishi, all_chishi_for_judgement)
+        normal_group = get_basic_group_for_chishi(chishi)
+        effective_chishi_for_normal = [
+            member for member in all_chishi_for_judgement
+            # Chong removes natal targets; the analysis-year branch remains a trigger.
+            if (member not in zero_score_targets or member == kantei_year_chishi)
+            # Reuse a transformed member only for the same element.
+            and (member not in sango_members or sango.get("element") == normal_group)
+            and (member not in hougou_members or hougou.get("element") == normal_group)
+        ]
+        element = resolve_normal_chishi_element(chishi, effective_chishi_for_normal)
         scoring[pillar_key] = {
             "element": element,
             "points": base_points,

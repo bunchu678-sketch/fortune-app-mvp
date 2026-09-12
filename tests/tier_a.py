@@ -87,3 +87,6 @@ def cases():
 
     from sekki_reference import accuracy_cases
     yield from accuracy_cases()
+
+    from gogyou_priority import cases as gogyou_priority_cases
+    yield from gogyou_priority_cases()
