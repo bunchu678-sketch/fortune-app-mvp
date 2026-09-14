@@ -294,8 +294,12 @@ def build_chishi_scoring(
 def calculate_gogyo_scores(
     year_tenkan, month_tenkan, day_tenkan, hour_tenkan,
     year_chishi, month_chishi, day_chishi, hour_chishi,
-    kantei_year_tenkan="", kantei_year_chishi=""
+    kantei_year_tenkan="", kantei_year_chishi="",
+    include_kantei_year_gogyo_effects=True,
 ):
+    # Preserve supplied year metadata; only these optional triggers affect gogyou.
+    effective_year_chishi = kantei_year_chishi if include_kantei_year_gogyo_effects else None
+    effective_year_tenkan = kantei_year_tenkan if include_kantei_year_gogyo_effects else None
     scores = init_gogyo_scores()
     details = []
     tenkan_data = [
@@ -318,10 +322,10 @@ def calculate_gogyo_scores(
     formula_chishi = [data["chishi"] for data in chishi_data if data["chishi"]]
     all_chishi_for_judgement = formula_chishi[:]
 
-    if kantei_year_chishi:
-        all_chishi_for_judgement.append(kantei_year_chishi)
+    if effective_year_chishi:
+        all_chishi_for_judgement.append(effective_year_chishi)
 
-    chong = judge_chong(formula_chishi, kantei_year_chishi)
+    chong = judge_chong(formula_chishi, effective_year_chishi)
     zero_score_targets = set(chong.get("zero_score_targets", []))
     relation_chishi_for_judgement = [
         chishi
@@ -329,8 +333,8 @@ def calculate_gogyo_scores(
         if chishi not in zero_score_targets
     ]
 
-    if kantei_year_chishi:
-        relation_chishi_for_judgement.append(kantei_year_chishi)
+    if effective_year_chishi:
+        relation_chishi_for_judgement.append(effective_year_chishi)
 
     sango = judge_sango(relation_chishi_for_judgement)
     hougou = judge_hougou(relation_chishi_for_judgement, sango)
@@ -342,8 +346,8 @@ def calculate_gogyo_scores(
         if tenkan
     ]
 
-    if kantei_year_tenkan:
-        all_tenkan_for_judgement.append(kantei_year_tenkan)
+    if effective_year_tenkan:
+        all_tenkan_for_judgement.append(effective_year_tenkan)
 
     has_earth_tenkan = bool({"戊", "己"} & set(all_tenkan_for_judgement))
     chishi_scoring = build_chishi_scoring(
@@ -353,7 +357,7 @@ def calculate_gogyo_scores(
         sango,
         hougou,
         hangou,
-        kantei_year_chishi,
+        effective_year_chishi,
     )
 
     for data in chishi_data:
@@ -373,6 +377,7 @@ def calculate_gogyo_scores(
     return {
         "scores": scores,
         "details": details,
+        "include_kantei_year_gogyo_effects": include_kantei_year_gogyo_effects,
         "formula_chishi": formula_chishi,
         "special_flags": {
             "chong": chong,
@@ -433,7 +438,9 @@ def format_gogyo_special_flags(special_flags):
     ]
 
 
-def calculate_gogyo_scores_from_meishiki(meishiki, analysis_context=None):
+def calculate_gogyo_scores_from_meishiki(
+    meishiki, analysis_context=None, include_kantei_year_gogyo_effects=True,
+):
     context = analysis_context or {}
     return calculate_gogyo_scores(
         get_pillar_value(meishiki, "year", "tenkan"),
@@ -446,4 +453,5 @@ def calculate_gogyo_scores_from_meishiki(meishiki, analysis_context=None):
         get_pillar_value(meishiki, "hour", "chishi"),
         context.get("target_year_tenkan", ""),
         context.get("target_year_chishi", ""),
+        include_kantei_year_gogyo_effects=include_kantei_year_gogyo_effects,
     )

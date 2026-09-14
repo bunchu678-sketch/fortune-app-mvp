@@ -96,7 +96,10 @@ def build_ijou_kanshi_texts(ijou_kanshi_data):
 def build_special_meishiki_rows(ijou_kanshi_data, gogyo_result):
     special_flags = gogyo_result.get("special_flags", {})
     kantei_year = gogyo_result.get("kantei_year", {})
-    kantei_year_chishi = kantei_year.get("chishi", "")
+    kantei_year_chishi = (
+        kantei_year.get("chishi", "")
+        if gogyo_result.get("include_kantei_year_gogyo_effects", True) else None
+    )
     formula_chishi = gogyo_result.get("formula_chishi", [])
     rows = []
 

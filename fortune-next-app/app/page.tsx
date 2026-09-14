@@ -14,6 +14,7 @@ type FortuneForm = {
   gender: string;
   consultation: string;
   readingDate: string;
+  includeKanteiYearGogyoEffects: boolean;
   specificDatetimeEnabled: boolean;
   specificDatetimeCandidates: Array<{ date: string; time: string }>;
 };
@@ -62,6 +63,7 @@ const defaultForm = (): FortuneForm => ({
   gender: "未選択",
   consultation: "",
   readingDate: todayIso(),
+  includeKanteiYearGogyoEffects: true,
   specificDatetimeEnabled: false,
   specificDatetimeCandidates: [
     { date: todayIso(), time: "14:00" },
@@ -456,6 +458,15 @@ export default function Home() {
                 <input type="date" value={form.readingDate} onChange={(event) => updateForm("readingDate", event.target.value)} />
               </label>
             </div>
+
+            <label className="checkLine">
+              <input
+                type="checkbox"
+                checked={form.includeKanteiYearGogyoEffects}
+                onChange={(event) => updateForm("includeKanteiYearGogyoEffects", event.target.checked)}
+              />
+              <span>鑑定年の影響を五行計算に反映する</span>
+            </label>
 
             <div className="timeLine">
               <label>

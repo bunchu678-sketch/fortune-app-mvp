@@ -286,6 +286,9 @@ def normalize_specific_candidates(payload_candidates):
 
 
 def calculate_fortune(payload):
+    include_year_gogyo_effects = payload.get("includeKanteiYearGogyoEffects", True)
+    if not isinstance(include_year_gogyo_effects, bool):
+        return {"ok": False, "errors": ["includeKanteiYearGogyoEffectsは真偽値で指定してください。"]}
     today = date.today()
     birth_date = parse_date(payload.get("birthDate"), date(1988, 8, 12))
     reading_date = parse_date(payload.get("readingDate"), today)
@@ -367,7 +370,10 @@ def calculate_fortune(payload):
     star_data = build_star_data(effective_meishiki)
     display_kubou = get_kubou(star_data["day_tenkan"], star_data["day_chishi"])
     analysis_context = build_analysis_context(reading_date)
-    gogyo_result = calculate_gogyo_scores_from_meishiki(effective_meishiki, analysis_context)
+    gogyo_result = calculate_gogyo_scores_from_meishiki(
+        effective_meishiki, analysis_context,
+        include_kantei_year_gogyo_effects=include_year_gogyo_effects,
+    )
     ijou_kanshi_data = build_ijou_kanshi_data_from_meishiki(effective_meishiki)
     special_rows = build_special_meishiki_rows(ijou_kanshi_data, gogyo_result)
     month_kanchi = ""

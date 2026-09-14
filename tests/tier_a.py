@@ -96,3 +96,6 @@ def cases():
 
     from gogyou_concurrent import cases as concurrent_cases
     yield from concurrent_cases()
+
+    from gogyou_year_effects import cases as year_effect_cases
+    yield from year_effect_cases()
