@@ -80,10 +80,19 @@ def judge_sango(all_chishi_for_judgement):
     }
 
 
-def judge_hougou(all_chishi_for_judgement):
-    judgement_set = set(all_chishi_for_judgement)
+def effective_members_for_element(all_chishi, element, *relations):
+    """Keep independent members and same-element reuse; reject transformed conflicts."""
+    return [member for member in all_chishi if all(
+        not relation or not relation.get("formed")
+        or member not in relation.get("members", [])
+        or relation.get("element") == element
+        for relation in relations
+    )]
 
+
+def judge_hougou(all_chishi_for_judgement, sango=None):
     for element, members in CHISHI_BASIC_GROUPS.items():
+        judgement_set = set(effective_members_for_element(all_chishi_for_judgement, element, sango))
         if set(members).issubset(judgement_set):
             return {
                 "element": element,
@@ -98,31 +107,20 @@ def judge_hougou(all_chishi_for_judgement):
     }
 
 
-def judge_hangou(all_chishi_for_judgement, sango=None):
-    judgement_set = set(all_chishi_for_judgement)
+def judge_hangou(all_chishi_for_judgement, sango=None, hougou=None):
     candidates = []
-
     for element, members in CHISHI_BASIC_GROUPS.items():
+        judgement_set = set(effective_members_for_element(
+            all_chishi_for_judgement, element, sango, hougou))
         matched_members = [member for member in members if member in judgement_set]
-
-        if len(matched_members) >= 2:
+        # A complete group is represented as hougou, never downgraded to a half.
+        if len(matched_members) == 2:
             candidates.append({
                 "element": element,
                 "members": matched_members,
                 "same_as_sango": bool(sango and sango.get("formed") and sango.get("element") == element),
             })
-
-    if sango and sango.get("formed"):
-        return [
-            candidate
-            for candidate in candidates
-            if candidate["element"] == sango.get("element")
-        ]
-
-    if len(candidates) == 1:
-        return candidates
-
-    return []
+    return candidates
 
 
 def get_chong_zero_reason(chishi, chong, kantei_year_chishi=""):
@@ -280,7 +278,8 @@ def build_chishi_scoring(
             if chishi in zero_score_targets:
                 continue
 
-            if sango.get("formed") and chishi in sango_members:
+            if (sango.get("formed") and chishi in sango_members
+                    or hougou.get("formed") and chishi in hougou_members):
                 continue
 
             scoring[pillar_key] = {
@@ -334,15 +333,8 @@ def calculate_gogyo_scores(
         relation_chishi_for_judgement.append(kantei_year_chishi)
 
     sango = judge_sango(relation_chishi_for_judgement)
-    hougou = {"element": "", "members": [], "formed": False}
-
-    if not sango.get("formed"):
-        hougou = judge_hougou(relation_chishi_for_judgement)
-
-    hangou = []
-
-    if sango.get("formed") or not hougou.get("formed"):
-        hangou = judge_hangou(relation_chishi_for_judgement, sango)
+    hougou = judge_hougou(relation_chishi_for_judgement, sango)
+    hangou = judge_hangou(relation_chishi_for_judgement, sango, hougou)
 
     all_tenkan_for_judgement = [
         tenkan

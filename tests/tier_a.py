@@ -93,3 +93,6 @@ def cases():
 
     from gogyou_priority import formal_cases as gogyou_formal_cases
     yield from gogyou_formal_cases()
+
+    from gogyou_concurrent import cases as concurrent_cases
+    yield from concurrent_cases()
