@@ -277,6 +277,51 @@ textarea {
   line-height: 1.6;
 }
 
+.boundaryPanel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--accent-2);
+  border-radius: 8px;
+  background: rgba(215, 169, 107, 0.08);
+}
+
+.boundaryPanel h3,
+.boundaryChoice p {
+  margin: 0;
+}
+
+.boundaryChoice {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.boundaryChoice legend {
+  padding: 0 4px;
+  font-weight: 700;
+}
+
+.boundaryChoice p {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.boundaryEmphasis {
+  color: var(--accent-2);
+  font-weight: 700;
+}
+
+.boundaryOptions {
+  display: grid;
+  gap: 4px;
+}
+
 .emptyState {
   min-height: 540px;
   display: grid;

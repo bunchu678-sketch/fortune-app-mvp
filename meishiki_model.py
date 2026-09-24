@@ -1,5 +1,7 @@
 from datetime import datetime, time as datetime_time
 
+from boundary_confirmation import datetime_for_boundary_choice
+
 from fortune_data import CHISHI_ORDER, TENKAN_ORDER, get_simple_zokkan_by_chishi
 from time_adjustment_logic import (
     apply_birthplace_time_adjustment,
@@ -388,20 +390,34 @@ def get_formula_chishi(meishiki):
     ]
 
 
-def get_kantei_year_kanshi(target_date):
+def get_kantei_year_kanshi(target_date, boundary_choice=None):
     if not target_date:
         return "", ""
 
-    year = target_date.year
-    cycle_index = (year - 1984) % 60
-    return (
-        KANSHI_TENKAN_ORDER[cycle_index % 10],
-        KANSHI_CHISHI_ORDER[cycle_index % 12],
+    # Import locally because calendar_logic also uses the meishiki model.
+    from calendar_logic import calculate_year_pillar
+    from calendar_reference import get_calendar_context_for_birth_year
+
+    context = get_calendar_context_for_birth_year(target_date.year)
+    if not context["ok"]:
+        raise ValueError(" / ".join(context["errors"]))
+    risshun_datetime = context["risshun_datetime"]
+    if isinstance(target_date, datetime):
+        target_datetime = target_date
+    elif target_date == risshun_datetime.date():
+        if boundary_choice is None:
+            raise ValueError("立春日の鑑定には立春前後の選択が必要です。")
+        target_datetime = datetime_for_boundary_choice(risshun_datetime, boundary_choice)
+    else:
+        target_datetime = datetime.combine(target_date, datetime_time.min)
+    result = calculate_year_pillar(target_datetime, risshun_datetime)
+    return result["tenkan"], result["chishi"]
+
+
+def build_analysis_context(target_date, boundary_choice=None):
+    target_year_tenkan, target_year_chishi = get_kantei_year_kanshi(
+        target_date, boundary_choice,
     )
-
-
-def build_analysis_context(target_date):
-    target_year_tenkan, target_year_chishi = get_kantei_year_kanshi(target_date)
     return {
         "target_year": target_date.year if target_date else "",
         "target_year_tenkan": target_year_tenkan,

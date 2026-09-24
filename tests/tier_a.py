@@ -50,8 +50,19 @@ def check_case(case):
         at = datetime.fromisoformat(inp)
         result = auto_at(at)
         equal({p:result[p]["kanchi"] for p in expected}, expected)
-        result = calculate_fortune({"birthDate":str(at.date()), "birthTime":at.strftime("%H:%M"),
-                                   "birthPlace":"未選択", "readingDate":"2026-09-08"})
+        payload = {"birthDate":str(at.date()), "birthTime":at.strftime("%H:%M"),
+                   "birthPlace":"未選択", "readingDate":"2026-09-08"}
+        result = calculate_fortune(payload)
+        if result.get("confirmation_required"):
+            equal(len(result["boundary_confirmations"]), 1)
+            confirmation = result["boundary_confirmations"][0]
+            equal(confirmation["kind"], "birth")
+            boundary = datetime.fromisoformat(confirmation["boundary_datetime"])
+            payload["boundarySelections"] = {"birth": {
+                "boundary_datetime": confirmation["boundary_datetime"],
+                "choice": "before" if at < boundary else "after",
+            }}
+            result = calculate_fortune(payload)
         equal(result["ok"], True)
         equal({p:result["meishiki"][p]["tenkan"]+result["meishiki"][p]["chishi"]
                for p in expected}, expected)
@@ -99,3 +110,6 @@ def cases():
 
     from gogyou_year_effects import cases as year_effect_cases
     yield from year_effect_cases()
+
+    from sekki_confirmation_cases import cases as boundary_confirmation_cases
+    yield from boundary_confirmation_cases()

@@ -9,6 +9,11 @@ import streamlit.components.v1 as components
 from datetime import date, datetime, time as datetime_time
 from pathlib import Path
 
+from boundary_confirmation import (
+    datetime_for_boundary_choice,
+    get_birth_boundary,
+    get_reading_risshun,
+)
 from calendar_logic import calculate_auto_meishiki
 from calendar_reference import (
     get_calendar_context_for_birth_year,
@@ -2398,6 +2403,18 @@ reading_date = st.date_input(
     min_value=date(1900, 1, 1),
     max_value=date(2050, 12, 31),
 )
+reading_context = get_calendar_context_for_birth_year(reading_date.year)
+reading_boundary_choice = None
+if reading_context.get("ok") and get_reading_risshun(
+    reading_date, reading_context["risshun_datetime"],
+):
+    st.info(f"この日は立春です。計算上の立春時刻は{reading_context['risshun_datetime']:%H:%M}頃です。鑑定する時刻は立春より前ですか、後ですか？")
+    reading_boundary_label = st.radio(
+        "鑑定日の立春境界",
+        ["立春前", "立春後"],
+        index=None,
+    )
+    reading_boundary_choice = {"立春前": "before", "立春後": "after"}.get(reading_boundary_label)
 specific_datetime_enabled = st.checkbox("特定の日時について占う")
 specific_datetime_candidates = []
 if specific_datetime_enabled:
@@ -2519,6 +2536,28 @@ effective_meishiki_source_label = "自動計算命式"
 calendar_context = get_calendar_context_for_birth_year(calculation_birth_date.year)
 auto_calculation_errors = []
 taizan_sekki_boundary_warnings = []
+birth_pillar_datetime = None
+if calendar_context.get("ok"):
+    birth_boundary = get_birth_boundary(
+        birth_date, adjusted_birth_datetime, birth_time_unknown,
+        calendar_context["sekki_entries"],
+    )
+    if birth_boundary:
+        boundary_at = birth_boundary["datetime"]
+        st.warning(f"出生日時が{birth_boundary['name']}の境界に該当します。計算上の節入り時刻は{boundary_at:%Y年%m月%d日 %H:%M}頃です。")
+        if adjusted_birth_datetime == boundary_at and not birth_time_unknown:
+            st.warning("計算上の出生時刻が節入り時刻と一致します。泰山流万年暦での確認を推奨します。")
+        birth_boundary_label = st.radio(
+            "出生時の節入り境界",
+            ["節入り前", "節入り後"],
+            index=None,
+        )
+        if birth_boundary_label is None:
+            st.info("節入り前または節入り後を選択してください。")
+            st.stop()
+        birth_pillar_datetime = datetime_for_boundary_choice(
+            boundary_at, {"節入り前": "before", "節入り後": "after"}[birth_boundary_label],
+        )
 if not calendar_context.get("ok"):
     auto_calculation_errors.extend(calendar_context.get("errors", []))
 else:
@@ -2529,6 +2568,7 @@ else:
             sekki_entries=calendar_context["sekki_entries"],
             base_date=calendar_context["base_date"],
             base_day_kanchi=calendar_context["base_day_kanchi"],
+            pillar_datetime=birth_pillar_datetime,
         )
         taizan_sekki_boundary_warnings = auto_effective_meishiki.get(
             "sekki_boundary_warnings",
@@ -2580,7 +2620,12 @@ year_juuni_unsei = get_juuni_unsei(effective_day_tenkan, effective_year_chishi)
 display_kubou = get_kubou(effective_day_tenkan, effective_day_chishi)
 
 # 五行バランス計算
-analysis_context = build_analysis_context(reading_date)
+if reading_context.get("ok") and get_reading_risshun(
+    reading_date, reading_context["risshun_datetime"],
+) and reading_boundary_choice is None:
+    st.info("鑑定日が立春日です。立春前または立春後を選択してください。")
+    st.stop()
+analysis_context = build_analysis_context(reading_date, reading_boundary_choice)
 kantei_year_tenkan = analysis_context["target_year_tenkan"]
 kantei_year_chishi = analysis_context["target_year_chishi"]
 gogyo_result = calculate_gogyo_scores_from_meishiki(

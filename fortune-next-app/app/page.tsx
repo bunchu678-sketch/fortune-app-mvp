@@ -36,6 +36,16 @@ type FortuneResult = {
   [key: string]: any;
 };
 
+type BoundaryChoice = "before" | "after";
+type BoundaryConfirmation = {
+  kind: "birth" | "reading";
+  term_name: string;
+  boundary_datetime: string;
+  adjusted_birth_datetime?: string;
+  birth_time_unknown?: boolean;
+  exact?: boolean;
+};
+
 const API_BASE = (process.env.NEXT_PUBLIC_FORTUNE_API_URL ?? "").replace(/\/+$/, "");
 
 const prefectures = [
@@ -369,6 +379,8 @@ export default function Home() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [candidateCount, setCandidateCount] = useState(1);
+  const [confirmations, setConfirmations] = useState<BoundaryConfirmation[]>([]);
+  const [boundaryChoices, setBoundaryChoices] = useState<Partial<Record<BoundaryConfirmation["kind"], BoundaryChoice>>>({});
 
   const visibleCandidates = useMemo(
     () => form.specificDatetimeCandidates.slice(0, candidateCount),
@@ -377,6 +389,8 @@ export default function Home() {
 
   function updateForm<K extends keyof FortuneForm>(key: K, value: FortuneForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+    setConfirmations([]);
+    setBoundaryChoices({});
   }
 
   function updateCandidate(index: number, field: "date" | "time", value: string) {
@@ -385,10 +399,16 @@ export default function Home() {
       nextCandidates[index] = { ...nextCandidates[index], [field]: value };
       return { ...current, specificDatetimeCandidates: nextCandidates };
     });
+    setConfirmations([]);
+    setBoundaryChoices({});
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (confirmations.some((item) => !boundaryChoices[item.kind])) {
+      setError("各境界について、前または後を選択してください。");
+      return;
+    }
     setIsLoading(true);
     setError("");
     setResult(null);
@@ -399,11 +419,21 @@ export default function Home() {
         body: JSON.stringify({
           ...form,
           specificDatetimeCandidates: form.specificDatetimeEnabled ? visibleCandidates : [],
+          boundarySelections: Object.fromEntries(confirmations.map((item) => [
+            item.kind,
+            { boundary_datetime: item.boundary_datetime, choice: boundaryChoices[item.kind] },
+          ])),
         }),
       });
       const data = await response.json();
-      setResult(data);
-      if (!data.ok) {
+      if (data.confirmation_required) {
+        setConfirmations(data.boundary_confirmations ?? []);
+        setBoundaryChoices({});
+      } else if (data.ok) {
+        setConfirmations([]);
+        setBoundaryChoices({});
+        setResult(data);
+      } else {
         setError(asRows(data.errors).join(" / ") || "鑑定結果を取得できませんでした。");
       }
     } catch (caught) {
@@ -418,6 +448,8 @@ export default function Home() {
     setResult(null);
     setError("");
     setCandidateCount(1);
+    setConfirmations([]);
+    setBoundaryChoices({});
   }
 
   return (
@@ -545,10 +577,48 @@ export default function Home() {
               </div>
             ) : null}
 
+            {confirmations.length ? (
+              <div className="boundaryPanel" role="group" aria-label="節入り境界の確認">
+                <h3>節入り境界の確認</h3>
+                {confirmations.map((item) => {
+                  const beforeLabel = item.kind === "reading" ? "立春前として鑑定" : "節入り前として鑑定";
+                  const afterLabel = item.kind === "reading" ? "立春後として鑑定" : "節入り後として鑑定";
+                  return (
+                    <fieldset className="boundaryChoice" key={item.kind}>
+                      <legend>{item.kind === "birth" ? "出生時刻" : "鑑定日"}</legend>
+                      <p>計算上の{item.term_name}時刻は {item.boundary_datetime.replace("T", " ").slice(0, 16)} 頃です。</p>
+                      {item.kind === "reading" ? (
+                        <p>この日は立春です。鑑定する時刻は立春より前ですか、後ですか？</p>
+                      ) : item.birth_time_unknown ? (
+                        <p>出生時刻は不明ですが、この日は節入り日です。出生はこの時刻より前でしたか、後でしたか？</p>
+                      ) : (
+                        <p>出生地補正後の出生時刻 {item.adjusted_birth_datetime?.replace("T", " ").slice(0, 16)} が節入りの前後5分以内です。時刻の数分差で命式が変わる可能性があります。</p>
+                      )}
+                      {item.exact ? <p className="boundaryEmphasis">計算上の時刻が境界と一致します。泰山流万年暦での確認を推奨します。</p> : null}
+                      {item.kind === "birth" && !item.exact ? <p>判断が難しい場合は泰山流万年暦での確認を推奨します。</p> : null}
+                      <div className="boundaryOptions">
+                        {(["before", "after"] as const).map((choice) => (
+                          <label className="checkLine" key={choice}>
+                            <input
+                              type="radio"
+                              name={`boundary-${item.kind}`}
+                              checked={boundaryChoices[item.kind] === choice}
+                              onChange={() => setBoundaryChoices((current) => ({ ...current, [item.kind]: choice }))}
+                            />
+                            {choice === "before" ? beforeLabel : afterLabel}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  );
+                })}
+              </div>
+            ) : null}
+
             <div className="buttonRow">
               <button type="submit" disabled={isLoading}>
                 {isLoading ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-                鑑定結果を表示する
+                {confirmations.length ? "選択して鑑定を続ける" : "鑑定結果を表示する"}
               </button>
               <button type="button" className="ghostButton" onClick={resetForm}>
                 <RotateCcw size={18} />

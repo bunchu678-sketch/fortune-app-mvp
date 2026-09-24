@@ -748,6 +748,7 @@ def calculate_auto_meishiki(
     sekki_entries,
     base_date,
     base_day_kanchi: str,
+    pillar_datetime=None,
 ) -> dict:
     """
     birth_info と暦計算用データから、年柱・月柱・日柱・時柱を自動計算する。
@@ -793,9 +794,10 @@ def calculate_auto_meishiki(
             calculation_datetime=calculation_datetime,
         )
 
-    year_result = calculate_year_pillar(calculation_datetime, risshun_datetime)
+    pillar_calculation_datetime = pillar_datetime or calculation_datetime
+    year_result = calculate_year_pillar(pillar_calculation_datetime, risshun_datetime)
     month_result = calculate_month_pillar(
-        calculation_datetime,
+        pillar_calculation_datetime,
         year_result["tenkan"],
         sekki_entries,
     )
@@ -816,13 +818,21 @@ def calculate_auto_meishiki(
         base_day_kanchi,
     )
     hour_result = calculate_hour_pillar(calculation_datetime, day_result["tenkan"])
+    normal_month = find_month_branch_by_sekki(calculation_datetime, sekki_entries)
     hidden_stem_day_count = calculate_days_after_latest_sekki(
-        calculation_datetime,
-        month_result["matched_sekki_datetime"],
+        calculation_datetime, normal_month["matched_sekki_datetime"],
+    )
+    pillar_hidden_stem_day_count = calculate_days_after_latest_sekki(
+        pillar_calculation_datetime, month_result["matched_sekki_datetime"],
+    )
+    normal_year_result = calculate_year_pillar(calculation_datetime, risshun_datetime)
+    year_hidden_stem_day_count = (
+        pillar_hidden_stem_day_count if year_result["year_kanchi"] != normal_year_result["year_kanchi"]
+        else hidden_stem_day_count
     )
     hidden_stems = {
-        "year": get_taizan_hidden_stem(year_result["chishi"], hidden_stem_day_count),
-        "month": get_taizan_hidden_stem(month_result["chishi"], hidden_stem_day_count),
+        "year": get_taizan_hidden_stem(year_result["chishi"], year_hidden_stem_day_count),
+        "month": get_taizan_hidden_stem(month_result["chishi"], pillar_hidden_stem_day_count),
         "day": get_taizan_hidden_stem(day_result["chishi"], hidden_stem_day_count),
         "hour": get_taizan_hidden_stem(hour_result["chishi"], hidden_stem_day_count),
     }
@@ -835,7 +845,7 @@ def calculate_auto_meishiki(
         "birth_info": birth_info,
         "calculation_datetime": calculation_datetime,
         "hidden_stem_day_count": hidden_stem_day_count,
-        "hidden_stem_latest_sekki_datetime": month_result["matched_sekki_datetime"],
+        "hidden_stem_latest_sekki_datetime": normal_month["matched_sekki_datetime"],
         "sekki_boundary_warnings": sekki_boundary_warnings,
         "year": build_auto_pillar_result(
             "year_kanchi",

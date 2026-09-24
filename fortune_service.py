@@ -2,6 +2,12 @@ from __future__ import annotations
 
 from datetime import date, datetime, time as datetime_time
 
+from boundary_confirmation import (
+    datetime_for_boundary_choice,
+    get_birth_boundary,
+    get_reading_risshun,
+    validate_boundary_selection,
+)
 from calendar_logic import calculate_auto_meishiki
 from calendar_reference import get_calendar_context_for_birth_year
 from daiun_logic import build_daiun_table
@@ -289,6 +295,9 @@ def calculate_fortune(payload):
     include_year_gogyo_effects = payload.get("includeKanteiYearGogyoEffects", True)
     if not isinstance(include_year_gogyo_effects, bool):
         return {"ok": False, "errors": ["includeKanteiYearGogyoEffectsは真偽値で指定してください。"]}
+    boundary_selections = payload.get("boundarySelections", {})
+    if not isinstance(boundary_selections, dict):
+        return {"ok": False, "errors": ["boundarySelectionsはオブジェクトで指定してください。"]}
     today = date.today()
     birth_date = parse_date(payload.get("birthDate"), date(1988, 8, 12))
     reading_date = parse_date(payload.get("readingDate"), today)
@@ -328,29 +337,88 @@ def calculate_fortune(payload):
     source_label = "自動計算命式"
 
     if not calendar_context.get("ok"):
-        auto_calculation_errors.extend(calendar_context.get("errors", []))
-    else:
-        try:
-            auto_meishiki = calculate_auto_meishiki(
-                birth_info,
-                risshun_datetime=calendar_context["risshun_datetime"],
-                sekki_entries=calendar_context["sekki_entries"],
-                base_date=calendar_context["base_date"],
-                base_day_kanchi=calendar_context["base_day_kanchi"],
+        return to_jsonable({
+            "ok": False,
+            "errors": calendar_context.get("errors", []),
+            "input": payload,
+        })
+
+    birth_boundary = get_birth_boundary(
+        birth_date, adjusted_birth_datetime, birth_time_unknown,
+        calendar_context["sekki_entries"],
+    )
+    reading_context = get_calendar_context_for_birth_year(reading_date.year)
+    if not reading_context.get("ok"):
+        return {"ok": False, "errors": reading_context.get("errors", [])}
+    reading_boundary = get_reading_risshun(
+        reading_date, reading_context["risshun_datetime"],
+    ) if include_year_gogyo_effects else None
+
+    confirmations = []
+    birth_choice = None
+    reading_choice = None
+    try:
+        if birth_boundary:
+            birth_choice = validate_boundary_selection(
+                boundary_selections.get("birth"), birth_boundary["datetime"],
             )
-            sekki_boundary_warnings = auto_meishiki.get("sekki_boundary_warnings", [])
-            selected = select_effective_meishiki(
-                input_mode="auto",
-                manual_meishiki=build_empty_meishiki(),
-                auto_meishiki=auto_meishiki,
+            if birth_choice is None:
+                confirmations.append({
+                    "kind": "birth",
+                    "term_name": birth_boundary["name"],
+                    "boundary_datetime": birth_boundary["datetime"],
+                    "adjusted_birth_datetime": adjusted_birth_datetime,
+                    "birth_time_unknown": birth_time_unknown,
+                    "exact": not birth_time_unknown and adjusted_birth_datetime == birth_boundary["datetime"],
+                })
+        if reading_boundary:
+            reading_choice = validate_boundary_selection(
+                boundary_selections.get("reading"), reading_boundary,
             )
-            source_label = selected.get("source_label", source_label)
-            if selected.get("ok"):
-                effective_meishiki = selected["meishiki"]
-            else:
-                auto_calculation_errors.extend(selected.get("errors", []))
-        except Exception as exc:
-            auto_calculation_errors.append(str(exc))
+            if reading_choice is None:
+                confirmations.append({
+                    "kind": "reading",
+                    "term_name": "立春",
+                    "boundary_datetime": reading_boundary,
+                })
+    except ValueError as exc:
+        return {"ok": False, "errors": [str(exc)]}
+
+    if confirmations:
+        return to_jsonable({
+            "ok": False,
+            "confirmation_required": True,
+            "boundary_confirmations": confirmations,
+            "errors": [],
+        })
+
+    pillar_datetime = (
+        datetime_for_boundary_choice(birth_boundary["datetime"], birth_choice)
+        if birth_boundary else None
+    )
+
+    try:
+        auto_meishiki = calculate_auto_meishiki(
+            birth_info,
+            risshun_datetime=calendar_context["risshun_datetime"],
+            sekki_entries=calendar_context["sekki_entries"],
+            base_date=calendar_context["base_date"],
+            base_day_kanchi=calendar_context["base_day_kanchi"],
+            pillar_datetime=pillar_datetime,
+        )
+        sekki_boundary_warnings = auto_meishiki.get("sekki_boundary_warnings", [])
+        selected = select_effective_meishiki(
+            input_mode="auto",
+            manual_meishiki=build_empty_meishiki(),
+            auto_meishiki=auto_meishiki,
+        )
+        source_label = selected.get("source_label", source_label)
+        if selected.get("ok"):
+            effective_meishiki = selected["meishiki"]
+        else:
+            auto_calculation_errors.extend(selected.get("errors", []))
+    except Exception as exc:
+        auto_calculation_errors.append(str(exc))
 
     if birth_time_unknown:
         effective_meishiki = clear_hour_pillar_for_unknown_birth_time(effective_meishiki)
@@ -369,7 +437,12 @@ def calculate_fortune(payload):
 
     star_data = build_star_data(effective_meishiki)
     display_kubou = get_kubou(star_data["day_tenkan"], star_data["day_chishi"])
-    analysis_context = build_analysis_context(reading_date)
+    analysis_context = (
+        {"target_year": reading_date.year, "target_year_tenkan": "", "target_year_chishi": ""}
+        if not include_year_gogyo_effects
+        and get_reading_risshun(reading_date, reading_context["risshun_datetime"])
+        else build_analysis_context(reading_date, reading_choice)
+    )
     gogyo_result = calculate_gogyo_scores_from_meishiki(
         effective_meishiki, analysis_context,
         include_kantei_year_gogyo_effects=include_year_gogyo_effects,
