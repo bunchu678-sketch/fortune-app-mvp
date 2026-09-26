@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { CalendarDays, ChevronDown, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
+import { formatJstDate } from "./jst-date";
 
 type FortuneForm = {
   name: string;
@@ -72,7 +73,7 @@ const defaultForm = (): FortuneForm => ({
   birthPlace: "未選択",
   gender: "未選択",
   consultation: "",
-  readingDate: todayIso(),
+  readingDate: formatJstDate(new Date()),
   includeKanteiYearGogyoEffects: true,
   specificDatetimeEnabled: false,
   specificDatetimeCandidates: [
