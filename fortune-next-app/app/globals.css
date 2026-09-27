@@ -105,6 +105,160 @@ main {
   padding-top: 18px;
 }
 
+.inputWorkspace {
+  grid-template-columns: minmax(0, 650px);
+  justify-content: center;
+}
+
+.inputWorkspace .inputPanel {
+  position: static;
+}
+
+.resultPage {
+  width: min(1320px, 100%);
+}
+
+.resultLayout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.resultToc {
+  position: sticky;
+  top: 18px;
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+
+.resultToc h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.resultToc nav {
+  display: grid;
+  gap: 2px;
+}
+
+.resultToc a {
+  padding: 6px 4px;
+  color: var(--muted);
+  text-decoration: none;
+  line-height: 1.45;
+  font-size: 0.85rem;
+}
+
+.resultToc a:hover,
+.resultToc a:focus {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.resultContent {
+  min-width: 0;
+  width: min(100%, 900px);
+  margin: 0 auto;
+}
+
+.resultPageHeader {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+
+.resultPageHeader p {
+  color: var(--soft);
+  margin: 0 0 4px;
+}
+
+.resultPageHeader h1 {
+  margin: 0;
+  font-size: 1.7rem;
+}
+
+.resultPageHeader button,
+.resultFooter button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--ink);
+  padding: 9px 12px;
+}
+
+.resultFooter {
+  margin-top: 18px;
+  text-align: right;
+}
+
+.resultPage .section,
+.resultPage .memoPanel {
+  scroll-margin-top: 16px;
+}
+
+.resultPage .tableWrap {
+  overflow-x: visible;
+}
+
+.resultPage table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.resultPage th,
+.resultPage td {
+  overflow-wrap: anywhere;
+}
+
+.stageList,
+.juuniList,
+.specialList,
+.timelineGroup {
+  display: grid;
+  gap: 10px;
+}
+
+.setsubokuItem {
+  margin-left: 18px;
+  border-style: dashed;
+}
+
+.timelineItem.marked {
+  border-left: 4px solid var(--accent-3);
+}
+
+.resultPage .monthGrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.thinkingHelp {
+  display: inline-grid;
+  place-items: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  padding: 0;
+  border: 1px solid var(--soft);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.thinkingHelpText {
+  color: var(--soft);
+  font-size: 0.75rem;
+}
+
 .inputPanel,
 .outputPanel {
   border: 1px solid var(--line);
@@ -526,7 +680,7 @@ tr:last-child td {
 
 .gogyoElement {
   fill: var(--ink);
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 700;
 }
 
@@ -681,6 +835,10 @@ tr:last-child td {
 }
 
 @media (max-width: 920px) {
+  .resultLayout {
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 18px;
+  }
   .workspace {
     grid-template-columns: 1fr;
   }
@@ -692,6 +850,26 @@ tr:last-child td {
   .resultSummary,
   .monthGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .resultLayout {
+    display: block;
+  }
+
+  .resultToc {
+    display: none;
+  }
+
+  .resultPageHeader {
+    flex-direction: column;
+  }
+
+  .resultPage th,
+  .resultPage td {
+    padding: 7px 4px;
+    font-size: 0.76rem;
   }
 }
 

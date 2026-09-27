@@ -9,6 +9,10 @@ const nodes = [
 ];
 const seisho = [0, 1, 2, 3, 4, 0];
 const seikoku = [0, 2, 4, 1, 3, 0];
+const formatScore = (value: unknown) => {
+  const number = Number(value ?? 0);
+  return Number.isFinite(number) ? String(Number(number.toFixed(1))) : "0";
+};
 
 function ends(a: number, b: number, startOffset: number, endOffset: number) {
   const first = nodes[a], last = nodes[b];
@@ -36,7 +40,7 @@ export default function GogyoFigure({ gogyo, id }: { gogyo: Gogyo; id: string })
         <text x={node.lx} y={node.ly} textAnchor="middle" className="gogyoRole">{node.label}</text>
         <circle cx={node.x} cy={node.y} r={22 + strength * 17} fill="rgba(158, 185, 168, 0.25)" />
         <circle cx={node.x} cy={node.y} r="31" fill="#232825" stroke="#f4efe6" strokeWidth="2" />
-        <text x={node.x} y={node.y + 7} textAnchor="middle" className="gogyoElement">{order[index]}</text>
+        <text x={node.x} y={node.y + 7} textAnchor="middle" className="gogyoElement">{order[index]}{formatScore(scores[order[index]])}</text>
       </g>;
     })}
     <path d="M 100 472 Q 118 458 136 472" fill="none" stroke="#9eb9a8" strokeWidth="2.8" markerEnd={`url(#${id}-seisho)`} /><text x="150" y="477" className="gogyoLegend">相生</text>
