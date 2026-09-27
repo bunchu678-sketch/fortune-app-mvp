@@ -4,6 +4,7 @@ import Image from "next/image";
 import { CalendarDays, ChevronDown, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { formatJstDate } from "./jst-date";
+import GogyoFigure from "./gogyo-figure";
 
 type FortuneForm = {
   name: string;
@@ -33,18 +34,17 @@ type FortuneResult = {
   errors?: string[];
   calendar?: {
     boundary_warnings?: SekkiBoundaryWarning[];
+    auto_boundaries?: BoundaryJudgement[];
   };
   [key: string]: any;
 };
 
 type BoundaryChoice = "before" | "after";
-type BoundaryConfirmation = {
+type BoundaryJudgement = {
   kind: "birth" | "reading";
   term_name: string;
   boundary_datetime: string;
-  adjusted_birth_datetime?: string;
-  birth_time_unknown?: boolean;
-  exact?: boolean;
+  choice: BoundaryChoice;
 };
 
 const API_BASE = (process.env.NEXT_PUBLIC_FORTUNE_API_URL ?? "").replace(/\/+$/, "");
@@ -67,8 +67,8 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
 const defaultForm = (): FortuneForm => ({
   name: "",
   furigana: "",
-  birthDate: "1988-08-12",
-  birthTime: "09:00",
+  birthDate: "1950-01-01",
+  birthTime: "00:00",
   birthTimeUnknown: false,
   birthPlace: "未選択",
   gender: "未選択",
@@ -133,28 +133,6 @@ function Section({
   );
 }
 
-function GogyoChart({ gogyo }: { gogyo: any }) {
-  const scores = gogyo?.scores ?? {};
-  const order = asRows(gogyo?.chart_order);
-  const maxScore = Math.max(1, ...order.map((element) => Number(scores[element] ?? 0)));
-  return (
-    <div className="gogyoGrid">
-      {order.map((element) => {
-        const value = Number(scores[element] ?? 0);
-        return (
-          <div className="gogyoRow" key={element}>
-            <div className="gogyoLabel">{element}</div>
-            <div className="gogyoTrack">
-              <div className="gogyoFill" style={{ width: `${Math.round((value / maxScore) * 100)}%` }} />
-            </div>
-            <div className="gogyoValue">{value}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function ThinkingBars({ thinking }: { thinking: any }) {
   const groups = [
     ["brain_type", "左脳／右脳"],
@@ -210,6 +188,9 @@ function ResultView({ result }: { result: FortuneResult }) {
   const juuniRows = asRows(result.personality?.juuni_unsei?.rows);
   const lifeStageRows = asRows(result.personality?.life_stage_tsuhensei);
   const sekkiWarnings = result.calendar?.boundary_warnings ?? [];
+  const variants = result.gogyo_variants ?? {};
+  const stages = ["幼年期", "青年期", "成熟期", "老年期"];
+  const variantLabels = { A: "元命式のみ", B: "元命式＋鑑定年", C: "元命式＋鑑定年＋大運" } as const;
 
   return (
     <div className="resultStack">
@@ -252,7 +233,17 @@ function ResultView({ result }: { result: FortuneResult }) {
       </Section>
 
       <Section title="五行のバランス">
-        <GogyoChart gogyo={result.gogyo} />
+        <div className="gogyoVariants">
+          {(["A", "B", "C"] as const).map((code) => {
+            const variant = variants[code];
+            return <article className="gogyoVariant" key={code}>
+              <h3>{code}. {variantLabels[code]}</h3>
+              {variant?.status === "available" ? <GogyoFigure gogyo={variant.gogyo} id={`main-${code}`} /> :
+                <p className="empty">{variant?.status === "boundary_pending" ? "節入りの確認後に算出します。" : "この条件では算出できません。"}</p>}
+              {code === "C" && variant?.daiun ? <p className="empty">対象大運：{variant.daiun.name} {variant.daiun.kanshi}</p> : null}
+            </article>;
+          })}
+        </div>
       </Section>
 
       <Section title="特殊な命式">
@@ -263,7 +254,7 @@ function ResultView({ result }: { result: FortuneResult }) {
         )}
       </Section>
 
-      <Section title="日干から読み取れる性格">
+      <Section title="元命式から読み取れる性格">
         <div className="textBlock">
           <h3>{starData.day_tenkan || "日干"}の傾向</h3>
           <p>{result.personality?.nikkan?.description || "日干コメントが未登録です。"}</p>
@@ -273,13 +264,14 @@ function ResultView({ result }: { result: FortuneResult }) {
         </div>
       </Section>
 
-      <Section title="通変星・蔵干通変星">
+      <Section title="通変星/蔵干通変星から読み取れる性格">
         <div className="cardGrid">
-          {lifeStageRows.map((row) => (
+          {lifeStageRows.map((row, index) => (
             <article className="infoCard" key={row.stage}>
-              <span className="cardEyebrow">{row.stage}</span>
-              <h3>{row.outer || "－"} / {row.inner || "－"}</h3>
+              <span className="cardEyebrow">{stages[index] ?? ""}</span>
+              <h3>社会に見せている自分：{row.outer || "－"}</h3>
               {row.outer_comment ? <p>{row.outer_comment}</p> : null}
+              <h3 className="stageInner">本来の自分：{row.inner || "－"}</h3>
               {row.inner_comment ? <p>{row.inner_comment}</p> : null}
             </article>
           ))}
@@ -292,7 +284,7 @@ function ResultView({ result }: { result: FortuneResult }) {
         ) : null}
       </Section>
 
-      <Section title="十二運星">
+      <Section title="十二運星から読み取れる性格">
         <div className="cardGrid">
           {juuniRows.map((row) => (
             <article className="infoCard" key={row.pillar_key}>
@@ -303,10 +295,13 @@ function ResultView({ result }: { result: FortuneResult }) {
             </article>
           ))}
         </div>
+      </Section>
+
+      <Section title="考え方の傾向">
         <ThinkingBars thinking={result.personality?.juuni_unsei?.thinking} />
       </Section>
 
-      <Section title="大運と接木運">
+      <Section title="大運・接木運">
         {result.daiun?.message ? <p className="empty">{result.daiun.message}</p> : null}
         <div className="timeline">
           {daiunRows.map((row) => (
@@ -366,8 +361,16 @@ function ResultView({ result }: { result: FortuneResult }) {
           鑑定者用メモ
         </summary>
         <div className="memoContent">
+          <h3>現行点数</h3>
           <PlainTable rows={asRows(result.gogyo?.details)} />
           <PlainTable rows={asRows(result.special_meishiki?.rows)} />
+          <h3>支援情報</h3>
+          <p className="empty">避けたい言葉・表現：未設定</p>
+          <p className="empty">伝わりやすい声かけ・伝え方：未設定</p>
+          <label>自由記入メモ
+            <textarea aria-label="鑑定者用メモの自由記入欄" />
+          </label>
+          <p className="empty">この入力内容は保存されません。</p>
         </div>
       </details>
     </div>
@@ -380,8 +383,9 @@ export default function Home() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [candidateCount, setCandidateCount] = useState(1);
-  const [confirmations, setConfirmations] = useState<BoundaryConfirmation[]>([]);
-  const [boundaryChoices, setBoundaryChoices] = useState<Partial<Record<BoundaryConfirmation["kind"], BoundaryChoice>>>({});
+  const [manualBoundary, setManualBoundary] = useState(false);
+  const [boundaries, setBoundaries] = useState<BoundaryJudgement[]>([]);
+  const [boundaryChoices, setBoundaryChoices] = useState<Partial<Record<BoundaryJudgement["kind"], BoundaryChoice>>>({});
 
   const visibleCandidates = useMemo(
     () => form.specificDatetimeCandidates.slice(0, candidateCount),
@@ -390,8 +394,9 @@ export default function Home() {
 
   function updateForm<K extends keyof FortuneForm>(key: K, value: FortuneForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
-    setConfirmations([]);
+    setBoundaries([]);
     setBoundaryChoices({});
+    setResult(null);
   }
 
   function updateCandidate(index: number, field: "date" | "time", value: string) {
@@ -400,42 +405,55 @@ export default function Home() {
       nextCandidates[index] = { ...nextCandidates[index], [field]: value };
       return { ...current, specificDatetimeCandidates: nextCandidates };
     });
-    setConfirmations([]);
+    setBoundaries([]);
     setBoundaryChoices({});
+    setResult(null);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (confirmations.some((item) => !boundaryChoices[item.kind])) {
-      setError("各境界について、前または後を選択してください。");
-      return;
-    }
     setIsLoading(true);
     setError("");
     setResult(null);
     try {
-      const response = await fetch(`${API_BASE}/api/fortune`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const base = {
           ...form,
+          productAutoBoundary: true,
+          includeGogyoVariants: true,
           specificDatetimeCandidates: form.specificDatetimeEnabled ? visibleCandidates : [],
-          boundarySelections: Object.fromEntries(confirmations.map((item) => [
-            item.kind,
-            { boundary_datetime: item.boundary_datetime, choice: boundaryChoices[item.kind] },
+      };
+      async function request(payload: Record<string, unknown>): Promise<FortuneResult> {
+        const response = await fetch(`${API_BASE}/api/fortune`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        });
+        return response.json();
+      }
+      const automatic = await request(base);
+      if (!automatic.ok) {
+        setError(asRows(automatic.errors).join(" / ") || "鑑定結果を取得できませんでした。");
+        return;
+      }
+      const found = automatic.calendar?.auto_boundaries ?? [];
+      setBoundaries(found);
+      if (manualBoundary && found.length && !boundaries.length) return;
+      if (manualBoundary && found.some((item) => !boundaryChoices[item.kind])) {
+        setError("修正する境界の前後を選択してください。");
+        return;
+      }
+      if (manualBoundary && found.length) {
+        const selected = await request({
+          ...base,
+          boundarySelections: Object.fromEntries(found.map((item) => [
+            item.kind, { boundary_datetime: item.boundary_datetime, choice: boundaryChoices[item.kind] },
           ])),
-        }),
-      });
-      const data = await response.json();
-      if (data.confirmation_required) {
-        setConfirmations(data.boundary_confirmations ?? []);
-        setBoundaryChoices({});
-      } else if (data.ok) {
-        setConfirmations([]);
-        setBoundaryChoices({});
-        setResult(data);
+        });
+        if (!selected.ok) {
+          setError(asRows(selected.errors).join(" / ") || "鑑定結果を取得できませんでした。");
+          return;
+        }
+        setResult(selected);
       } else {
-        setError(asRows(data.errors).join(" / ") || "鑑定結果を取得できませんでした。");
+        setResult(automatic);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "APIに接続できませんでした。");
@@ -449,7 +467,8 @@ export default function Home() {
     setResult(null);
     setError("");
     setCandidateCount(1);
-    setConfirmations([]);
+    setManualBoundary(false);
+    setBoundaries([]);
     setBoundaryChoices({});
   }
 
@@ -484,22 +503,13 @@ export default function Home() {
             <div className="fieldPair">
               <label>
                 生年月日
-                <input type="date" value={form.birthDate} onChange={(event) => updateForm("birthDate", event.target.value)} />
+                <input required type="date" value={form.birthDate} onChange={(event) => updateForm("birthDate", event.target.value)} />
               </label>
               <label>
                 鑑定日
-                <input type="date" value={form.readingDate} onChange={(event) => updateForm("readingDate", event.target.value)} />
+                <input required type="date" value={form.readingDate} onChange={(event) => updateForm("readingDate", event.target.value)} />
               </label>
             </div>
-
-            <label className="checkLine">
-              <input
-                type="checkbox"
-                checked={form.includeKanteiYearGogyoEffects}
-                onChange={(event) => updateForm("includeKanteiYearGogyoEffects", event.target.checked)}
-              />
-              <span>鑑定年の影響を五行計算に反映する</span>
-            </label>
 
             <div className="timeLine">
               <label>
@@ -517,7 +527,7 @@ export default function Home() {
                   checked={form.birthTimeUnknown}
                   onChange={(event) => updateForm("birthTimeUnknown", event.target.checked)}
                 />
-                不明
+                出生時刻不明
               </label>
             </div>
 
@@ -578,25 +588,33 @@ export default function Home() {
               </div>
             ) : null}
 
-            {confirmations.length ? (
+            <div className="boundaryPanel" role="group" aria-label="節入り・万年暦確認">
+              <h3>節入り・万年暦確認</h3>
+              {boundaries.length ? boundaries.map((item) => (
+                <p className="boundaryJudgement" key={item.kind}>
+                  {item.kind === "birth" ? "出生日時" : "鑑定日"}／{item.term_name}　現在のアプリ判定：節入り{item.choice === "before" ? "前" : "後"}
+                </p>
+              )) : <p>境界付近の場合、鑑定時に現在のアプリ判定を表示します。</p>}
+              <label className="checkLine">
+                <input type="checkbox" checked={manualBoundary} onChange={(event) => {
+                  setManualBoundary(event.target.checked);
+                  setBoundaryChoices({});
+                  setResult(null);
+                }} />
+                万年暦の確認結果で判定を修正する
+              </label>
+            </div>
+
+            {manualBoundary && boundaries.length ? (
               <div className="boundaryPanel" role="group" aria-label="節入り境界の確認">
-                <h3>節入り境界の確認</h3>
-                {confirmations.map((item) => {
+                <h3>万年暦の確認結果</h3>
+                {boundaries.map((item) => {
                   const beforeLabel = item.kind === "reading" ? "立春前として鑑定" : "節入り前として鑑定";
                   const afterLabel = item.kind === "reading" ? "立春後として鑑定" : "節入り後として鑑定";
                   return (
                     <fieldset className="boundaryChoice" key={item.kind}>
                       <legend>{item.kind === "birth" ? "出生時刻" : "鑑定日"}</legend>
                       <p>計算上の{item.term_name}時刻は {item.boundary_datetime.replace("T", " ").slice(0, 16)} 頃です。</p>
-                      {item.kind === "reading" ? (
-                        <p>この日は立春です。鑑定する時刻は立春より前ですか、後ですか？</p>
-                      ) : item.birth_time_unknown ? (
-                        <p>出生時刻は不明ですが、この日は節入り日です。出生はこの時刻より前でしたか、後でしたか？</p>
-                      ) : (
-                        <p>出生地補正後の出生時刻 {item.adjusted_birth_datetime?.replace("T", " ").slice(0, 16)} が節入りの前後5分以内です。時刻の数分差で命式が変わる可能性があります。</p>
-                      )}
-                      {item.exact ? <p className="boundaryEmphasis">計算上の時刻が境界と一致します。泰山流万年暦での確認を推奨します。</p> : null}
-                      {item.kind === "birth" && !item.exact ? <p>判断が難しい場合は泰山流万年暦での確認を推奨します。</p> : null}
                       <div className="boundaryOptions">
                         {(["before", "after"] as const).map((choice) => (
                           <label className="checkLine" key={choice}>
@@ -604,7 +622,10 @@ export default function Home() {
                               type="radio"
                               name={`boundary-${item.kind}`}
                               checked={boundaryChoices[item.kind] === choice}
-                              onChange={() => setBoundaryChoices((current) => ({ ...current, [item.kind]: choice }))}
+                              onChange={() => {
+                                setBoundaryChoices((current) => ({ ...current, [item.kind]: choice }));
+                                setResult(null);
+                              }}
                             />
                             {choice === "before" ? beforeLabel : afterLabel}
                           </label>
@@ -619,7 +640,7 @@ export default function Home() {
             <div className="buttonRow">
               <button type="submit" disabled={isLoading}>
                 {isLoading ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-                {confirmations.length ? "選択して鑑定を続ける" : "鑑定結果を表示する"}
+                {manualBoundary && boundaries.length ? "選択して鑑定を続ける" : "鑑定結果を表示する"}
               </button>
               <button type="button" className="ghostButton" onClick={resetForm}>
                 <RotateCcw size={18} />
