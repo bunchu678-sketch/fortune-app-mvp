@@ -10,7 +10,7 @@ from boundary_confirmation import (
 )
 from calendar_logic import calculate_auto_meishiki
 from calendar_reference import get_calendar_context_for_birth_year
-from daiun_logic import build_daiun_table
+from daiun_logic import build_daiun_table, select_current_daiun
 from fortune_core_logic import (
     build_juuni_unsei_summary_data,
     build_thinking_chart_data,
@@ -295,6 +295,9 @@ def normalize_specific_candidates(payload_candidates):
 def calculate_fortune(payload):
     include_year_gogyo_effects = payload.get("includeKanteiYearGogyoEffects", True)
     include_variants = payload.get("includeGogyoVariants", False)
+    product_auto_boundary = payload.get("productAutoBoundary", False)
+    if not isinstance(product_auto_boundary, bool):
+        return {"ok": False, "errors": ["productAutoBoundaryは真偽値で指定してください。"]}
     if not isinstance(include_variants, bool):
         return {"ok": False, "errors": ["includeGogyoVariantsは真偽値で指定してください。"]}
     if not isinstance(include_year_gogyo_effects, bool):
@@ -359,6 +362,7 @@ def calculate_fortune(payload):
     ) if include_year_gogyo_effects or include_variants else None
 
     confirmations = []
+    auto_boundaries = []
     birth_choice = None
     reading_choice = None
     try:
@@ -367,24 +371,43 @@ def calculate_fortune(payload):
                 boundary_selections.get("birth"), birth_boundary["datetime"],
             )
             if birth_choice is None:
-                confirmations.append({
-                    "kind": "birth",
-                    "term_name": birth_boundary["name"],
-                    "boundary_datetime": birth_boundary["datetime"],
-                    "adjusted_birth_datetime": adjusted_birth_datetime,
-                    "birth_time_unknown": birth_time_unknown,
-                    "exact": not birth_time_unknown and adjusted_birth_datetime == birth_boundary["datetime"],
-                })
+                if product_auto_boundary:
+                    birth_choice = (
+                        "before" if adjusted_birth_datetime < birth_boundary["datetime"] else "after"
+                    )
+                    auto_boundaries.append({
+                        "kind": "birth", "term_name": birth_boundary["name"],
+                        "boundary_datetime": birth_boundary["datetime"], "choice": birth_choice,
+                    })
+                else:
+                    confirmations.append({
+                        "kind": "birth",
+                        "term_name": birth_boundary["name"],
+                        "boundary_datetime": birth_boundary["datetime"],
+                        "adjusted_birth_datetime": adjusted_birth_datetime,
+                        "birth_time_unknown": birth_time_unknown,
+                        "exact": not birth_time_unknown and adjusted_birth_datetime == birth_boundary["datetime"],
+                    })
         if reading_boundary:
             reading_choice = validate_boundary_selection(
                 boundary_selections.get("reading"), reading_boundary,
             )
             if reading_choice is None:
-                confirmations.append({
-                    "kind": "reading",
-                    "term_name": "立春",
-                    "boundary_datetime": reading_boundary,
-                })
+                if product_auto_boundary:
+                    # The reading input is a date. Its existing date-only reference time is 00:00.
+                    reading_choice = (
+                        "before" if datetime.combine(reading_date, datetime_time.min) < reading_boundary else "after"
+                    )
+                    auto_boundaries.append({
+                        "kind": "reading", "term_name": "立春",
+                        "boundary_datetime": reading_boundary, "choice": reading_choice,
+                    })
+                else:
+                    confirmations.append({
+                        "kind": "reading",
+                        "term_name": "立春",
+                        "boundary_datetime": reading_boundary,
+                    })
     except ValueError as exc:
         return {"ok": False, "errors": [str(exc)]}
 
@@ -484,6 +507,8 @@ def calculate_fortune(payload):
         reading_date=reading_date,
         day_tenkan=star_data["day_tenkan"],
         kubou=display_kubou,
+        include_periods=product_auto_boundary,
+        sekki_entries=reading_context["sekki_entries"] if product_auto_boundary else None,
     )
     yearly_overall_result = build_yearly_overall_fortune(
         reading_date=reading_date,
@@ -497,6 +522,19 @@ def calculate_fortune(payload):
         specific_datetime_result = {"ok": True, "rows": [], "errors": []}
 
     life_stage_data = build_life_stage_tsuhensei_data(star_data)
+    current_life_stage_pair = None
+    if product_auto_boundary:
+        age = select_current_daiun(daiun_result, birth_date, reading_date).get("age")
+        if isinstance(age, int) and age >= 0:
+            stage_index = 0 if age < 5 else 1 if age < 30 else 2 if age < 65 else 3
+            stage = life_stage_data[stage_index]
+            current_life_stage_pair = {
+                "age": age,
+                "stage": stage["stage"],
+                "outer": stage["outer"],
+                "inner": stage["inner"],
+                "public_comment": get_month_pair_comment(stage["inner"], stage["outer"], "public"),
+            }
     juuni_unsei_display_data = build_juuni_unsei_display_data(star_data)
     juuni_unsei_by_pillar = {
         data["pillar_key"]: data.get("juuni_unsei", "")
@@ -530,6 +568,7 @@ def calculate_fortune(payload):
             "label": calendar_context.get("label", ""),
             "warnings": calendar_context.get("warnings", []),
             "boundary_warnings": sekki_boundary_warnings,
+            **({"auto_boundaries": auto_boundaries} if product_auto_boundary else {}),
         },
         "meishiki": effective_meishiki,
         "meishiki_table": build_meishiki_table_data(effective_meishiki, star_data),
@@ -550,6 +589,7 @@ def calculate_fortune(payload):
                 "keywords": nikkan_comment.get("keywords", ""),
             },
             "life_stage_tsuhensei": build_life_stage_comments(life_stage_data),
+            **({"current_life_stage_pair": current_life_stage_pair} if product_auto_boundary else {}),
             "month_pair": {
                 "center_star": star_data["month_zokkan_tsuhensei"],
                 "tsuhensei": star_data["month_tsuhensei"],

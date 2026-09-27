@@ -1,6 +1,7 @@
 @echo off
 set "APP_DIR=%~dp0"
 set "PYTHON=C:\Users\bunch\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
+if exist "%APP_DIR%..\.venv\Scripts\python.exe" set "PYTHON=%APP_DIR%..\.venv\Scripts\python.exe"
 set "NODE=C:\Users\bunch\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
 
 cd /d "%APP_DIR%"

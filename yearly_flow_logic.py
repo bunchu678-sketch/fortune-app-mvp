@@ -78,7 +78,7 @@ def get_yearly_flow_month_targets(base_year):
     return [(base_year, month) for month in range(2, 13)] + [(base_year + 1, 1)]
 
 
-def build_yearly_monthly_flow(reading_date, day_tenkan, kubou):
+def build_yearly_monthly_flow(reading_date, day_tenkan, kubou, include_periods=False, sekki_entries=None):
     base_date = normalize_to_date(reading_date)
     base_year = base_date.year
     rows = []
@@ -91,6 +91,25 @@ def build_yearly_monthly_flow(reading_date, day_tenkan, kubou):
             day_tenkan=day_tenkan,
             kubou=kubou,
         )
+        if include_periods:
+            ordered_entries = sorted(
+                (entry for entry in (sekki_entries or []) if entry.get("datetime")),
+                key=lambda entry: entry["datetime"],
+            )
+            start_index = next((
+                index for index, entry in enumerate(ordered_entries)
+                if entry["datetime"].year == target_year
+                and entry["datetime"].month == target_month
+            ), None)
+            if start_index is not None and start_index + 1 < len(ordered_entries):
+                start = ordered_entries[start_index]
+                end = ordered_entries[start_index + 1]
+                row["対象期間"] = {
+                    "start": start["datetime"].isoformat(),
+                    "end_exclusive": end["datetime"].isoformat(),
+                    "start_term": start["name"],
+                    "end_term": end["name"],
+                }
         rows.append(row)
         if row.get("error"):
             errors.append(row["error"])
