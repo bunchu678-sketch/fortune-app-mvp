@@ -111,5 +111,8 @@ def cases():
     from gogyou_year_effects import cases as year_effect_cases
     yield from year_effect_cases()
 
+    from gogyou_daiun_effects import cases as daiun_effect_cases
+    yield from daiun_effect_cases()
+
     from sekki_confirmation_cases import cases as boundary_confirmation_cases
     yield from boundary_confirmation_cases()

@@ -361,6 +361,8 @@ def build_daiun_table(
             "大運": f"第{index}大運",
             "開始年齢": format_age(start_age),
             "終了年齢": format_age(end_age),
+            "開始年齢数値": start_age,
+            "終了年齢数値": end_age,
             "目安開始年": int(birth_year) + start_age,
             "目安終了年": int(birth_year) + end_age,
             "大運干支": daiun_kanchi,
@@ -411,3 +413,20 @@ def build_daiun_table(
         "rows": rows,
         "message": "",
     }
+
+
+def select_current_daiun(daiun_result, birth_date, reading_date):
+    """Select an existing table row by full age; never recalculate its kanshi."""
+    if not birth_date or not reading_date:
+        return {"ok": False, "reason": "date_missing"}
+    if reading_date < birth_date:
+        return {"ok": False, "reason": "before_birth", "age": -1}
+    age = reading_date.year - birth_date.year - (
+        (reading_date.month, reading_date.day) < (birth_date.month, birth_date.day)
+    )
+    if not daiun_result.get("ok") or not daiun_result.get("rows"):
+        return {"ok": False, "reason": "daiun_not_available", "age": age}
+    for row in daiun_result["rows"]:
+        if row["開始年齢数値"] <= age <= row["終了年齢数値"]:
+            return {"ok": True, "age": age, "row": row}
+    return {"ok": False, "reason": "age_out_of_range", "age": age}

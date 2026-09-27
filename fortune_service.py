@@ -22,6 +22,7 @@ from fortune_core_logic import (
     get_tsuhensei_comment,
 )
 from gogyou_logic import calculate_gogyo_scores_from_meishiki, get_gogyo_chart_order
+from gogyo_variants import build_gogyo_variants
 from meishiki_model import (
     build_analysis_context,
     build_birth_info,
@@ -293,6 +294,9 @@ def normalize_specific_candidates(payload_candidates):
 
 def calculate_fortune(payload):
     include_year_gogyo_effects = payload.get("includeKanteiYearGogyoEffects", True)
+    include_variants = payload.get("includeGogyoVariants", False)
+    if not isinstance(include_variants, bool):
+        return {"ok": False, "errors": ["includeGogyoVariantsは真偽値で指定してください。"]}
     if not isinstance(include_year_gogyo_effects, bool):
         return {"ok": False, "errors": ["includeKanteiYearGogyoEffectsは真偽値で指定してください。"]}
     boundary_selections = payload.get("boundarySelections", {})
@@ -352,7 +356,7 @@ def calculate_fortune(payload):
         return {"ok": False, "errors": reading_context.get("errors", [])}
     reading_boundary = get_reading_risshun(
         reading_date, reading_context["risshun_datetime"],
-    ) if include_year_gogyo_effects else None
+    ) if include_year_gogyo_effects or include_variants else None
 
     confirmations = []
     birth_choice = None
@@ -384,7 +388,12 @@ def calculate_fortune(payload):
     except ValueError as exc:
         return {"ok": False, "errors": [str(exc)]}
 
-    if confirmations:
+    reading_pending = include_variants and any(
+        item["kind"] == "reading" for item in confirmations
+    )
+    if confirmations and (
+        not reading_pending or any(item["kind"] == "birth" for item in confirmations)
+    ):
         return to_jsonable({
             "ok": False,
             "confirmation_required": True,
@@ -439,13 +448,15 @@ def calculate_fortune(payload):
     display_kubou = get_kubou(star_data["day_tenkan"], star_data["day_chishi"])
     analysis_context = (
         {"target_year": reading_date.year, "target_year_tenkan": "", "target_year_chishi": ""}
-        if not include_year_gogyo_effects
-        and get_reading_risshun(reading_date, reading_context["risshun_datetime"])
+        if reading_pending or (
+            not include_year_gogyo_effects
+            and get_reading_risshun(reading_date, reading_context["risshun_datetime"])
+        )
         else build_analysis_context(reading_date, reading_choice)
     )
     gogyo_result = calculate_gogyo_scores_from_meishiki(
         effective_meishiki, analysis_context,
-        include_kantei_year_gogyo_effects=include_year_gogyo_effects,
+        include_kantei_year_gogyo_effects=include_year_gogyo_effects and not reading_pending,
     )
     ijou_kanshi_data = build_ijou_kanshi_data_from_meishiki(effective_meishiki)
     special_rows = build_special_meishiki_rows(ijou_kanshi_data, gogyo_result)
@@ -461,6 +472,13 @@ def calculate_fortune(payload):
         month_kanchi=month_kanchi,
         day_tenkan=star_data["day_tenkan"],
         sekki_entries=calendar_context.get("sekki_entries", []),
+    )
+    gogyo_variants = (
+        build_gogyo_variants(
+            effective_meishiki, birth_date, reading_date, reading_choice,
+            reading_pending, daiun_result, ijou_kanshi_data,
+            star_data["day_tenkan"], reading_boundary,
+        ) if include_variants else None
     )
     yearly_flow_result = build_yearly_monthly_flow(
         reading_date=reading_date,
@@ -552,6 +570,7 @@ def calculate_fortune(payload):
             },
         },
         "daiun": daiun_result,
+        **({"gogyo_variants": gogyo_variants} if include_variants else {}),
         "yearly_flow": yearly_flow_result,
         "yearly_overall": yearly_overall_result,
         "specific_datetime": specific_datetime_result,

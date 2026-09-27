@@ -94,6 +94,8 @@ def build_ijou_kanshi_texts(ijou_kanshi_data):
 
 
 def build_special_meishiki_rows(ijou_kanshi_data, gogyo_result):
+    if gogyo_result.get("external_effects"):
+        return _build_multi_external_rows(ijou_kanshi_data, gogyo_result)
     special_flags = gogyo_result.get("special_flags", {})
     kantei_year = gogyo_result.get("kantei_year", {})
     kantei_year_chishi = (
@@ -165,3 +167,61 @@ def build_ijou_kanshi_data_from_meishiki(meishiki):
         }
         for pillar_key in PILLAR_DISPLAY_ORDER
     ]
+
+
+def _build_multi_external_rows(ijou_kanshi_data, gogyo_result):
+    """Reuse existing relation labels while naming both external sources."""
+    flags = gogyo_result["special_flags"]
+    effects = gogyo_result["external_effects"]
+    formula = set(gogyo_result["formula_chishi"])
+    labels = {"kantei_year": "鑑定年", "daiun": "大運"}
+
+    def source_note(members):
+        names = [
+            f"{labels.get(effect['source'], effect['source'])}の{effect['chishi']}"
+            for effect in effects if effect.get("chishi") in members
+        ]
+        return f"（{'・'.join(names)}を含む）" if names else ""
+
+    rows = []
+    ijou_texts = build_ijou_kanshi_texts(ijou_kanshi_data)
+    if ijou_texts:
+        rows.append({"判定": "異常干支", "結果": " / ".join(ijou_texts)})
+
+    chong_texts = []
+    zero_targets = set(flags["chong"]["zero_score_targets"])
+    for detail in flags["chong"]["details"]:
+        trigger, target = detail["trigger"], detail["target"]
+        if target not in formula:
+            continue
+        names = [
+            f"{labels.get(effect['source'], effect['source'])}の{trigger}"
+            for effect in effects if effect.get("chishi") == trigger
+        ]
+        display_trigger = "・".join(names) if trigger not in formula and names else trigger
+        text = f"{display_trigger} → {target}"
+        if target in zero_targets:
+            text += f"（{target}は五行点数0点）"
+        chong_texts.append(text)
+    if chong_texts:
+        rows.append({"判定": "沖", "結果": " / ".join(chong_texts)})
+
+    for kind, title, relations in (
+        ("hougou", "方合", flags["hougou_all"]),
+        ("hangou", "方合半会", flags["hangou"]),
+        ("sango", "三合会局", flags["sango_all"]),
+    ):
+        texts = []
+        for relation in relations:
+            members = relation["members"]
+            prefix = (
+                f"{relation['element']}局（三合会局）"
+                if kind == "sango" else f"{relation['element']}の{title}"
+            )
+            texts.append(
+                f"{prefix}：{format_special_relation_members(members)}"
+                f"{source_note(members)}"
+            )
+        if texts:
+            rows.append({"判定": title, "結果": " / ".join(texts)})
+    return rows
