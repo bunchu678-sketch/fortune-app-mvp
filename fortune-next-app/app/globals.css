@@ -577,6 +577,20 @@ textarea {
   border-radius: 8px;
 }
 
+.meishikiKubou {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.meishikiKubou strong {
+  color: var(--ink);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

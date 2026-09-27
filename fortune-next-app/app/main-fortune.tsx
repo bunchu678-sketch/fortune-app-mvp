@@ -264,6 +264,7 @@ function ResultView({ result, form, manualChoices }: {
 
       <Section id="meishiki" title="命式表">
         <PlainTable rows={asRows(result.meishiki_table)} />
+        {kubou ? <div className="meishikiKubou"><span>空亡</span><strong>{kubou}</strong></div> : null}
       </Section>
 
       <Section id="gogyo" title="五行バランス">
@@ -309,16 +310,10 @@ function ResultView({ result, form, manualChoices }: {
           ))}
         </div>
         {currentStage?.public_comment ? <div className="textBlock">
-          <h3>鑑定日時点の人生段階の組み合わせ</h3>
+          <h3>本来の自分らしさ</h3>
           <p>{currentStageName}：{currentStage.outer} × {currentStage.inner}</p>
           <p>{currentStage.public_comment}</p>
         </div> : null}
-        {result.personality?.month_pair?.public_comment ? (
-          <div className="textBlock">
-            <h3>{result.personality.month_pair.center_star} × {result.personality.month_pair.tsuhensei}</h3>
-            <p>{result.personality.month_pair.public_comment}</p>
-          </div>
-        ) : null}
       </Section>
 
       <Section id="juuni" title="十二運星から読み取れる性格">
