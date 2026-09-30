@@ -4,12 +4,19 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarDays, ChevronDown, Loader2, RotateCcw, Sparkles } from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { formatJstDate } from "./jst-date";
 import GogyoFigure from "./gogyo-figure";
-import { useFortuneState } from "./fortune-state";
+import { FortuneSaved, useFortuneState } from "./fortune-state";
+import { HistoryLink, PersonCandidate, PastMemo, RerunDraft, HistoryRequestError, displayName, displayKana, historyRequest } from "./history-client";
+import { ReadingControls } from "./history-controls";
+import "./history/history.css";
 
 type FortuneForm = {
+  surname: string;
+  givenName: string;
+  surnameKana: string;
+  givenNameKana: string;
   name: string;
   furigana: string;
   birthDate: string;
@@ -68,6 +75,10 @@ const prefectures = [
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
 const defaultForm = (): FortuneForm => ({
+  surname: "",
+  givenName: "",
+  surnameKana: "",
+  givenNameKana: "",
   name: "",
   furigana: "",
   birthDate: "1950-01-01",
@@ -206,9 +217,12 @@ function ThinkingBars({ thinking }: { thinking: any }) {
   );
 }
 
-function ResultView({ result, form, manualChoices }: {
+function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos }: {
   result: FortuneResult;
   form: FortuneForm;
+  memo: string;
+  onMemoChange: (value: string) => void;
+  pastMemos: PastMemo[];
   manualChoices: Partial<Record<BoundaryJudgement["kind"], BoundaryChoice>>;
 }) {
   const starData = result.star_data ?? {};
@@ -224,7 +238,7 @@ function ResultView({ result, form, manualChoices }: {
   const variantLabels = { A: "元命式のみ", B: "元命式＋鑑定年", C: "元命式＋鑑定年＋大運" } as const;
   const basicValue = (label: string) => asRows(result.basic_info).find((row) => row["項目"] === label)?.["内容"];
   const filled = (value: unknown) => value && value !== "未選択" ? String(value) : "未入力";
-  const basicRows = [
+  const computedBasicRows = [
     ["氏名", basicValue("氏名") ?? form.name],
     ["ふりがな", basicValue("ふりがな") ?? form.furigana],
     ["生年月日", basicValue("生年月日") ?? form.birthDate],
@@ -234,16 +248,17 @@ function ResultView({ result, form, manualChoices }: {
     ["鑑定日", basicValue("鑑定日") ?? form.readingDate],
   ].map(([label, value]) => ({ "項目": label, "内容": filled(value) }));
   if (result.birth_adjustment?.time_adjustment_enabled) {
-    basicRows.push({ "項目": "出生地補正後時刻", "内容": formatTime(result.birth_adjustment.adjusted_birth_datetime) });
+    computedBasicRows.push({ "項目": "出生地補正後時刻", "内容": formatTime(result.birth_adjustment.adjusted_birth_datetime) });
   }
   for (const [kind, choice] of Object.entries(manualChoices)) {
-    if (choice) basicRows.push({ "項目": `${kind === "birth" ? "出生日時" : "鑑定日"}の節入り判定`,
+    if (choice) computedBasicRows.push({ "項目": `${kind === "birth" ? "出生日時" : "鑑定日"}の節入り判定`,
       "内容": `万年暦確認により節入り${choice === "before" ? "前" : "後"}を採用` });
   }
+  const basicRows = result.display_snapshot?.basicRows ?? computedBasicRows;
   const kubou = String(result.kubou ?? "");
   const currentStage = result.personality?.current_life_stage_pair;
-  const currentStageName = typeof currentStage?.age === "number"
-    ? stages[currentStage.age < 5 ? 0 : currentStage.age < 30 ? 1 : currentStage.age < 65 ? 2 : 3] : "";
+  const currentStageName = result.display_snapshot?.currentStageName ?? (typeof currentStage?.age === "number"
+    ? stages[currentStage.age < 5 ? 0 : currentStage.age < 30 ? 1 : currentStage.age < 65 ? 2 : 3] : "");
 
   return (
     <div className="resultStack">
@@ -402,20 +417,81 @@ function ResultView({ result, form, manualChoices }: {
           <p className="empty">伝わりやすい声かけ・伝え方：未設定</p>
           <h3>現行点数</h3>
           <PlainTable rows={asRows(result.gogyo?.details)} />
-          <label>自由記入メモ
-            <textarea aria-label="鑑定者用メモの自由記入欄" />
+          {pastMemos.length ? <div aria-label="過去の鑑定メモ">
+            <h3>過去の鑑定メモ</h3>
+            {pastMemos.map(item => <article key={item.id}>
+              <h4>{item.reading_date}</h4><p className="historyMemo">{item.memo}</p>
+            </article>)}
+          </div> : null}
+          <label>今回の鑑定メモ
+            <textarea aria-label="鑑定者用メモの自由記入欄" value={memo} onChange={event => onMemoChange(event.target.value)} />
           </label>
-          <p className="empty">この入力内容は保存されません。</p>
         </div>
       </details>
     </div>
   );
 }
 
+export function ReadingPage({ saved, onChange }: {
+  saved: FortuneSaved; onChange: (value: FortuneSaved) => void;
+}) {
+    const specialRows = asRows(saved.result.special_meishiki?.rows);
+    const visibleSections: Array<readonly [string, string]> = sectionList.filter(([id]) => id !== "special" || specialRows.length);
+    if (asRows(saved.result.specific_datetime?.rows).length) {
+      visibleSections.splice(visibleSections.findIndex(([id]) => id === "memo"), 0, ["specific", "特定日時での運勢"]);
+    }
+    return <main className="appShell resultPage">
+      <div className="resultLayout">
+        <aside className="resultToc" aria-label="目次"><h2>目次</h2><nav>
+          {visibleSections.map(([id, title]) => <a key={id} href={`#${id}`}>{title}</a>)}
+        </nav></aside>
+        <div className="resultContent">
+          <header className="resultPageHeader"><div><p>四柱推命 鑑定補助</p><h1>鑑定結果</h1><p>{saved.history ? "保存済み鑑定" : "未保存の鑑定"}</p><Link href="/history" onClick={event => {
+              if (saved.history && (saved.memo ?? "") !== saved.history.memo &&
+                !window.confirm("未保存のメモ変更を破棄して履歴一覧へ移動しますか？")) event.preventDefault();
+            }}>鑑定履歴</Link></div>
+            <button type="button" disabled title="Phase 5で実装予定">鑑定書を出力（未実装）</button>
+          </header>
+          <ResultView result={saved.result} form={saved.form as FortuneForm}
+            manualChoices={saved.manualChoices} memo={saved.memo ?? ""}
+            onMemoChange={memo => onChange({ ...saved, memo })} pastMemos={saved.pastMemos ?? []} />
+          <footer className="resultFooter"><ReadingControls saved={saved} onChange={onChange} /></footer>
+        </div>
+      </div>
+    </main>;
+}
+
 export default function MainFortune({ mode }: { mode: "input" | "result" }) {
   const router = useRouter();
-  const { saved, setSaved } = useFortuneState();
-  const [form, setForm] = useState<FortuneForm>(() => defaultForm());
+  const { saved, setSaved, draft, setDraft } = useFortuneState();
+  const [form, setForm] = useState<FortuneForm>(() => ({ ...defaultForm(), ...draft?.form }));
+  const [historyLink, setHistoryLink] = useState<HistoryLink | undefined>(draft?.link);
+  const [pastMemos, setPastMemos] = useState<PastMemo[]>(draft?.pastMemos ?? []);
+  const [inheritedBirth, setInheritedBirth] = useState<Record<string, any>>(draft?.boundarySelections ?? {});
+  const [inheritedChoices, setInheritedChoices] = useState<Record<string, "before" | "after">>(draft?.manualChoices ?? {});
+  const [personCandidates, setPersonCandidates] = useState<PersonCandidate[]>([]);
+  const [historyHint, setHistoryHint] = useState("");
+  useEffect(() => { if (mode === "input") setDraft(null); }, []);
+  async function choosePerson(candidate?: PersonCandidate, groupId?: string) {
+    setError("");
+    try {
+      if (!candidate) {
+        setHistoryLink({ mode: "new_person" }); setPastMemos([]);
+      } else {
+        const origin = groupId ? candidate.histories.find(h => h.group_id === groupId)! : candidate.histories[0];
+        const prepared = await historyRequest<RerunDraft>("/" + origin.id + "/rerun", {
+          method: "POST", body: JSON.stringify({ mode: groupId ? "existing_group" : "new_group" }),
+        });
+        setHistoryLink(prepared.link); setPastMemos(prepared.pastMemos);
+        // Reuse a birth override only for the same birth conditions as the current input.
+        const sameBirth = ["birthDate", "birthTime", "birthTimeUnknown", "birthPlace"].every(key =>
+          prepared.form[key] === form[key as keyof FortuneForm]);
+        setInheritedBirth(sameBirth ? prepared.boundarySelections : {});
+        setInheritedChoices(sameBirth ? prepared.manualChoices : {});
+      }
+      setPersonCandidates([]);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "人物を選択できません。"); }
+  }
   const [result, setResult] = useState<FortuneResult | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -431,6 +507,13 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
 
   function updateForm<K extends keyof FortuneForm>(key: K, value: FortuneForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+    setPersonCandidates([]);
+    if (["surname", "givenName", "birthDate"].includes(key) && !historyLink?.source_reading_id) {
+      setHistoryLink(undefined); setPastMemos([]);
+    }
+    if (["birthDate", "birthTime", "birthTimeUnknown", "birthPlace"].includes(key)) {
+      setInheritedBirth({}); setInheritedChoices({});
+    }
     setBoundaries([]);
     setBoundaryChoices({});
     setResult(null);
@@ -457,9 +540,20 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
     setError("");
     setResult(null);
     try {
+      const effectiveForm = { ...form, name: displayName(form), furigana: displayKana(form),
+        readingDate: form.readingDate || formatJstDate(new Date()) };
+      if (!historyLink) {
+        try {
+          const candidates = await historyRequest<PersonCandidate[]>("/candidates", { method: "POST", body: JSON.stringify(effectiveForm) });
+          if (candidates.length) { setPersonCandidates(candidates); return; }
+        } catch (caught) {
+          if (caught instanceof HistoryRequestError && caught.status === 503) setHistoryHint(caught.message);
+          else throw caught;
+        }
+      }
       const base = {
-          ...form,
-          readingDate: form.readingDate || formatJstDate(new Date()),
+          ...effectiveForm,
+          ...(Object.keys(inheritedBirth).length ? { boundarySelections: inheritedBirth } : {}),
           productAutoBoundary: true,
           includeGogyoVariants: true,
           specificDatetimeCandidates: form.specificDatetimeEnabled ? visibleCandidates : [],
@@ -478,30 +572,51 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
       const found = automatic.calendar?.auto_boundaries ?? [];
       setBoundaries(found);
       if (found.length && !boundaries.length) return;
-      if (manualBoundary && found.some((item) => !boundaryChoices[item.kind])) {
+      if (manualBoundary && found.some((item) => !boundaryChoices[item.kind] && !inheritedChoices[item.kind])) {
         setError("修正する境界の前後を選択してください。");
         return;
       }
+      const saveResult = (value: FortuneResult, manualChoices: Record<string, BoundaryChoice>, boundarySelections: Record<string, any>) => {
+        // Preserve all API comments/values and the UI-derived basic information as of this reading.
+        const basicValue = (label: string) => asRows(value.basic_info).find(row => row["項目"] === label)?.["内容"];
+        const filled = (raw: unknown) => raw && raw !== "未選択" ? String(raw) : "未入力";
+        const basicRows = [["氏名", basicValue("氏名") ?? effectiveForm.name],
+          ["ふりがな", basicValue("ふりがな") ?? effectiveForm.furigana],
+          ["生年月日", basicValue("生年月日") ?? effectiveForm.birthDate], ["出生時刻", basicValue("出生時刻")],
+          ["性別", basicValue("性別") ?? effectiveForm.gender], ["出生地", basicValue("出生地") ?? effectiveForm.birthPlace],
+          ["鑑定日", basicValue("鑑定日") ?? effectiveForm.readingDate]]
+          .map(([label, raw]) => ({ "項目": label, "内容": filled(raw) }));
+        if (value.birth_adjustment?.time_adjustment_enabled) basicRows.push({ "項目": "出生地補正後時刻",
+          "内容": formatTime(value.birth_adjustment.adjusted_birth_datetime) });
+        for (const [kind, choice] of Object.entries(manualChoices)) basicRows.push({
+          "項目": (kind === "birth" ? "出生日時" : "鑑定日") + "の節入り判定",
+          "内容": "万年暦確認により節入り" + (choice === "before" ? "前" : "後") + "を採用" });
+        const age = value.personality?.current_life_stage_pair?.age;
+        const currentStageName = typeof age === "number" ? ["幼年期", "青年期", "成熟期", "老年期"][age < 5 ? 0 : age < 30 ? 1 : age < 65 ? 2 : 3] : "";
+        setSaved({ result: { ...value, display_snapshot: { basicRows, currentStageName } },
+          form: effectiveForm, manualChoices, boundarySelections, link: historyLink, pastMemos, memo: "" });
+        router.push("/result");
+      };
       if (manualBoundary && found.length) {
         const selected = await request({
           ...base,
-          boundarySelections: Object.fromEntries(found.map((item) => [
-            item.kind, { boundary_datetime: item.boundary_datetime, choice: boundaryChoices[item.kind] },
-          ])),
+          boundarySelections: { ...inheritedBirth, ...Object.fromEntries(found.map((item) => [
+            item.kind, { boundary_datetime: item.boundary_datetime, choice: boundaryChoices[item.kind] ?? inheritedChoices[item.kind] },
+          ])) },
         });
         if (!selected.ok) {
           setError(asRows(selected.errors).join(" / ") || "鑑定結果を取得できませんでした。");
           return;
         }
         setResult(selected);
-        setSaved({ result: selected, form, manualChoices: Object.fromEntries(
-          found.map((item) => [item.kind, boundaryChoices[item.kind]]),
-        ) as Record<string, BoundaryChoice> });
-        router.push("/result");
+        const choices = { ...inheritedChoices, ...Object.fromEntries(
+          found.map(item => [item.kind, boundaryChoices[item.kind] ?? inheritedChoices[item.kind]])) } as Record<string, BoundaryChoice>;
+        const selections = { ...inheritedBirth, ...Object.fromEntries(
+          found.map(item => [item.kind, { boundary_datetime: item.boundary_datetime, choice: choices[item.kind] }])) };
+        saveResult(selected, choices, selections);
       } else {
         setResult(automatic);
-        setSaved({ result: automatic, form, manualChoices: {} });
-        router.push("/result");
+        saveResult(automatic, inheritedChoices, inheritedBirth);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "APIに接続できませんでした。");
@@ -512,6 +627,8 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
 
   function resetForm() {
     setForm(defaultForm());
+    setDraft(null); setSaved(null); setHistoryLink(undefined); setPastMemos([]);
+    setInheritedBirth({}); setInheritedChoices({}); setPersonCandidates([]); setHistoryHint("");
     setResult(null);
     setError("");
     setCandidateCount(1);
@@ -525,26 +642,7 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
       <h1>鑑定結果</h1><p>この画面で確認できる鑑定結果がありません。</p>
       <Link href="/">基本情報入力へ戻る</Link>
     </main>;
-    const specialRows = asRows(saved.result.special_meishiki?.rows);
-    const visibleSections: Array<readonly [string, string]> = sectionList.filter(([id]) => id !== "special" || specialRows.length);
-    if (asRows(saved.result.specific_datetime?.rows).length) {
-      visibleSections.splice(visibleSections.findIndex(([id]) => id === "memo"), 0, ["specific", "特定日時での運勢"]);
-    }
-    return <main className="appShell resultPage">
-      <div className="resultLayout">
-        <aside className="resultToc" aria-label="目次"><h2>目次</h2><nav>
-          {visibleSections.map(([id, title]) => <a key={id} href={`#${id}`}>{title}</a>)}
-        </nav></aside>
-        <div className="resultContent">
-          <header className="resultPageHeader"><div><p>四柱推命 鑑定補助</p><h1>鑑定結果</h1></div>
-            <button type="button" disabled title="Phase 5で実装予定">鑑定書を出力（未実装）</button>
-          </header>
-          <ResultView result={saved.result} form={saved.form as FortuneForm}
-            manualChoices={saved.manualChoices} />
-          <footer className="resultFooter"><button type="button" disabled title="Phase 4で実装予定">鑑定結果を保存（未実装）</button></footer>
-        </div>
-      </div>
-    </main>;
+    return <ReadingPage saved={saved} onChange={setSaved} />;
   }
 
   return (
@@ -556,25 +654,41 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
           </div>
           <div>
             <p>四柱推命 鑑定補助</p>
-            <h1>鑑定結果を、見せる画面へ。</h1>
+            <h1>鑑定結果を、見せる画面へ。</h1><Link href="/history">鑑定履歴</Link>
           </div>
         </header>
 
         <div className="workspace inputWorkspace">
           <form className="inputPanel" onSubmit={submit}>
+            {historyLink ? <p role="status">{historyLink.mode === "existing_group" ? "過去の鑑定履歴を引き継ぎます。" : historyLink.mode === "new_group" ? "同じ人物の新しい鑑定グループです。" : "別人として登録します。"}</p> : null}
+            {historyHint ? <p role="status">{historyHint}</p> : null}
+            {inheritedChoices.birth ? <p>出生日時の手動補正：節入り{inheritedChoices.birth === "before" ? "前" : "後"}を引き継いでいます。</p> : null}
+            {personCandidates.length ? <section className="historyChoice" aria-label="同一人物候補確認">
+              <h3>過去に鑑定履歴がありますが、同一人物ですか？</h3>
+              {personCandidates.map(candidate => <article className="historyCard" key={candidate.id}>
+                <h4>{candidate.surname}{candidate.givenName}／{candidate.birthDate}</h4>
+                <p>出生地：{candidate.birthPlace}／過去の鑑定日：{candidate.histories.map(h => h.reading_date).join("、")}</p>
+                {[...new Set(candidate.histories.map(h => h.group_id))].map((group, index) =>
+                  <button type="button" key={group} onClick={() => choosePerson(candidate, group)}>
+                    同一人物として、過去の鑑定履歴を引き継ぐ（グループ{index + 1}：{candidate.histories.filter(h => h.group_id === group).map(h => h.reading_date).join("、")}）
+                  </button>)}
+                <button type="button" onClick={() => choosePerson(candidate)}>同一人物だが、過去の鑑定履歴を引き継がず新規鑑定として開始する</button>
+              </article>)}
+              <button type="button" onClick={() => choosePerson()}>別人として登録する</button>
+            </section> : null}
             <div className="panelTitle">
               <CalendarDays size={20} />
               <h2>基本情報</h2>
             </div>
 
-            <label>
-              氏名
-              <input value={form.name} onChange={(event) => updateForm("name", event.target.value)} />
-            </label>
-            <label>
-              ふりがな
-              <input value={form.furigana} onChange={(event) => updateForm("furigana", event.target.value)} />
-            </label>
+            <div className="fieldPair">
+              <label>姓<input value={form.surname} onChange={event => updateForm("surname", event.target.value)} /></label>
+              <label>名<input value={form.givenName} onChange={event => updateForm("givenName", event.target.value)} /></label>
+            </div>
+            <div className="fieldPair">
+              <label>ふりがな（せい）<input value={form.surnameKana} onChange={event => updateForm("surnameKana", event.target.value)} /></label>
+              <label>ふりがな（めい）<input value={form.givenNameKana} onChange={event => updateForm("givenNameKana", event.target.value)} /></label>
+            </div>
             <div className="fieldPair">
               <label>
                 生年月日

@@ -1,0 +1,22 @@
+.historyPage .historyHeader { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.historySearch { display: grid; grid-template-columns: minmax(180px, 2fr) 1fr 1fr auto; gap: 12px; align-items: end; }
+.historySearch label { display: grid; gap: 6px; min-width: 0; }
+.historyDesktop { overflow-x: auto; }
+.historyDesktop table { min-width: 0; }
+.historyMobile { display: none; }
+.historyCard, .historyChoice { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: var(--panel); }
+.historyCard { overflow-wrap: anywhere; }
+.historyCard h2 { font-size: 1.1rem; margin: 0 0 12px; }
+.historyActions, .historyChoice { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.historyActions button, .historyChoice button, .historySearch button { padding: 8px 12px; }
+.historyControls { display: grid; gap: 12px; width: 100%; }
+.historyControls p { margin: 0; }
+.historyChoice { margin: 12px 0; }
+.historyMemo { white-space: pre-wrap; overflow-wrap: anywhere; }
+.historyModal { position: fixed; inset: 0; z-index: 20; padding: 20px; background: rgba(0,0,0,0.6); display: grid; place-items: center; }
+.historyModal section { max-width: 520px; width: 100%; }
+@media (max-width: 760px) {
+  .historySearch { grid-template-columns: 1fr; }
+  .historyDesktop { display: none; }
+  .historyMobile { display: grid; gap: 12px; }
+}

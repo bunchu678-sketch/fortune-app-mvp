@@ -20,7 +20,13 @@ from fortune_service import calculate_fortune  # noqa: E402
 HOST = "127.0.0.1"
 PORT = 8765
 
+BACKEND_ROOT = str(Path(__file__).parent)
+if BACKEND_ROOT not in sys.path:
+    sys.path.insert(0, BACKEND_ROOT)
+from history_api import router as history_router
+
 app = FastAPI()
+app.include_router(history_router)
 
 
 @app.exception_handler(StarletteHTTPException)
