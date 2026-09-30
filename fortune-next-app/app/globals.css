@@ -584,7 +584,7 @@ textarea {
   padding: 10px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  color: var(--muted);
+  color: var(--ink);
 }
 
 .meishikiKubou strong {
@@ -674,6 +674,10 @@ tr:last-child td {
   background: rgba(35, 40, 37, 0.82);
 }
 
+.gogyoVariantContext {
+  color: var(--ink);
+}
+
 .gogyoVariant h3 {
   margin: 0 0 8px;
   font-size: 1rem;
@@ -688,7 +692,7 @@ tr:last-child td {
 
 .gogyoRole,
 .gogyoLegend {
-  fill: var(--muted);
+  fill: var(--ink);
   font-size: 16px;
 }
 

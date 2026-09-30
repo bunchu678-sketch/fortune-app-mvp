@@ -271,11 +271,13 @@ function ResultView({ result, form, manualChoices }: {
         <div className="gogyoVariants">
           {(["A", "B", "C"] as const).map((code) => {
             const variant = variants[code];
+            const kanteiYear = variant?.gogyo?.kantei_year;
             return <article className="gogyoVariant" key={code}>
               <h3>{code}. {variantLabels[code]}</h3>
               {variant?.status === "available" ? <GogyoFigure gogyo={variant.gogyo} id={`main-${code}`} /> :
                 <p className="empty" role="status">{variant?.status === "boundary_pending" ? "節入りの確認後に算出します。" : variant?.status === "unavailable" ? "大運を取得できないため算出できません。" : "算出結果を取得できませんでした。"}</p>}
-              {code === "C" && variant?.daiun ? <p className="empty">対象大運：{variant.daiun.name} {variant.daiun.kanshi}</p> : null}
+              {code === "B" && variant?.status === "available" && kanteiYear?.tenkan && kanteiYear?.chishi ? <p className="empty gogyoVariantContext">鑑定年：{kanteiYear.tenkan}{kanteiYear.chishi}</p> : null}
+              {code === "C" && variant?.daiun ? <p className="empty gogyoVariantContext">対象大運：{variant.daiun.name} {variant.daiun.kanshi}</p> : null}
             </article>;
           })}
         </div>
