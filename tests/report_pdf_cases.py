@@ -46,7 +46,9 @@ class PdfCases(unittest.TestCase):
         xname,xlsx=export_reading('one',payload,tokens=tokens)
         name,body=export_pdf_reading('one',payload,tokens=tokens,converter=adapter)
         self.assertEqual(name,xname[:-5]+'.pdf');self.assertEqual(body,PDF)
-        self.assertEqual(adapter.inputs,[xlsx])
+        # ZIP creation timestamps can differ; all completed workbook entries must match.
+        self.assertEqual(len(adapter.inputs),1)
+        self.assertEqual(unpack(adapter.inputs[0]),unpack(xlsx))
 
     def test_nameless_and_safe_names_reuse_excel_rule(self):
         for surname,given in [('', ''),('危険/名:*?','太郎<>')]:
@@ -105,7 +107,7 @@ class PdfCases(unittest.TestCase):
             self.assertEqual(headers[b'cache-control'],b'no-store');self.assertEqual(headers[b'x-content-type-options'],b'nosniff')
             self.assertIn(quote('鑑定書_出力試験太郎_2026-10-05.pdf',safe='').encode(),headers[b'content-disposition'])
             status,_,body=asyncio.run(api_call('POST','/api/export/excel',{'export_token':token}))
-            self.assertEqual(status,200);self.assertEqual(body,adapter.inputs[0])
+            self.assertEqual(status,200);self.assertEqual(unpack(body),unpack(adapter.inputs[0]))
         with patch.dict(os.environ,{'FORTUNE_ENV':'development','FORTUNE_HISTORY_DEV_USER_ID':'two'}),patch('report_pdf.get_pdf_converter',return_value=adapter):
             self.assertEqual(asyncio.run(api_call('POST','/api/export/pdf',{'export_token':token}))[0],404)
         self.assertEqual(len(adapter.inputs),1)
@@ -150,7 +152,7 @@ class PdfCases(unittest.TestCase):
             for payload in ({'result_snapshot':self.result},{'export_token':'x','converter':'windows_excel'},[]):
                 self.assertEqual(asyncio.run(api_call('POST','/api/export/pdf',payload))[0],422)
         with patch.dict(os.environ,{'FORTUNE_ENV':'production','FORTUNE_HISTORY_DEV_USER_ID':'one'}):
-            self.assertEqual(asyncio.run(api_call('POST','/api/export/pdf',{'export_token':'x'}))[0],503)
+            self.assertEqual(asyncio.run(api_call('POST','/api/export/pdf',{'export_token':'x'}))[0],401)
 
 
 class ConverterCases(unittest.TestCase):

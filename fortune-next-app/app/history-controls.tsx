@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useAuth, useActiveView, LoginRequired } from "./auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FortuneSaved, useFortuneState } from "./fortune-state";
@@ -9,6 +10,8 @@ export function ReadingControls({ saved, onChange }: {
   saved: FortuneSaved; onChange: (value: FortuneSaved) => void;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
+  const isActive = useActiveView();
   const { setDraft } = useFortuneState();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -35,6 +38,7 @@ export function ReadingControls({ saved, onChange }: {
               result_snapshot: saved.result, memo: saved.memo ?? "", ...(saved.link ? { link: saved.link } : {}),
             }),
           });
+      if (!isActive()) return;
       onChange({ ...saved, history: record });
     } catch (caught) { setError(caught instanceof Error ? caught.message : "保存に失敗しました。"); }
     finally { setBusy(false); }
@@ -47,11 +51,13 @@ export function ReadingControls({ saved, onChange }: {
       const draft = await historyRequest<RerunDraft>("/" + saved.history.id + "/rerun", {
         method: "POST", body: JSON.stringify({ mode }),
       });
+      if (!isActive()) return;
       setDraft(draft);
       router.push("/");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "再鑑定の準備に失敗しました。"); }
     finally { setBusy(false); }
   }
+  if (!user) return <LoginRequired />;
   return <div className="historyControls">
     <p role="status">{dirty ? "未保存の変更あり" : saved.history ? "保存済み　" + savedTime(saved.history.saved_at) : "未保存"}</p>
     {error ? <p role="alert">{error}</p> : null}

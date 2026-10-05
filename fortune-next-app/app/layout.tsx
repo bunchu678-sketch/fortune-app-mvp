@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { FortuneStateProvider } from "./fortune-state";
+import { AuthProvider } from "./auth";
 
 export const metadata: Metadata = {
   title: "四柱推命 鑑定補助アプリ",
@@ -14,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body><FortuneStateProvider>{children}</FortuneStateProvider></body>
+      <body><FortuneStateProvider><AuthProvider>{children}</AuthProvider></FortuneStateProvider></body>
     </html>
   );
 }

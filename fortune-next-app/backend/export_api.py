@@ -6,7 +6,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 from history_repository import HistoryError
-from history_service import development_owner, make_service
+from history_service import make_service
+from auth_api import request_owner, session_scope
 from report_data import ReportError
 from report_export_service import export_reading
 from report_pdf import export_pdf_reading
@@ -18,10 +19,10 @@ router=APIRouter(prefix="/api/export")
 @router.post("/excel")
 async def excel_report(request: Request):
     try:
-        owner=development_owner()
+        owner=request_owner(request)
         payload=await request.json()
         repository=make_service().repository if isinstance(payload,dict) and "reading_id" in payload else None
-        filename,body=await run_in_threadpool(export_reading,owner,payload,repository)
+        filename,body=await run_in_threadpool(export_reading,owner,payload,repository,session_id=session_scope(request))
         return Response(content=body,media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers={"Content-Disposition":"attachment; filename=\"reading-report.xlsx\"; filename*=UTF-8''"+quote(filename,safe=""),
                                  "Cache-Control":"no-store","X-Content-Type-Options":"nosniff"})
@@ -37,10 +38,10 @@ async def excel_report(request: Request):
 @router.post("/pdf")
 async def pdf_report(request: Request):
     try:
-        owner=development_owner()
+        owner=request_owner(request)
         payload=await request.json()
         repository=make_service().repository if isinstance(payload,dict) and "reading_id" in payload else None
-        filename,body=await run_in_threadpool(export_pdf_reading,owner,payload,repository)
+        filename,body=await run_in_threadpool(export_pdf_reading,owner,payload,repository,session_id=session_scope(request))
         return Response(content=body,media_type="application/pdf",
                         headers={"Content-Disposition":"attachment; filename=\"reading-report.pdf\"; filename*=UTF-8''"+quote(filename,safe=""),
                                  "Cache-Control":"no-store","X-Content-Type-Options":"nosniff"})

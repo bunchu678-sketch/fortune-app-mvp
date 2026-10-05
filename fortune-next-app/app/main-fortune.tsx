@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useAuth, useActiveView, API_BASE } from "./auth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarDays, ChevronDown, Loader2, RotateCcw, Sparkles } from "lucide-react";
@@ -58,7 +59,6 @@ type BoundaryJudgement = {
   choice: BoundaryChoice;
 };
 
-const API_BASE = (process.env.NEXT_PUBLIC_FORTUNE_API_URL ?? "").replace(/\/+$/, "");
 
 const prefectures = [
   "未選択",
@@ -464,6 +464,8 @@ export function ReadingPage({ saved, onChange }: {
 
 export default function MainFortune({ mode }: { mode: "input" | "result" }) {
   const router = useRouter();
+  const { user } = useAuth();
+  const isActive = useActiveView();
   const { saved, setSaved, draft, setDraft } = useFortuneState();
   const [form, setForm] = useState<FortuneForm>(() => ({ ...defaultForm(), ...draft?.form }));
   const [historyLink, setHistoryLink] = useState<HistoryLink | undefined>(draft?.link);
@@ -543,12 +545,12 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
     try {
       const effectiveForm = { ...form, name: displayName(form), furigana: displayKana(form),
         readingDate: form.readingDate || formatJstDate(new Date()) };
-      if (!historyLink) {
+      if (!historyLink && user) {
         try {
           const candidates = await historyRequest<PersonCandidate[]>("/candidates", { method: "POST", body: JSON.stringify(effectiveForm) });
           if (candidates.length) { setPersonCandidates(candidates); return; }
         } catch (caught) {
-          if (caught instanceof HistoryRequestError && caught.status === 503) setHistoryHint(caught.message);
+          if (caught instanceof HistoryRequestError && (caught.status === 503 || caught.status === 401)) setHistoryHint(caught.message);
           else throw caught;
         }
       }
@@ -561,11 +563,12 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
       };
       async function request(payload: Record<string, unknown>): Promise<FortuneResult> {
         const response = await fetch(`${API_BASE}/api/fortune`, {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+          method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
         });
         return response.json();
       }
       const automatic = await request(base);
+      if (!isActive()) return;
       if (!automatic.ok) {
         setError(asRows(automatic.errors).join(" / ") || "鑑定結果を取得できませんでした。");
         return;
@@ -578,6 +581,7 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
         return;
       }
       const saveResult = (value: FortuneResult, manualChoices: Record<string, BoundaryChoice>, boundarySelections: Record<string, any>) => {
+        if (!isActive()) return;
         // Preserve all API comments/values and the UI-derived basic information as of this reading.
         const basicValue = (label: string) => asRows(value.basic_info).find(row => row["項目"] === label)?.["内容"];
         const filled = (raw: unknown) => raw && raw !== "未選択" ? String(raw) : "未入力";
@@ -605,6 +609,7 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
             item.kind, { boundary_datetime: item.boundary_datetime, choice: boundaryChoices[item.kind] ?? inheritedChoices[item.kind] },
           ])) },
         });
+        if (!isActive()) return;
         if (!selected.ok) {
           setError(asRows(selected.errors).join(" / ") || "鑑定結果を取得できませんでした。");
           return;

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useAuth, LoginRequired } from "../auth";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { historyRequest, savedTime } from "../history-client";
 import { useFortuneState } from "../fortune-state";
@@ -7,6 +8,7 @@ import "./history.css";
 
 type Entry = { id: string; name: string; birth_date: string; reading_date: string; saved_at: string };
 export default function HistoryPage() {
+  const { user, loading: authLoading } = useAuth();
   const { setDraft, setSaved } = useFortuneState();
   const [items, setItems] = useState<Entry[]>([]);
   const [keyword, setKeyword] = useState("");
@@ -28,7 +30,7 @@ export default function HistoryPage() {
     } catch (caught) { if (requestId === latestRequest.current) setError(caught instanceof Error ? caught.message : "履歴を取得できません。"); }
     finally { if (requestId === latestRequest.current) setLoading(false); }
   }
-  useEffect(() => { void load(); }, []); // Initial query; later search is explicit.
+  useEffect(() => { if (user) void load(); else { ++latestRequest.current; setItems([]); } }, [user?.id]); // Initial query; later search is explicit.
   useEffect(() => {
     const key = (event: KeyboardEvent) => { if (event.key === "Escape") { setDeleting(null); setMenu(null); } };
     window.addEventListener("keydown", key);
@@ -49,6 +51,7 @@ export default function HistoryPage() {
       onClick={() => setMenu(menu === item.id ? null : item.id)}>⋮</button>
     {menu === item.id ? <button type="button" onClick={() => { setDeleting(item); setMenu(null); }}>削除</button> : null}
   </div>;
+  if (authLoading || !user) return <main className="appShell historyPage"><h1>鑑定履歴</h1><LoginRequired next="/history" /><Link href="/">通常鑑定へ戻る</Link></main>;
   return <main className="appShell historyPage">
     <header className="historyHeader"><h1>鑑定履歴</h1>
       <Link href="/" onClick={() => { setDraft(null); setSaved(null); }}>新しく鑑定する</Link>

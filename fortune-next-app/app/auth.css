@@ -1,0 +1,12 @@
+.authBar { max-width: 1200px; margin: 0 auto; padding: 12px 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; font-size: 14px; }
+.authBar span, .authBar p { overflow-wrap: anywhere; min-width: 0; }
+.authBar p { flex-basis: 100%; margin: 0; }
+.authBar button, .loginPage button { padding: 9px 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-strong); color: var(--ink); cursor: pointer; }
+.loginPage { max-width: 520px; padding-top: 28px; }
+.loginPage h1 { margin-bottom: 24px; }
+.loginPage form, .loginPage label { display: grid; gap: 10px; }
+.loginPage form { gap: 22px; }
+.loginPage input { width: 100%; min-width: 0; padding: 12px; border: 1px solid #b3b8bd; border-radius: 6px; font: inherit; }
+.loginPage p { overflow-wrap: anywhere; margin: 20px 0; }
+.loginRequired { padding: 10px 0; font-size: 14px; overflow-wrap: anywhere; }
+.loginRequired p { margin: 0 0 8px; }

@@ -299,7 +299,7 @@ class HistoryCases(unittest.TestCase):
             status, body = asyncio.run(asgi_request(api_app(), "GET", "/api/history/" + row["id"]))
             self.assertEqual(status, 404)
         with patch.dict(os.environ, {"FORTUNE_ENV": "production", "FORTUNE_HISTORY_DEV_USER_ID": "one"}):
-            self.assertEqual(asyncio.run(asgi_request(api_app(), "GET", "/api/history"))[0], 503)
+            self.assertEqual(asyncio.run(asgi_request(api_app(), "GET", "/api/history"))[0], 401)
 
 
 if __name__ == "__main__":

@@ -19,19 +19,19 @@ class ExportTokens:
         for token,entry in list(self.entries.items()):
             if entry[0]<=now:self.entries.pop(token)
 
-    def issue(self, owner, form, result):
+    def issue(self, owner, form, result, session_id=None):
         with self.lock:
             self._expire()
             token=secrets.token_urlsafe(32)
-            self.entries[token]=(self.clock()+self.ttl,owner,deepcopy(form),deepcopy(result))
+            self.entries[token]=(self.clock()+self.ttl,owner,deepcopy(form),deepcopy(result),session_id)
             while len(self.entries)>self.capacity:self.entries.popitem(last=False)
             return token
 
-    def get(self, owner, token):
+    def get(self, owner, token, session_id=None):
         with self.lock:
             self._expire()
             entry=self.entries.get(token)
-            if not entry or entry[1]!=owner:
+            if not entry or entry[1]!=owner or entry[4]!=session_id:
                 raise ReportError("出力元の鑑定結果を取得できません。保存済み履歴から出力するか、再度鑑定してください。",404)
             return deepcopy(entry[2]),deepcopy(entry[3])
 
@@ -39,7 +39,7 @@ class ExportTokens:
 export_tokens=ExportTokens()
 
 
-def export_reading(owner, payload, repository=None, tokens=export_tokens):
+def export_reading(owner, payload, repository=None, tokens=export_tokens, session_id=None):
     if not owner or not isinstance(payload,dict) or set(payload) not in ({"reading_id"},{"export_token"}):
         raise ReportError("出力元の鑑定を指定してください。")
     key=next(iter(payload));value=payload[key]
@@ -51,6 +51,6 @@ def export_reading(owner, payload, repository=None, tokens=export_tokens):
         reading=repository.detail(owner,value)
         form,result=reading["input_snapshot"]["form"],reading["result_snapshot"]
     else:
-        form,result=tokens.get(owner,value)
+        form,result=tokens.get(owner,value,session_id)
     report=build_reading_report(form,result)
     return report.filename,render_xlsx(report)

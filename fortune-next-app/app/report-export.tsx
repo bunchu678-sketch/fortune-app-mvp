@@ -1,11 +1,13 @@
 "use client";
 import { useState } from "react";
+import { useAuth, useActiveView, LoginRequired, API_BASE } from "./auth";
 import type { FortuneSaved } from "./fortune-state";
 import "./report-export.css";
 
-const API_BASE = (process.env.NEXT_PUBLIC_FORTUNE_API_URL ?? "").replace(/\/+$/, "");
 
 export function ReportExport({ saved }: { saved: FortuneSaved }) {
+  const { user } = useAuth();
+  const isActive = useActiveView();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<"excel" | "pdf" | null>(null);
   const [error, setError] = useState("");
@@ -18,7 +20,7 @@ export function ReportExport({ saved }: { saved: FortuneSaved }) {
         throw new Error("出力元の鑑定結果を取得できません。保存済み履歴から出力するか、再度鑑定してください。");
       }
       const response = await fetch(API_BASE + "/api/export/" + format, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(source), cache: "no-store",
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(source), cache: "no-store",
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -27,6 +29,7 @@ export function ReportExport({ saved }: { saved: FortuneSaved }) {
       const header = response.headers.get("Content-Disposition") ?? "";
       const name = header.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
       const blob = await response.blob();
+      if (!isActive()) return;
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url; anchor.download = name ? decodeURIComponent(name) : "鑑定書." + (format === "excel" ? "xlsx" : "pdf");
@@ -36,6 +39,7 @@ export function ReportExport({ saved }: { saved: FortuneSaved }) {
     } catch (caught) { setError(caught instanceof Error ? caught.message : label + "の出力に失敗しました。"); }
     finally { setBusy(null); }
   }
+  if (!user) return <LoginRequired />;
   return <div className="reportExport">
     <button type="button" disabled={busy !== null} aria-expanded={open} onClick={() => setOpen(!open)}>鑑定書を出力</button>
     {open ? <div className="reportExportOptions" role="group" aria-label="鑑定書の出力形式">

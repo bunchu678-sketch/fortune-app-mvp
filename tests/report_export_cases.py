@@ -481,7 +481,7 @@ class ReportCases(unittest.TestCase):
 
     def test_api_fail_closed_and_invalid_body(self):
         with patch.dict('os.environ',{'FORTUNE_ENV':'production','FORTUNE_HISTORY_DEV_USER_ID':'one'}):
-            self.assertEqual(asyncio.run(api_call('POST','/api/export/excel',{'reading_id':'x'}))[0],503)
+            self.assertEqual(asyncio.run(api_call('POST','/api/export/excel',{'reading_id':'x'}))[0],401)
         with patch.dict('os.environ',{'FORTUNE_ENV':'development','FORTUNE_HISTORY_DEV_USER_ID':'one'}):
             self.assertEqual(asyncio.run(api_call('POST','/api/export/excel',{'export_token':'x','text':'arbitrary'}))[0],422)
 

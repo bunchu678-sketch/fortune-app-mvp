@@ -1,3 +1,4 @@
+import { API_BASE } from "./auth";
 import { formatJstDate } from "./jst-date";
 
 export type HistoryLink = {
@@ -20,13 +21,12 @@ export type RerunDraft = {
   form: Record<string, any>; manualChoices: Record<string, "before" | "after">;
   boundarySelections: Record<string, any>; link: HistoryLink; pastMemos: PastMemo[];
 };
-const API_BASE = (process.env.NEXT_PUBLIC_FORTUNE_API_URL ?? "").replace(/\/+$/, "");
 export class HistoryRequestError extends Error {
   constructor(message: string, public status: number) { super(message); }
 }
 export async function historyRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(API_BASE + "/api/history" + path, {
-    ...options, headers: { "Content-Type": "application/json", ...options?.headers }, cache: "no-store",
+    ...options, credentials: "same-origin", headers: { "Content-Type": "application/json", ...options?.headers }, cache: "no-store",
   });
   const body = await response.json();
   if (!response.ok || !body.ok) throw new HistoryRequestError(body.error || "履歴の処理に失敗しました。", response.status);

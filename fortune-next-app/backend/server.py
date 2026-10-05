@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -26,10 +27,12 @@ if BACKEND_ROOT not in sys.path:
 from history_api import router as history_router
 from export_api import router as export_router
 from history_repository import HistoryError
-from history_service import development_owner
+from auth_api import router as auth_router, AuthBoundary, request_owner, session_scope
 from report_export_service import export_tokens
 
 app = FastAPI()
+app.add_middleware(AuthBoundary)
+app.include_router(auth_router)
 app.include_router(history_router)
 app.include_router(export_router)
 
@@ -54,11 +57,11 @@ async def fortune(request: Request):
         result = calculate_fortune(payload)
         if result.get("ok") and payload.get("includeGogyoVariants"):
             try:
-                owner = development_owner()
-            except HistoryError:
+                owner = request_owner(request)
+            except (HistoryError, OSError, sqlite3.Error):
                 owner = None
             if owner:
-                result = {**result, "excel_export_token": export_tokens.issue(owner, payload, result)}
+                result = {**result, "excel_export_token": export_tokens.issue(owner, payload, result, session_scope(request))}
         status_code = 200 if result.get("ok") else 422
         return JSONResponse(status_code=status_code, content=result)
     except Exception as exc:
@@ -66,7 +69,7 @@ async def fortune(request: Request):
 
 
 def main():
-    uvicorn.run(app, host=HOST, port=PORT, reload=False, access_log=False)
+    uvicorn.run(app, host=HOST, port=PORT, reload=False, access_log=False, proxy_headers=False)
 
 
 if __name__ == "__main__":

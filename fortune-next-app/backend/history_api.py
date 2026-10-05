@@ -1,17 +1,18 @@
-"""Separate Phase 4 routes; owner identity comes only from server configuration."""
+"""Separate Phase 4 routes; owner identity comes from verified server-side sessions."""
 import logging
 import sqlite3
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from history_repository import HistoryError
-from history_service import development_owner, make_service, validate_input
+from history_service import make_service, validate_input
+from auth_api import request_owner
 
 router = APIRouter(prefix="/api/history")
 
 
 async def handle(request, action, body=False):
     try:
-        owner = development_owner()
+        owner = request_owner(request)
         service = make_service()
         payload = await request.json() if body else None
         value = action(service, owner, payload)
