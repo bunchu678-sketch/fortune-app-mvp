@@ -13,7 +13,7 @@ fs.mkdirSync(out,{recursive:true});
 const disposable = fs.mkdtempSync(path.join(out,'test-db-'));
 const env = {...process.env, PYTHONDONTWRITEBYTECODE:'1', PYTHONIOENCODING:'utf-8',
  FORTUNE_ENV:'development', FORTUNE_HISTORY_DEV_USER_ID:'', FORTUNE_HISTORY_DB_PATH:path.join(disposable,'test-auth.sqlite3'),
- FORTUNE_PUBLIC_ORIGIN:base, FORTUNE_PDF_CONVERTER:'windows_excel'};
+ FORTUNE_PUBLIC_ORIGIN:base, FORTUNE_PROXY_HEADERS:'0', FORTUNE_PDF_CONVERTER:process.env.FORTUNE_TEST_PDF_CONVERTER || 'windows_excel'};
 const children = [], results = [], errors = [];
 const sleep = ms => new Promise(resolve=>setTimeout(resolve,ms));
 async function freePort(port) {
@@ -103,6 +103,17 @@ function record(device,flow) { results.push({device,flow,passed:true}); console.
    const calculated = await calculate(); assert.ok(calculated.excel_export_token);
    const exportReport = async (format,label)=>{
     await page.getByRole('button',{name:'鑑定書を出力',exact:true}).click();
+    const capability = await page.request.get(base+'/api/export-capabilities');
+    assert.equal(capability.status(),200);
+    assert.equal((await capability.json()).data.pdf_available,env.FORTUNE_PDF_CONVERTER==='windows_excel');
+    if(format==='pdf' && env.FORTUNE_PDF_CONVERTER==='disabled') {
+     const pdf = page.getByRole('button',{name:'PDF（現在利用できません）',exact:true});
+     await pdf.waitFor(); assert.equal(await pdf.isDisabled(),true);
+     assert.equal(await page.getByRole('button',{name:'Excelで出力',exact:true}).isEnabled(),true);
+     await checkWidth(); await page.screenshot({path:path.join(out,device+'_'+label+'_pdf_disabled.png')});
+     await page.getByRole('button',{name:'鑑定書を出力',exact:true}).click();
+     record(device,label+' PDF disabled and Excel enabled'); return;
+    }
     const pending = page.waitForEvent('download',{timeout:150000});
     await page.getByRole('button',{name:(format==='excel'?'Excel':'PDF')+'で出力',exact:true}).click();
     const download = await pending;

@@ -101,8 +101,8 @@ Sec-Fetch-Site: cross-siteも拒否する。履歴・出力・認証に加え、
 Originなしは拒否。例外はCookieなし＋明示的開発固定ownerの既存非ブラウザ回帰クライアントのみで、auth APIには適用しない。
 
 IP/emailの試行制限はSQLiteでtransactionとして計数し、同じDBを使うworker/restart間でも維持する。
-IPは接続元を使用する。`server.py` 起動はproxy headersを無効にする。
-uvicorn CLIを使う本番サービスでは `--no-proxy-headers` とするか、管理されたproxyが外部のForwarded情報を除去し信頼境界を確定してから別途設計する。
+IPはASGIの接続元を使用する。`server.py` 起動はproxy headersを既定で無効にし、明示設定時だけUvicornの既存middlewareを使う。
+localhost限定の信頼設定と、nginxでの外部forwarded header上書きを組み合わせる。詳細は以下の配備blocker対応を参照。
 proxy headers無効でreverse proxyを通す場合、IP上限はproxy接続元を共有するため実質的に全体上限となる。利用規模に合わせて暫定設定を監査する。
 分散rate limit、強いbot対策、運用監視は後続工程。
 password/hash/raw session/Cookie全文/private鑑定内容を認証ログへ出さない。APIアクセスログは無効で検証する。
@@ -197,3 +197,119 @@ Tier Cの既知6項目は従来のまま。今回の重大な未解決事項は�
 `fortune-next-app/app/layout.tsx`、`main-fortune.tsx`、`history-client.ts`、`history-controls.tsx`、`report-export.tsx`、
 `fortune-next-app/app/history/page.tsx`、`fortune-next-app/app/history/[historyId]/page.tsx`、
 `tests/history_cases.py`、`tests/report_export_cases.py`、`tests/report_pdf_cases.py`。
+
+
+## 2026-10-05 配備blockerのローカル対応
+
+### PDF能力API
+
+`GET /api/export-capabilities` は公開read-only API。`{ok:true,data:{pdf_available:boolean}}` と `Cache-Control: no-store` だけを返す。
+利用者・DB・sessionにはアクセスせず、Excel起動・変換・出力ファイル作成もしない。
+判定はサーバー側のconverter設定、Windows platform、PowerShell、adapter/cleanupファイル、
+既存workerと同じHKLM/HKCU App PathsのExcel実行ファイルを読み取り確認する。
+Windows developmentの既定converterは従来どおりwindows_excel。disabled、未対応platform、必要ファイルやExcel欠如はfalse。
+実変換の成功を保証するprobeではなく、busy・権限・Excel障害等の実行時エラーは既存PDF APIで処理する。
+
+UIは確認中・取得失敗時もPDFを無効化し、falseなら「PDF（現在利用できません）」と「現在はExcelで出力してください。」を表示する。
+Excelは通常どおり。取得完了後trueならWindows PDFを有効化する。利用者変更・unmount時は取得をabortする。
+直接PDF APIを呼ぶ場合の503 / converter_unavailable、認証、owner、CSRF防御は変更していない。
+
+### proxy設定（server.py直接起動用）
+
+| 環境変数 | default | 本番推奨値 |
+| --- | --- | --- |
+| FORTUNE_PROXY_HEADERS | 0（無効） | nginx境界準備後だけ1 |
+| FORTUNE_TRUSTED_PROXY_IPS | 127.0.0.1,::1 | 現行IPv4 upstreamに合わせ127.0.0.1 |
+
+toggleは0/1のみ。trusted proxyは127.0.0.1と::1の列挙のみを許可し、*、CIDR、外部IP、hostname、空値は起動時に拒否する。
+Uvicornへproxy_headersとforwarded_allow_ipsを明示して渡すため、別のFORWARDED_ALLOW_IPSやWEB_CONCURRENCYによる意図しない全trust／複数workerを避ける。
+workerは1、reloadは無効を維持。login limiterは引き続きrequest.client.hostを使い、独自XFF parserは追加しない。
+この設定を読むのはserver.pyのmain。uvicorn CLIで起動する場合は同等の限定flagが別途必要なので、本番は既存の直接起動を維持する。
+
+### VPS経路比較と推奨（未適用）
+
+| 案 | セキュリティ | 既存挙動・単純さ | rollback |
+| --- | --- | --- | --- |
+| A nginx→Next.js→Python | nginxで外部headerを上書きしたうえで、Next.jsの転送・追記規則を固定して検証する必要あり | rewriteを維持できるが2段proxyのheader監査が必要 | 経路変更なし。ただしbuild版の転送挙動に依存 |
+| B /api/だけnginx→Python | nginxが単一の信頼境界。XFFをremote_addrで上書き可能 | 同originのURL、Cookie、JSON APIは維持。WebだけNext.js、APIはPythonへ直結 | nginx locationとproxy設定を戻せる |
+
+推奨はB。既存/api/*はPythonへrewriteするだけでNext.js内API処理を持たず、直結してもパス・origin・Cookie契約を維持できる。
+ローカルdevelopmentでは既存Next.js rewriteを維持する。VPSのnginxは今回は変更しない。
+
+次回設定案（既存HTTPS server内へ追加。今回は実行・適用しない）：
+
+```nginx
+location /api/ {
+    proxy_pass http://127.0.0.1:8765;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header Forwarded "";
+    client_max_body_size 1m;
+    proxy_read_timeout 60s;
+    proxy_send_timeout 60s;
+}
+```
+
+proxy_passにURI部分を付けず/api/を維持。Cookie/Set-Cookie、Origin、Content-Typeを除去・書換しない。
+外部XFFをappendするproxy_add_x_forwarded_forはこのAPI境界で使わない。
+Pythonは127.0.0.1:8765だけで待受、nginx以外のlocalhostプロセスも信頼範囲に入るためOS上のアクセス制御が前提。
+proxy toggleだけを先に有効化して現行Next.js経由のheaderを無条件に信頼しない。
+CSRFは引き続き明示HTTPS公開originを使用する。
+
+### production設定案
+
+必須：FORTUNE_ENV=production、FORTUNE_PUBLIC_ORIGIN=https://app.hakase-uranai.jp、FORTUNE_HISTORY_DB_PATH=/var/lib/fortune-app/history.sqlite3。
+推奨：FORTUNE_PDF_CONVERTER=disabled、FORTUNE_SESSION_TTL_HOURS=24、FORTUNE_LOGIN_WINDOW_SECONDS=900、
+FORTUNE_LOGIN_ACCOUNT_LIMIT=10、FORTUNE_LOGIN_IP_LIMIT=30、上記境界適用後FORTUNE_PROXY_HEADERS=1、FORTUNE_TRUSTED_PROXY_IPS=127.0.0.1。
+WebはNODE_ENV=production、NEXT_PUBLIC_FORTUNE_API_URLは未設定/空。FORTUNE_HISTORY_DEV_USER_IDはproductionで設定禁止。
+DB directory 0700、DB 0600、natsuki所有、API UMask=0077を次回監査・設定する。CLIにも同じ絶対DB pathを渡す。
+
+### 配備artifact・依存
+
+正式依存は既存requirements.txt。argon2-cffi==25.1.0が登録済みで、新しいPython packageは追加なし。
+VPSだけの手動追加を正本にせず、次回はrequirementsから環境を構築する。
+templates/kanteisho.xlsxはGit追跡済み。report_xlsx.pyの__file__から絶対位置を組み立てるため、cwd・Windows driveに依存しない。
+テンプレートhash・内容は変更しない。OOXML処理は標準ライブラリのみでUbuntuにWindows依存を追加しない。
+
+### 次回の停止点
+
+最終read-only監査でGit HEAD・サービス・DB所在・sudo・nginx全設定・backup/rollback案を確認する。
+「ここから本番変更」で承認を得るまではVPSを変更しない。DB backup→path/permission・environment準備→Git更新→
+正式依存導入→Web build→制御したschema追加/初期利用者発行→systemd反映→nginx構文検査と反映→HTTPS実運用確認の順。
+単一workerを維持し、再起動時の未保存token消失を運用上考慮する。
+
+
+### ローカル検証結果
+
+開始：main / 9f350626a81b271e74a61216b16b0612e17901b5 / origin/main一致 / clean。
+
+| 検証 | 結果 |
+| --- | --- |
+| PDF能力・proxy境界・IP偽装・loginへのIP受渡し・全trust/worker環境変数対策 | 20/20 PASS |
+| 認証 | 44/44 PASS |
+| 履歴 | 32/32 PASS |
+| Excel | 46/46 PASS |
+| PDF | 21/21 PASS |
+| Tier A | 524/524 PASS |
+| Tier B | 38/38 一致、REVIEW 0 |
+| TypeScript / Next.js build | PASS |
+| Windows PDF available PC1280/375px E2E | 28/28 PASS |
+| PDF disabled PC1280/375px E2E | 28/28 PASS |
+| Windows実PDF4件 | すべてA4縦2ページ、595.2×841.44pt |
+| disabled PC/mobile画像目視 | PDF無効表示、Excel有効、文字・ボタンの欠けなし |
+| テンプレートSHA-256 | 289b5d1093061487ba2e0e18bf6cd1c5c6056609daa31cbe0629e21489fa3b22（変更なし） |
+| 検証終了後の8765/3000 | 待受なし |
+
+追加テスト：`python -B tests/deploy_blocker_cases.py`。
+既存E2Eは既定でwindows_excel、`FORTUNE_TEST_PDF_CONVERTER=disabled` を設定してdisabledの2択UIと実Excel出力も検証する。
+認証・履歴・owner分離の既存期待値を緩和していない。故障系テストで意図したエラーログは出るが、全テストは正常終了。
+成果物：`C:\Users\bunch\Documents\Codex\fortune-app\outputs\phase7a-blockers-20261005` のpdf-available / pdf-disabled。
+架空アカウントと新しい専用検証DBのみを使い、利用者保存DBを変更していない。
+
+Notionの2026-10-05引継ぎSessionsページは参照のみ。古い「Phase 7A未着手」の進捗より今回の明示指示と実コードを採用した。
+共通AGENTS.mdと指示に衝突なし。正本内のAGENTS.mdは見つからず、共通ルールは編集していない。
+VPSへ接続せず、本番DB・設定・サービス・Gitは未変更。ローカルblocker対応後、次工程は最終read-only配備前監査。

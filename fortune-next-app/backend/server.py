@@ -29,12 +29,21 @@ from export_api import router as export_router
 from history_repository import HistoryError
 from auth_api import router as auth_router, AuthBoundary, request_owner, session_scope
 from report_export_service import export_tokens
+from pdf_converter import pdf_available
+from proxy_settings import proxy_settings
 
 app = FastAPI()
 app.add_middleware(AuthBoundary)
 app.include_router(auth_router)
 app.include_router(history_router)
 app.include_router(export_router)
+
+
+@app.get("/api/export-capabilities")
+def export_capabilities():
+    # Public capability only: no DB access, user data, converter launch, or migration.
+    return JSONResponse({"ok": True, "data": {"pdf_available": pdf_available()}},
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -69,7 +78,7 @@ async def fortune(request: Request):
 
 
 def main():
-    uvicorn.run(app, host=HOST, port=PORT, reload=False, access_log=False, proxy_headers=False)
+    uvicorn.run(app, host=HOST, port=PORT, reload=False, access_log=False, workers=1, **proxy_settings())
 
 
 if __name__ == "__main__":

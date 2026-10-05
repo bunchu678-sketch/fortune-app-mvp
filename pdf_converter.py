@@ -107,3 +107,31 @@ def get_pdf_converter() -> PdfConverter:
     if name == "windows_excel": return WindowsExcelPdfConverter()
     if name != "disabled": logger.error("Unsupported PDF converter configuration")
     return UnavailablePdfConverter()
+
+
+def pdf_available():
+    """Read-only prerequisite check; never starts Excel or creates output files.
+
+    Conversion may still fail at runtime (busy, permission, or Excel failure).
+    Keep the export API's existing converter_unavailable fallback.
+    """
+    if not isinstance(get_pdf_converter(), WindowsExcelPdfConverter) or sys.platform != "win32":
+        return False
+    powershell = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    if not all(p.is_file() for p in (powershell, RESOURCES / "windows_excel_pdf.ps1", RESOURCES / "stop_owned_excel.ps1")):
+        return False
+    return windows_excel_installed()
+
+
+def windows_excel_installed():
+    # Match the worker's App Paths lookup; do not instantiate COM or launch Excel.
+    import winreg
+    for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+        try:
+            with winreg.OpenKey(hive, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\excel.exe") as key:
+                executable = winreg.QueryValueEx(key, "")[0]
+                if isinstance(executable, str) and Path(executable).is_file():
+                    return True
+        except OSError:
+            continue
+    return False
