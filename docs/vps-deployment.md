@@ -449,7 +449,7 @@ production-tls / production-tls-fresh / windows-pdf、resolved-requirements.txt�
 runbookの9 shell blockと2 Python blockはparserで構文確認だけを行い、本番操作は未実行。
 Ubuntuの実install/build/migration/login/export、maintenance/backup/rollbackは次回承認後の停止条件付き工程であり、夜間検証済みとしない。
 
-### 最終判定
+### 夜間終了時の判定（以下は夜間時点の記録）
 
 **NOT_READY_FOR_PRODUCTION_DEPLOY_APPROVAL**
 
@@ -457,3 +457,37 @@ Ubuntuの実install/build/migration/login/export、maintenance/backup/rollback�
 未確認を成功扱いせず、翌朝このread-only検査が成功した後に配備承認へ進む。
 initial userの本人email/password入力も配備時に必要（手順完成、未作成）。
 VPS production状態の変更なし。旧版正常・Git clean・API/Web PID不変を監査した。
+
+## 14. 本人sudo認証後のnginx最終read-only確認（2026-10-06）
+
+本人が可視SSH TTYへsudo passwordを非表示入力。sudo -v後、同じTTYでsudo -n nginx -T、sudo -n nginx -tを実行。
+両方終了コード0、syntax is ok / test is successful。秘密鍵内容は読まず、設定出力は秘密値を伏せて取得した。
+端末起動の最初の引用符エラーはnginx実行前に終了し、修正した別端末で上記成功を確認。
+VPS Gitはmain/clean/d8fe9a970ddae6fa0a6b58115164a0b1825c2075、API/Web/nginxは前回PIDのままactive/running。
+HTTPS /200、HTTP→同domain HTTPS301。設定変更・reload・restart・DB/Git更新・本番loginなし。
+
+実際の全includeはnginx.conf、mime.types、sites-enabled/default、sites-enabled/fortune-app、Certbot options-ssl-nginx.conf。
+modules-enabled/conf.dから追加設定は読み込まれていない。defaultは80のdefault_server、server_name _、静的try_files。
+fortune-appは443 ssl（IPv4/IPv6）と80（IPv4/IPv6）の2 server。app.hakase-uranai.jpの同じlistenでの重複なし。
+80は対象HostをHTTPS301へ転送し、その他404。443はlocation /のみ、Next.js 127.0.0.1:3000へ全pathを転送。
+/api/専用location・regex/exact location・rewrite・Cookie書換えなし。現行APIもNext.jsの/api/:path* rewrite経由。
+Host=$host、X-Real-IP=$remote_addr、XFF=$proxy_add_x_forwarded_for、XFP=$scheme。Forwarded上書きは現行なし。
+body/read/send timeoutの明示上書きなし（nginx既定1m/60s/60s）。
+証明書/鍵path、Certbot SSL include、DH paramsは第5節と一致。appの実効TLSはCertbot includeのTLS1.2/1.3。
+nginx.confの広いTLS既定を理由にappの実効設定を取り違えない。他サイト/Certbotとの競合なし。
+
+第5節の差分は実環境から適用可能。location ^~ /api/でAPIだけPythonへ転送し、location /の画面routeは維持。
+proxy_pass http://127.0.0.1:8765にはURI部分も末尾slashもないため、/api/接頭辞とqueryを保持する。
+/api/auth/*、/api/history（末尾slashなしも含む）とその配下、/api/export/*、/api/export-capabilities、/api/fortuneはすべて対象。
+Cookie/Set-Cookie/Originを保持し、公開originはhttps://app.hakase-uranai.jp。Host/$schemeの上書きとlocalhostだけのtrustが整合。
+外部XFFをremote_addrへ置換し、Forwardedを除去する予定差分はそのまま維持。security boundary/architecture変更不要。
+/healthは内部確認用のまま、公開API経路へ追加しない。
+候補設定そのもののsudo nginx -tは配備時Step 17で必須。今回の成功は現在設定の検査で、候補をVPSへ置いてはいない。
+
+### 最新の配備前判定
+
+**READY_FOR_PRODUCTION_DEPLOY_APPROVAL**
+
+夜間終了時の唯一のblockerだった権限付きnginx全設定・構文確認を完了。unresolved blockerなし。
+本人による初期利用者email/password入力は引き続き配備時に必要。
+次はユーザー承認後、本書の本番配備runbookを実行する。今回VPSのproduction状態を変更していない。
