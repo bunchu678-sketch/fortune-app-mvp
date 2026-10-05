@@ -1,0 +1,4 @@
+.reportExport { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: 100%; }
+.reportExportOptions { display: flex; flex-wrap: wrap; gap: 8px; }
+.reportExport button { max-width: 100%; white-space: normal; }
+.reportExport [role="alert"] { max-width: 28rem; overflow-wrap: anywhere; margin: 0; }

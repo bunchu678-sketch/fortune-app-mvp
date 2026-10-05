@@ -10,6 +10,7 @@ import GogyoFigure from "./gogyo-figure";
 import { FortuneSaved, useFortuneState } from "./fortune-state";
 import { HistoryLink, PersonCandidate, PastMemo, RerunDraft, HistoryRequestError, displayName, displayKana, historyRequest } from "./history-client";
 import { ReadingControls } from "./history-controls";
+import { ReportExport } from "./report-export";
 import "./history/history.css";
 
 type FortuneForm = {
@@ -450,7 +451,7 @@ export function ReadingPage({ saved, onChange }: {
               if (saved.history && (saved.memo ?? "") !== saved.history.memo &&
                 !window.confirm("未保存のメモ変更を破棄して履歴一覧へ移動しますか？")) event.preventDefault();
             }}>鑑定履歴</Link></div>
-            <button type="button" disabled title="Phase 5で実装予定">鑑定書を出力（未実装）</button>
+            <ReportExport saved={saved} />
           </header>
           <ResultView result={saved.result} form={saved.form as FortuneForm}
             manualChoices={saved.manualChoices} memo={saved.memo ?? ""}

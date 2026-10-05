@@ -24,9 +24,14 @@ BACKEND_ROOT = str(Path(__file__).parent)
 if BACKEND_ROOT not in sys.path:
     sys.path.insert(0, BACKEND_ROOT)
 from history_api import router as history_router
+from export_api import router as export_router
+from history_repository import HistoryError
+from history_service import development_owner
+from report_export_service import export_tokens
 
 app = FastAPI()
 app.include_router(history_router)
+app.include_router(export_router)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -47,6 +52,13 @@ async def fortune(request: Request):
         raw_body = (await request.body()).decode("utf-8")
         payload = json.loads(raw_body) if raw_body else {}
         result = calculate_fortune(payload)
+        if result.get("ok") and payload.get("includeGogyoVariants"):
+            try:
+                owner = development_owner()
+            except HistoryError:
+                owner = None
+            if owner:
+                result = {**result, "excel_export_token": export_tokens.issue(owner, payload, result)}
         status_code = 200 if result.get("ok") else 422
         return JSONResponse(status_code=status_code, content=result)
     except Exception as exc:
