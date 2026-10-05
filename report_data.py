@@ -88,14 +88,20 @@ def build_reading_report(form, result):
     age_value = age.get("age")
     if age_value is None:
         age_value = reading.year - birth.year - ((reading.month, reading.day) < (birth.month, birth.day))
-    birth_time = "出生時刻不明" if form.get("birthTimeUnknown") else text(form.get("birthTime", ""))
+    birth_time = "出生時刻不明"
+    if not form.get("birthTimeUnknown"):
+        match = re.fullmatch(r"(\d{1,2}):(\d{2})", text(form.get("birthTime", "")))
+        if not match or int(match[1]) > 23 or int(match[2]) > 59:
+            raise ReportError("出生時刻を確認してください。")
+        birth_time = f"{int(match[1])}時{int(match[2]):02d}分生まれ"
     cells = {
-        "D3": name, "G3": birth.strftime("%Y/%m/%d"), "J3": birth_time,
+        "C2": "鑑定日", "D2": f"{reading.year}年{reading.month}月{reading.day}日",
+        "D3": name, "G3": f"{birth.year}年", "H3": f"{birth.month}月", "I3": f"{birth.day}日", "J3": birth_time,
         "L3": text(basic.get("出生地", form.get("birthPlace", ""))),
         "M3": age_value if age_value >= 0 else "", "N3": text(basic.get("性別", form.get("gender", ""))),
         "E13": text(result.get("kubou", "")), "N14": "",
         "C15": difference("今年の影響", a, b), "C16": difference("大運の影響", b, c),
-        "C17": f"鑑定日：{reading.isoformat()}",
+        "C17": "",
         "B60": "●年運　太罫線：接木運の境界",
     }
     for addr in ("L3", "N3"):

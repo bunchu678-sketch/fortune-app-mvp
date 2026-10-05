@@ -21,7 +21,7 @@ from fortune_service import calculate_fortune
 from history_repository import SQLiteHistoryRepository, HistoryError
 from history_service import HistoryService
 from report_data import build_reading_report, difference, ReportError
-from report_xlsx import render_xlsx, TEMPLATE_PATH, TEMPLATE_SHA256, GOGYO_CELLS, GOGYO_DRAWING_IDS
+from report_xlsx import render_xlsx, TEMPLATE_PATH, TEMPLATE_SHA256, GOGYO_CELLS, GOGYO_DRAWING_IDS, SECTION_HEADING_ROWS, SECTION_GAP_PT, REPORT_PRINT_SCALE
 from report_export_service import ExportTokens, export_reading
 from tier_b import api_app
 
@@ -85,7 +85,7 @@ class ReportCases(unittest.TestCase):
 
     def test_print_settings_and_break(self):
         sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
-        self.assertEqual(sheet.find('s:pageSetup',NS).get('scale'),'85')
+        self.assertEqual(sheet.find('s:pageSetup',NS).get('scale'),str(REPORT_PRINT_SCALE))
         self.assertEqual(sheet.find('s:pageSetup',NS).get('paperSize'),'9')
         self.assertEqual(sheet.find('s:rowBreaks/s:brk',NS).get('id'),'35')
         workbook=ET.fromstring(self.parts['xl/workbook.xml'])
@@ -164,8 +164,12 @@ class ReportCases(unittest.TestCase):
             if int(a.find('.//x:cNvPr',NS).get('id')) not in GOGYO_DRAWING_IDS:
                 self.assertEqual(ET.tostring(a),ET.tostring(b))
         old_sheet=ET.fromstring(before['xl/worksheets/sheet2.xml']);new_sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
+        old_xfs=list(ET.fromstring(before['xl/styles.xml']).find('s:cellXfs',NS))
+        new_xfs=list(ET.fromstring(self.parts['xl/styles.xml']).find('s:cellXfs',NS))
         for a,b in zip(old_sheet.findall('.//s:c',NS),new_sheet.findall('.//s:c',NS)):
-            if a.get('r') in GOGYO_CELLS:a.attrib.pop('s',None);b.attrib.pop('s',None)
+            if a.get('r') not in GOGYO_CELLS:
+                self.assertEqual(ET.tostring(old_xfs[int(a.get('s','0'))]),ET.tostring(new_xfs[int(b.get('s','0'))]),a.get('r'))
+            a.attrib.pop('s',None);b.attrib.pop('s',None)
             self.assertEqual(ET.tostring(a),ET.tostring(b),a.get('r'))
 
     def test_gogyo_objects_stay_inside_existing_frame(self):
@@ -181,7 +185,48 @@ class ReportCases(unittest.TestCase):
             self.assertLessEqual(ax+aw,x+w);self.assertLessEqual(ay+ah,y+h)
 
     def test_basic_information(self):
-        for key,expected in {'D3':'出力試験太郎','G3':'1988/08/12','J3':'09:00','L3':'東京都','M3':'38','N3':'男性'}.items():self.assertEqual(self.cells[key],expected)
+        for key,expected in {'D3':'出力試験太郎','G3':'1988年','H3':'8月','I3':'12日','J3':'9時00分生まれ','L3':'東京都','M3':'38','N3':'男性'}.items():self.assertEqual(self.cells[key],expected)
+
+    def test_birth_date_three_cells_with_units(self):
+        report=build_reading_report({**FORM,'birthDate':'2026-10-05'},self.result)
+        self.assertEqual([report.cells[a] for a in ('G3','H3','I3')],['2026年','10月','5日'])
+        sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
+        merges=[n.get('ref') for n in sheet.find('s:mergeCells',NS)]
+        self.assertNotIn('G3:I3',merges)
+
+    def test_birth_time_japanese_and_two_digit_minutes(self):
+        for value,expected in [('09:00','9時00分生まれ'),('09:05','9時05分生まれ'),('13:07','13時07分生まれ'),('23:30','23時30分生まれ')]:
+            self.assertEqual(build_reading_report({**FORM,'birthTime':value},self.result).cells['J3'],expected)
+        for value in ('','24:00','09:60','not-a-time'):
+            with self.assertRaises(ReportError):build_reading_report({**FORM,'birthTime':value},self.result)
+        self.assertEqual(build_reading_report({**FORM,'birthTimeUnknown':True,'birthTime':'09:00'},self.result).cells['J3'],'出生時刻不明')
+
+    def test_reading_date_top_only(self):
+        self.assertEqual(self.cells['C2'],'鑑定日');self.assertEqual(self.cells['D2'],'2026年10月5日')
+        self.assertEqual(self.cells['C17'],'')
+        sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
+        self.assertIn('D2:F2',[n.get('ref') for n in sheet.find('s:mergeCells',NS)])
+        self.assertEqual(sum(value=='鑑定日' for value in self.cells.values()),1)
+
+    def test_heading_gaps_without_body_or_font_reduction(self):
+        with ZipFile(TEMPLATE_PATH) as z:
+            original=ET.fromstring(z.read('xl/worksheets/sheet2.xml'))
+            old_drawing=ET.fromstring(z.read('xl/drawings/drawing2.xml'))
+        sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
+        old_rows={n.get('r'):n for n in original.findall('s:sheetData/s:row',NS)}
+        for row in sheet.findall('s:sheetData/s:row',NS):
+            number=int(row.get('r'))
+            if number>68:continue
+            old=old_rows[row.get('r')]
+            expected=float(old.get('ht',15))+(SECTION_GAP_PT if number in SECTION_HEADING_ROWS else 0)
+            self.assertEqual(float(row.get('ht',15)),expected)
+        new_drawing=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
+        for old,new in zip(old_drawing,new_drawing):
+            props=old.find('.//x:cNvPr',NS)
+            if not props.get('name').startswith('Phase5_') and props.get('id')!='3':continue
+            self.assertEqual(old.find('.//a:xfrm/a:ext',NS).attrib,new.find('.//a:xfrm/a:ext',NS).attrib)
+            self.assertEqual(ET.tostring(old.find('.//x:txBody/a:bodyPr',NS)),ET.tostring(new.find('.//x:txBody/a:bodyPr',NS)))
+            self.assertEqual(ET.tostring(old.find('.//x:txBody/a:p/a:r/a:rPr',NS)),ET.tostring(new.find('.//x:txBody/a:p/a:r/a:rPr',NS)))
 
     def test_meishiki_and_kubou(self):
         for col,key in zip('DEFG',('hour','day','month','year')):

@@ -19,6 +19,9 @@ X = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
 C = "http://schemas.openxmlformats.org/drawingml/2006/chart"
 GOGYO_CELLS = ("K6", "M8", "L12", "J12", "I8")
 GOGYO_DRAWING_IDS = set(range(4, 24))
+SECTION_GAP_PT = 7.5
+SECTION_HEADING_ROWS = (25, 29, 34, 36, 43, 55, 60, 62, 67)
+REPORT_PRINT_SCALE = 82
 
 
 def children(node, local=None):
@@ -171,6 +174,43 @@ def hide_gogyo_cell_text(sheet, styles):
     styles.xfs.setAttribute("count", str(len(children(styles.xfs))))
 
 
+def apply_report_layout(sheet, drawing, styles):
+    """Add half a line above headings without changing prose/font/body-box sizes."""
+    merges = first(sheet.documentElement, "mergeCells")
+    if not any(n.getAttribute("ref") == "D2:F2" for n in children(merges)):
+        new(merges, S, "mergeCell", {"ref": "D2:F2"})
+        merges.setAttribute("count", str(len(children(merges))))
+    for row in sheet.getElementsByTagNameNS(S, "row"):
+        rownum = int(row.getAttribute("r"))
+        if rownum in SECTION_HEADING_ROWS:
+            row.setAttribute("ht", f"{float(row.getAttribute('ht')) + SECTION_GAP_PT:g}")
+            row.setAttribute("customHeight", "1")
+        for cell in children(row, "c"):
+            address = cell.getAttribute("r")
+            if rownum not in SECTION_HEADING_ROWS and address not in ("C2", "D2"):
+                continue
+            xf = children(styles.xfs)[int(cell.getAttribute("s") or 0)].cloneNode(True)
+            alignment = first(xf, "alignment")
+            if alignment is None: alignment = new(xf, S, "alignment")
+            alignment.setAttribute("vertical", "bottom" if rownum in SECTION_HEADING_ROWS else "center")
+            if address in ("C2", "D2"): alignment.setAttribute("horizontal", "left")
+            xf.setAttribute("applyAlignment", "1")
+            styles.xfs.appendChild(xf)
+            cell.setAttribute("s", str(len(children(styles.xfs)) - 1))
+    styles.xfs.setAttribute("count", str(len(children(styles.xfs))))
+    first(sheet.documentElement, "pageSetup").setAttribute("scale", str(REPORT_PRINT_SCALE))
+    # Excel uses the row anchors; synchronize cached physical transforms too.
+    for anchor in children(drawing.documentElement, "twoCellAnchor"):
+        start = int(content(first(first(anchor, "from"), "row"))) + 1
+        end = int(content(first(first(anchor, "to"), "row"))) + 1
+        before = sum(SECTION_GAP_PT for row in SECTION_HEADING_ROWS if row < start) * 12700
+        after = sum(SECTION_GAP_PT for row in SECTION_HEADING_ROWS if row < end) * 12700
+        for transform in anchor.getElementsByTagNameNS(A, "xfrm"):
+            off, ext = first(transform, "off"), first(transform, "ext")
+            off.setAttribute("y", str(int(off.getAttribute("y")) + round(before)))
+            ext.setAttribute("cy", str(int(ext.getAttribute("cy")) + round(after - before)))
+
+
 def polish_gogyo_layout(doc, report):
     """Update only the approved five-element drawing, in physical EMU coordinates."""
     anchors = {int(n.getAttribute("id")): n.parentNode.parentNode.parentNode
@@ -305,10 +345,11 @@ def render_xlsx(report: ReadingReport, template_path=TEMPLATE_PATH):
     sheet=minidom.parseString(files["xl/worksheets/sheet2.xml"])
     write_sheet(sheet,{**report.cells,**report.chart_cells},styles,report,strings)
     hide_gogyo_cell_text(sheet, styles)
-    files["xl/worksheets/sheet2.xml"]=serialize(sheet)
-    files["xl/styles.xml"]=serialize(style_doc)
     drawing=minidom.parseString(files["xl/drawings/drawing2.xml"])
     write_shapes(drawing,report.texts)
+    apply_report_layout(sheet, drawing, styles)
+    files["xl/worksheets/sheet2.xml"]=serialize(sheet)
+    files["xl/styles.xml"]=serialize(style_doc)
     polish_gogyo_layout(drawing, report)
     files["xl/drawings/drawing2.xml"]=serialize(drawing)
     for index in range(1,6):
