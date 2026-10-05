@@ -22,6 +22,7 @@ GOGYO_DRAWING_IDS = set(range(4, 24))
 SECTION_GAP_PT = 7.5
 SECTION_HEADING_ROWS = (25, 29, 34, 36, 43, 55, 60, 62, 67)
 REPORT_PRINT_SCALE = 82
+ADVICE_BOTTOM_INSET_PT = 6
 
 
 def children(node, local=None):
@@ -211,6 +212,26 @@ def apply_report_layout(sheet, drawing, styles):
             ext.setAttribute("cy", str(int(ext.getAttribute("cy")) + round(after - before)))
 
 
+def protect_advice_bottom_border(sheet, drawing, workbook):
+    """Put the final cell border inside the print area, keeping the total page height."""
+    rows = {int(r.getAttribute("r")): r for r in sheet.getElementsByTagNameNS(S, "row")}
+    rows[68].setAttribute("ht", f"{float(rows[68].getAttribute('ht')) - ADVICE_BOTTOM_INSET_PT:g}")
+    rows[69].setAttribute("ht", str(ADVICE_BOTTOM_INSET_PT))
+    rows[69].setAttribute("hidden", "0")
+    rows[69].setAttribute("customHeight", "1")
+    # Row 69 is a cleared legacy row; keep the new printing gutter free of borders.
+    for cell in children(rows[69], "c"):
+        address = cell.getAttribute("r")
+        if re.fullmatch(r"[A-O]69", address): cell.setAttribute("s", "0")
+    for name in workbook.getElementsByTagNameNS(S, "definedName"):
+        if name.getAttribute("name") == "_xlnm.Print_Area" and name.getAttribute("localSheetId") == "1":
+            replace_text(name, "原本!$A$1:$O$69")
+    for shape in drawing.getElementsByTagNameNS(X, "sp"):
+        if shape.getElementsByTagNameNS(X, "cNvPr")[0].getAttribute("id") != "3": continue
+        extent = first(first(first(shape, "spPr"), "xfrm"), "ext")
+        extent.setAttribute("cy", str(int(extent.getAttribute("cy")) - ADVICE_BOTTOM_INSET_PT * 12700))
+
+
 def polish_gogyo_layout(doc, report):
     """Update only the approved five-element drawing, in physical EMU coordinates."""
     anchors = {int(n.getAttribute("id")): n.parentNode.parentNode.parentNode
@@ -348,6 +369,9 @@ def render_xlsx(report: ReadingReport, template_path=TEMPLATE_PATH):
     drawing=minidom.parseString(files["xl/drawings/drawing2.xml"])
     write_shapes(drawing,report.texts)
     apply_report_layout(sheet, drawing, styles)
+    workbook=minidom.parseString(files["xl/workbook.xml"])
+    protect_advice_bottom_border(sheet, drawing, workbook)
+    files["xl/workbook.xml"]=serialize(workbook)
     files["xl/worksheets/sheet2.xml"]=serialize(sheet)
     files["xl/styles.xml"]=serialize(style_doc)
     polish_gogyo_layout(drawing, report)

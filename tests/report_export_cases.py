@@ -1,5 +1,6 @@
 """Excel report contract, official data, snapshot and owner-isolation tests."""
 from copy import deepcopy
+from datetime import date
 from io import BytesIO
 import asyncio
 import hashlib
@@ -21,7 +22,7 @@ from fortune_service import calculate_fortune
 from history_repository import SQLiteHistoryRepository, HistoryError
 from history_service import HistoryService
 from report_data import build_reading_report, difference, ReportError
-from report_xlsx import render_xlsx, TEMPLATE_PATH, TEMPLATE_SHA256, GOGYO_CELLS, GOGYO_DRAWING_IDS, SECTION_HEADING_ROWS, SECTION_GAP_PT, REPORT_PRINT_SCALE
+from report_xlsx import render_xlsx, TEMPLATE_PATH, TEMPLATE_SHA256, GOGYO_CELLS, GOGYO_DRAWING_IDS, SECTION_HEADING_ROWS, SECTION_GAP_PT, REPORT_PRINT_SCALE, ADVICE_BOTTOM_INSET_PT
 from report_export_service import ExportTokens, export_reading
 from tier_b import api_app
 
@@ -90,7 +91,7 @@ class ReportCases(unittest.TestCase):
         self.assertEqual(sheet.find('s:rowBreaks/s:brk',NS).get('id'),'35')
         workbook=ET.fromstring(self.parts['xl/workbook.xml'])
         areas=[n.text for n in workbook.findall('s:definedNames/s:definedName',NS) if n.get('name')=='_xlnm.Print_Area']
-        self.assertTrue(any('$A$1:$O$68' in x for x in areas))
+        self.assertTrue(any('$A$1:$O$69' in x for x in areas))
 
     def test_drawing_anchors_and_objects_preserved(self):
         with ZipFile(TEMPLATE_PATH) as z:old=ET.fromstring(z.read('xl/drawings/drawing2.xml'))
@@ -208,7 +209,7 @@ class ReportCases(unittest.TestCase):
         self.assertIn('D2:F2',[n.get('ref') for n in sheet.find('s:mergeCells',NS)])
         self.assertEqual(sum(value=='鑑定日' for value in self.cells.values()),1)
 
-    def test_heading_gaps_without_body_or_font_reduction(self):
+    def test_heading_gaps_preserve_fonts_and_other_body_boxes(self):
         with ZipFile(TEMPLATE_PATH) as z:
             original=ET.fromstring(z.read('xl/worksheets/sheet2.xml'))
             old_drawing=ET.fromstring(z.read('xl/drawings/drawing2.xml'))
@@ -219,14 +220,86 @@ class ReportCases(unittest.TestCase):
             if number>68:continue
             old=old_rows[row.get('r')]
             expected=float(old.get('ht',15))+(SECTION_GAP_PT if number in SECTION_HEADING_ROWS else 0)
+            if number==68:expected-=ADVICE_BOTTOM_INSET_PT
             self.assertEqual(float(row.get('ht',15)),expected)
         new_drawing=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
         for old,new in zip(old_drawing,new_drawing):
             props=old.find('.//x:cNvPr',NS)
             if not props.get('name').startswith('Phase5_') and props.get('id')!='3':continue
-            self.assertEqual(old.find('.//a:xfrm/a:ext',NS).attrib,new.find('.//a:xfrm/a:ext',NS).attrib)
+            expected_extent=dict(old.find('.//a:xfrm/a:ext',NS).attrib)
+            if props.get('id')=='3':expected_extent['cy']=str(int(expected_extent['cy'])-ADVICE_BOTTOM_INSET_PT*12700)
+            self.assertEqual(expected_extent,new.find('.//a:xfrm/a:ext',NS).attrib)
             self.assertEqual(ET.tostring(old.find('.//x:txBody/a:bodyPr',NS)),ET.tostring(new.find('.//x:txBody/a:bodyPr',NS)))
             self.assertEqual(ET.tostring(old.find('.//x:txBody/a:p/a:r/a:rPr',NS)),ET.tostring(new.find('.//x:txBody/a:p/a:r/a:rPr',NS)))
+
+    def _assert_reading_age(self,birth,reading,expected):
+        form={**FORM,'birthDate':birth,'readingDate':reading}
+        result=calculate_fortune(form);self.assertTrue(result['ok'])
+        self.assertEqual(result['personality']['current_life_stage_pair']['age'],expected)
+        for official in (True,False):
+            snapshot=deepcopy(result)
+            if not official:snapshot['personality'].pop('current_life_stage_pair',None)
+            with patch('report_data.date',wraps=date) as date_api:
+                date_api.today.side_effect=AssertionError('age must not use today')
+                report=build_reading_report(form,snapshot)
+                self.assertEqual(report.cells['M3'],expected)
+                parts=unpack(render_xlsx(report))
+                self.assertEqual(sheet_cells(parts)['M3'],str(expected))
+                self.assertFalse(ET.fromstring(parts['xl/worksheets/sheet2.xml']).findall('.//s:f',NS))
+
+    def test_age_same_birth_and_reading_date(self):
+        self._assert_reading_age('2026-10-05','2026-10-05',0)
+
+    def test_age_adult_reading_date(self):
+        self._assert_reading_age('1988-08-12','2026-10-05',38)
+
+    def test_age_day_before_birthday(self):
+        self._assert_reading_age('1988-08-12','2026-08-11',37)
+
+    def test_age_on_birthday(self):
+        self._assert_reading_age('1988-08-12','2026-08-12',38)
+
+    def test_saved_age_uses_original_reading_date_without_recalculation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo=SQLiteHistoryRepository(Path(directory)/'history.sqlite3')
+            service=HistoryService(repo)
+            cases=(('2026-10-05','2026-10-05',0),('1988-08-12','2026-10-05',38),
+                   ('1988-08-12','2026-08-11',37),('1988-08-12','2026-08-12',38))
+            linked={};saved=[]
+            for birth,reading,expected in cases:
+                form={**FORM,'birthDate':birth,'readingDate':reading}
+                result=calculate_fortune(form)
+                payload={'input_snapshot':{'form':form},'result_snapshot':result,'memo':''}
+                if birth in linked:
+                    previous=linked[birth]
+                    payload['link']={'mode':'existing_group','person_id':previous['person_id'],
+                                     'group_id':previous['group_id'],'source_reading_id':previous['id']}
+                row=service.create('one',payload)
+                linked[birth]=row;saved.append((row,birth,reading,expected))
+            for row,birth,reading,expected in saved:
+                with self.subTest(birth=birth,reading=reading):
+                    with patch('report_data.date',wraps=date) as date_api,patch('fortune_service.calculate_fortune',side_effect=AssertionError('saved export must not recalculate')):
+                        date_api.today.side_effect=AssertionError('saved age must not use today')
+                        _,body=export_reading('one',{'reading_id':row['id']},repo)
+                    cells=sheet_cells(unpack(body))
+                    self.assertEqual(cells['M3'],str(expected))
+                    day=date.fromisoformat(reading)
+                    self.assertEqual(cells['D2'],f'{day.year}年{day.month}月{day.day}日')
+
+    def test_advice_border_has_blank_printing_gutter(self):
+        sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
+        gutter=sheet.find("s:sheetData/s:row[@r='69']",NS)
+        self.assertEqual(gutter.get('hidden'),'0')
+        self.assertEqual(float(gutter.get('ht')),6)
+        for cell in gutter.findall('s:c',NS):
+            if cell.get('r')[0]>'O':continue
+            self.assertEqual(cell.get('s'),'0')
+            self.assertFalse(list(cell))
+        self.assertEqual(sheet.find('s:pageSetup',NS).get('scale'),'82')
+        with ZipFile(TEMPLATE_PATH) as z:original=ET.fromstring(z.read('xl/worksheets/sheet2.xml'))
+        before=float(original.find("s:sheetData/s:row[@r='68']",NS).get('ht'))
+        after=float(sheet.find("s:sheetData/s:row[@r='68']",NS).get('ht'))
+        self.assertEqual(after+float(gutter.get('ht')),before)
 
     def test_meishiki_and_kubou(self):
         for col,key in zip('DEFG',('hour','day','month','year')):
