@@ -313,3 +313,12 @@ templates/kanteisho.xlsxはGit追跡済み。report_xlsx.pyの__file__から絶�
 Notionの2026-10-05引継ぎSessionsページは参照のみ。古い「Phase 7A未着手」の進捗より今回の明示指示と実コードを採用した。
 共通AGENTS.mdと指示に衝突なし。正本内のAGENTS.mdは見つからず、共通ルールは編集していない。
 VPSへ接続せず、本番DB・設定・サービス・Gitは未変更。ローカルblocker対応後、次工程は最終read-only配備前監査。
+
+
+## 2026-10-06 夜間最終predeploy
+
+本番設定差分・backup・migration・initial user・smoke・rollback・28工程の配備手順は [VPS deployment runbook](vps-deployment.md) に統合。
+本番状態は変更していない。production TLSと履歴メモ/再鑑定/削除を追加したローカルE2Eを実施。
+
+既存/new requirements環境の認証44・履歴32・Excel46・PDF21・Tier A524・Tier B38・proxy20・本番追加7はすべてPASS。
+production TLS E2Eは両venvで34/34、Windows PDF E2E34/34。runbookに検証結果とsudo未確認の停止条件を記録。
