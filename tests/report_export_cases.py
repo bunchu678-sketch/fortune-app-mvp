@@ -4,6 +4,7 @@ from io import BytesIO
 import asyncio
 import hashlib
 import json
+import math
 import posixpath
 from pathlib import Path
 import sys
@@ -20,7 +21,7 @@ from fortune_service import calculate_fortune
 from history_repository import SQLiteHistoryRepository, HistoryError
 from history_service import HistoryService
 from report_data import build_reading_report, difference, ReportError
-from report_xlsx import render_xlsx, TEMPLATE_PATH, TEMPLATE_SHA256
+from report_xlsx import render_xlsx, TEMPLATE_PATH, TEMPLATE_SHA256, GOGYO_CELLS, GOGYO_DRAWING_IDS
 from report_export_service import ExportTokens, export_reading
 from tier_b import api_app
 
@@ -96,11 +97,88 @@ class ReportCases(unittest.TestCase):
         new=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
         self.assertEqual(len(old),len(new))
         for a,b in zip(old,new):
+            if int(a.find('.//x:cNvPr',NS).get('id')) in GOGYO_DRAWING_IDS:
+                continue
             for local in ('from','to','pos','ext'):
                 x,y=a.find('x:'+local,NS),b.find('x:'+local,NS)
                 self.assertEqual(ET.tostring(x) if x is not None else None,ET.tostring(y) if y is not None else None)
         self.assertEqual(len(new.findall('.//c:chart',NS)),5)
-        self.assertEqual(len(new.findall('.//x:sp',NS)),len(old.findall('.//x:sp',NS)))
+        self.assertEqual(len(new.findall('.//x:sp',NS))+len(new.findall('.//x:cxnSp',NS)),
+                         len(old.findall('.//x:sp',NS))+len(old.findall('.//x:cxnSp',NS)))
+
+    def test_gogyo_round_nodes_centered_official_text(self):
+        drawing=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
+        for i,address in enumerate(GOGYO_CELLS):
+            anchor=next(a for a in drawing if a.find('.//x:cNvPr',NS).get('name')==f'Gogyo_Node_{i}')
+            ext=anchor.find('x:ext',NS)
+            self.assertEqual(ext.get('cx'),ext.get('cy'))
+            shape=anchor.find('x:sp',NS)
+            self.assertEqual(shape.find('x:spPr/a:prstGeom',NS).get('prst'),'ellipse')
+            self.assertEqual(shape.find('x:txBody/a:bodyPr',NS).get('anchor'),'ctr')
+            self.assertEqual(shape.find('x:txBody/a:p/a:pPr',NS).get('algn'),'ctr')
+            self.assertEqual(shape.findtext('x:txBody/a:p/a:r/a:t','',NS),self.cells[address])
+            self.assertEqual(len(shape.findall('x:txBody/a:p',NS)),1)
+
+    def test_gogyo_cycle_and_arrow_clearance(self):
+        drawing=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
+        anchors={a.find('.//x:cNvPr',NS).get('name'):a for a in drawing}
+        centers=[]
+        for i in range(5):
+            node=anchors[f'Gogyo_Node_{i}'];pos=node.find('x:pos',NS);ext=node.find('x:ext',NS)
+            radius=int(ext.get('cx'))/2
+            centers.append((int(pos.get('x'))+radius,int(pos.get('y'))+radius))
+        for i in range(5):
+            node=anchors[f'Gogyo_Sheng_{i}_{(i+1)%5}']
+            shape=node.find('x:cxnSp',NS)
+            self.assertIsNotNone(shape)
+            self.assertEqual(shape.find('x:spPr/a:ln/a:tailEnd',NS).get('type'),'arrow')
+            self.assertEqual(shape.find('x:spPr/a:ln/a:solidFill/a:schemeClr',NS).get('val'),'accent3')
+            transform=shape.find('x:spPr/a:xfrm',NS);off=transform.find('a:off',NS);ext=transform.find('a:ext',NS)
+            x,y,w,h=(int(off.get('x')),int(off.get('y')),int(ext.get('cx')),int(ext.get('cy')))
+            start=(x+w if transform.get('flipH')=='1' else x,y+h if transform.get('flipV')=='1' else y)
+            end=(x if transform.get('flipH')=='1' else x+w,y if transform.get('flipV')=='1' else y+h)
+            for point,center in ((start,centers[i]),(end,centers[(i+1)%5])):
+                self.assertGreater(math.dist(point,center),radius+6*12700)
+            self.assertGreater(math.dist(start,end),30*12700)
+        elements=[self.cells[a].split()[0] for a in GOGYO_CELLS]
+        cycle='木火土金水'
+        for i,element in enumerate(elements):self.assertEqual(elements[(i+1)%5],cycle[(cycle.index(element)+1)%5])
+
+    def test_gogyo_source_values_retained_single_visible_label(self):
+        sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml']);styles=ET.fromstring(self.parts['xl/styles.xml'])
+        formats={x.get('numFmtId'):x.get('formatCode') for x in styles.find('s:numFmts',NS)}
+        xfs=list(styles.find('s:cellXfs',NS))
+        for address in GOGYO_CELLS:
+            cell=sheet.find(f"s:sheetData/s:row/s:c[@r='{address}']",NS)
+            self.assertEqual(formats[xfs[int(cell.get('s'))].get('numFmtId')],';;;')
+            self.assertTrue(self.cells[address])
+
+    def test_non_gogyo_shapes_and_other_parts_unchanged(self):
+        with patch('report_xlsx.polish_gogyo_layout'),patch('report_xlsx.hide_gogyo_cell_text'):
+            before=unpack(render_xlsx(self.report))
+        for path,data in before.items():
+            if path not in ('xl/drawings/drawing2.xml','xl/worksheets/sheet2.xml','xl/styles.xml'):
+                self.assertEqual(data,self.parts[path],path)
+        old=ET.fromstring(before['xl/drawings/drawing2.xml']);new=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
+        for a,b in zip(old,new):
+            if int(a.find('.//x:cNvPr',NS).get('id')) not in GOGYO_DRAWING_IDS:
+                self.assertEqual(ET.tostring(a),ET.tostring(b))
+        old_sheet=ET.fromstring(before['xl/worksheets/sheet2.xml']);new_sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
+        for a,b in zip(old_sheet.findall('.//s:c',NS),new_sheet.findall('.//s:c',NS)):
+            if a.get('r') in GOGYO_CELLS:a.attrib.pop('s',None);b.attrib.pop('s',None)
+            self.assertEqual(ET.tostring(a),ET.tostring(b),a.get('r'))
+
+    def test_gogyo_objects_stay_inside_existing_frame(self):
+        drawing=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
+        frame=next(a for a in drawing if a.find('.//x:cNvPr',NS).get('id')=='2').find('.//a:xfrm',NS)
+        off=frame.find('a:off',NS);ext=frame.find('a:ext',NS)
+        x,y,w,h=int(off.get('x')),int(off.get('y')),int(ext.get('cx')),int(ext.get('cy'))
+        for a in drawing:
+            if int(a.find('.//x:cNvPr',NS).get('id')) not in GOGYO_DRAWING_IDS:continue
+            pos=a.find('x:pos',NS);size=a.find('x:ext',NS)
+            ax,ay,aw,ah=int(pos.get('x')),int(pos.get('y')),int(size.get('cx')),int(size.get('cy'))
+            self.assertGreaterEqual(ax,x);self.assertGreaterEqual(ay,y)
+            self.assertLessEqual(ax+aw,x+w);self.assertLessEqual(ay+ah,y+h)
 
     def test_basic_information(self):
         for key,expected in {'D3':'出力試験太郎','G3':'1988/08/12','J3':'09:00','L3':'東京都','M3':'38','N3':'男性'}.items():self.assertEqual(self.cells[key],expected)

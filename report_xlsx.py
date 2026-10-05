@@ -3,6 +3,7 @@
 Uses Python's standard library only, including on Linux. Never opens/saves with openpyxl.
 """
 import hashlib
+import math
 from io import BytesIO
 from pathlib import Path
 import re
@@ -16,6 +17,8 @@ S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 X = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
 C = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+GOGYO_CELLS = ("K6", "M8", "L12", "J12", "I8")
+GOGYO_DRAWING_IDS = set(range(4, 24))
 
 
 def children(node, local=None):
@@ -148,6 +151,119 @@ def write_shapes(doc, texts):
             p.insertBefore(r,first(p,"endParaRPr"));body.appendChild(p)
 
 
+def hide_gogyo_cell_text(sheet, styles):
+    """Keep official source cell values, but draw their text inside the circles only."""
+    formats = first(styles.root, "numFmts")
+    if formats is None:
+        formats = styles.root.ownerDocument.createElementNS(S, "numFmts")
+        styles.root.insertBefore(formats, styles.fonts)
+    format_id = max([163] + [int(n.getAttribute("numFmtId")) for n in children(formats)]) + 1
+    new(formats, S, "numFmt", {"numFmtId": format_id, "formatCode": ";;;"})
+    formats.setAttribute("count", str(len(children(formats))))
+    for cell in sheet.getElementsByTagNameNS(S, "c"):
+        if cell.getAttribute("r") not in GOGYO_CELLS:
+            continue
+        xf = children(styles.xfs)[int(cell.getAttribute("s"))].cloneNode(True)
+        xf.setAttribute("numFmtId", str(format_id))
+        xf.setAttribute("applyNumberFormat", "1")
+        styles.xfs.appendChild(xf)
+        cell.setAttribute("s", str(len(children(styles.xfs)) - 1))
+    styles.xfs.setAttribute("count", str(len(children(styles.xfs))))
+
+
+def polish_gogyo_layout(doc, report):
+    """Update only the approved five-element drawing, in physical EMU coordinates."""
+    anchors = {int(n.getAttribute("id")): n.parentNode.parentNode.parentNode
+               for n in doc.getElementsByTagNameNS(X, "cNvPr")}
+    frame = anchors[2].getElementsByTagNameNS(A, "xfrm")[0]
+    off, ext = first(frame, "off"), first(frame, "ext")
+    left, top = int(off.getAttribute("x")), int(off.getAttribute("y"))
+    width, height = int(ext.getAttribute("cx")), int(ext.getAttribute("cy"))
+    center = (left + width / 2, top + height * .55)
+    orbit, radius = height * .36, height * .103
+    points = [(center[0] + orbit * math.cos(math.radians(-90 + i * 72)),
+               center[1] + orbit * math.sin(math.radians(-90 + i * 72))) for i in range(5)]
+
+    def place(ident, x, y, w, h, flip_h=False, flip_v=False):
+        old = anchors[ident]
+        shape = next(n for n in children(old) if n.localName in ("sp", "cxnSp"))
+        anchor = doc.createElementNS(X, "xdr:absoluteAnchor")
+        new(anchor, X, "xdr:pos", {"x": round(x), "y": round(y)})
+        new(anchor, X, "xdr:ext", {"cx": round(w), "cy": round(h)})
+        anchor.appendChild(shape)
+        anchor.appendChild(first(old, "clientData"))
+        old.parentNode.replaceChild(anchor, old)
+        anchors[ident] = anchor
+        transform = first(first(shape, "spPr"), "xfrm")
+        for name, enabled in (("flipH", flip_h), ("flipV", flip_v)):
+            if enabled: transform.setAttribute(name, "1")
+            elif transform.hasAttribute(name): transform.removeAttribute(name)
+        first(transform, "off").setAttribute("x", str(round(x)))
+        first(transform, "off").setAttribute("y", str(round(y)))
+        first(transform, "ext").setAttribute("cx", str(round(w)))
+        first(transform, "ext").setAttribute("cy", str(round(h)))
+        return shape
+
+    for i, ident in enumerate((20, 21, 22, 23, 19)):
+        x, y = points[i]
+        shape = place(ident, x-radius, y-radius, radius*2, radius*2)
+        shape.getElementsByTagNameNS(X, "cNvPr")[0].setAttribute("name", f"Gogyo_Node_{i}")
+        props = first(shape, "spPr")
+        no_fill = first(props, "noFill")
+        fill = doc.createElementNS(A, "a:solidFill")
+        new(fill, A, "a:srgbClr", {"val": "FFFFFF"})
+        props.replaceChild(fill, no_fill)
+        body = first(shape, "txBody")
+        for child in list(body.childNodes): body.removeChild(child)
+        body_props = new(body, A, "a:bodyPr", {"anchor": "ctr", "anchorCtr": "1", "wrap": "none",
+                         "lIns": "0", "tIns": "0", "rIns": "0", "bIns": "0"})
+        new(body_props, A, "a:noAutofit")
+        new(body, A, "a:lstStyle")
+        paragraph = new(body, A, "a:p")
+        new(paragraph, A, "a:pPr", {"algn": "ctr", "marL": "0", "marR": "0", "indent": "0"})
+        run = new(paragraph, A, "a:r")
+        run_props = new(run, A, "a:rPr", {"lang": "ja-JP", "sz": "1600", "b": "1"})
+        new(new(run_props, A, "a:solidFill"), A, "a:srgbClr", {"val": "000000"})
+        for font in ("latin", "ea"): new(run_props, A, "a:"+font, {"typeface": "游ゴシック"})
+        new(run, A, "a:t", value=report.cells[GOGYO_CELLS[i]])
+
+    # Five complete edges follow the official chart_order (a rotation of 木火土金水).
+    # Both sets of arrows stop outside the node outlines; native line colours are preserved.
+    for ident, source, target in [(9+i, i, (i+1)%5) for i in range(5)] + [
+            (14,3,0), (15,0,2), (16,2,4), (17,1,3), (18,4,1)]:
+        start, end = points[source], points[target]
+        dx, dy = end[0]-start[0], end[1]-start[1]
+        distance = math.hypot(dx, dy)
+        clearance = radius + 7 * 12700
+        sx, sy = start[0]+dx/distance*clearance, start[1]+dy/distance*clearance
+        ex, ey = end[0]-dx/distance*clearance, end[1]-dy/distance*clearance
+        shape = place(ident, min(sx,ex), min(sy,ey), abs(ex-sx), abs(ey-sy), ex<sx, ey<sy)
+        shape.getElementsByTagNameNS(X, "cNvPr")[0].setAttribute(
+            "name", f"Gogyo_{'Sheng' if ident<14 else 'Ke'}_{source}_{target}")
+        geom = first(first(shape, "spPr"), "prstGeom")
+        geom.setAttribute("prst", "straightConnector1")
+        for adjustment in list(children(first(geom, "avLst"))): first(geom, "avLst").removeChild(adjustment)
+        # Arc shapes become native connectors, so Excel renders a full line with its end arrow.
+        if ident < 14:
+            replacement = doc.createElementNS(X, "xdr:cxnSp")
+            nv = new(replacement, X, "xdr:nvCxnSpPr")
+            nv.appendChild(shape.getElementsByTagNameNS(X, "cNvPr")[0])
+            new(nv, X, "xdr:cNvCxnSpPr")
+            replacement.appendChild(first(shape, "spPr"))
+            style = first(shape, "style")
+            if style is not None: replacement.appendChild(style)
+            shape.parentNode.replaceChild(replacement, shape)
+
+    # Keep role labels outside node/arrow paths and inside the unchanged chart frame.
+    label_height, label_width = 16*12700, 68*12700
+    positions = {4:(points[0][0]-45*12700, points[0][1]-radius-18*12700, 90*12700),
+                 5:(points[1][0]+radius+3*12700, points[1][1]-radius-12*12700, label_width),
+                 6:(points[4][0]-radius-3*12700-label_width, points[4][1]-radius-12*12700, label_width),
+                 7:(points[2][0]+radius+8*12700, points[2][1]-label_height/2, label_width),
+                 8:(points[3][0]-radius-8*12700-label_width, points[3][1]-label_height/2, label_width)}
+    for ident, (x, y, w) in positions.items(): place(ident, x, y, w, label_height)
+
+
 def formula_values(formula, cells):
     match = re.fullmatch(r"'?原本'?!\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?",formula)
     if not match:return None
@@ -188,10 +304,13 @@ def render_xlsx(report: ReadingReport, template_path=TEMPLATE_PATH):
     style_doc=minidom.parseString(files["xl/styles.xml"]);styles=Styles(style_doc)
     sheet=minidom.parseString(files["xl/worksheets/sheet2.xml"])
     write_sheet(sheet,{**report.cells,**report.chart_cells},styles,report,strings)
+    hide_gogyo_cell_text(sheet, styles)
     files["xl/worksheets/sheet2.xml"]=serialize(sheet)
     files["xl/styles.xml"]=serialize(style_doc)
     drawing=minidom.parseString(files["xl/drawings/drawing2.xml"])
-    write_shapes(drawing,report.texts);files["xl/drawings/drawing2.xml"]=serialize(drawing)
+    write_shapes(drawing,report.texts)
+    polish_gogyo_layout(drawing, report)
+    files["xl/drawings/drawing2.xml"]=serialize(drawing)
     for index in range(1,6):
         name=f"xl/charts/chart{index}.xml";chart=minidom.parseString(files[name])
         write_charts(chart,report.chart_cells);files[name]=serialize(chart)
