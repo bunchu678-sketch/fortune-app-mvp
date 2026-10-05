@@ -2,7 +2,7 @@
 
 ## 出力経路
 
-- 博士版の結果画面と履歴詳細画面の「鑑定書を出力」→「Excelで出力」。PDF操作はまだない。
+- 博士版の結果画面と履歴詳細画面の「鑑定書を出力」→「Excelで出力」。PDF出力は同じ完成Excelを変換する（[PDF出力](phase5-pdf-export.md)参照）。
 - `POST /api/export/excel` は `{"export_token":"…"}` または `{"reading_id":"…"}` のどちらか一方だけを受け付ける。任意の鑑定文、テンプレートパス、user_id等は受け付けない。
 - 未保存鑑定：既存 `/api/fortune` が正式結果を計算した時点でサーバー側に入力と結果の独立コピーを保持し、ランダムな `excel_export_token` を返す。出力時には再計算しない。
 - 保存済み：サーバーのownerスコープで削除されていない履歴を取得し、保存当時のinput/result/display snapshotを使用する。現在のコメント辞書から取り直さず、再計算しない。
@@ -52,7 +52,7 @@ Phase 4と同じ `FORTUNE_ENV=development` と `FORTUNE_HISTORY_DEV_USER_ID` の
 ## 検証
 
 - `python -B tests/report_export_cases.py`：構造、正式値、境界ケース、秘密情報除外、利用者分離、削除済み拒否、保存当時snapshot再現。
-- `tests/report_export_ui.cjs`：専用の一時履歴DBを設定したローカルAPI/UIで実行する。PC 1280px／スマホ375pxの未保存・保存済みダウンロード、出力時に鑑定APIを再実行しないこと、PDF操作なし、失敗表示と復帰、横幅を検証。
+- `tests/report_export_ui.cjs`：専用の一時履歴DBを設定したローカルAPI/UIで実行する。PC 1280px／スマホ375pxの未保存・保存済みダウンロード、出力時に鑑定APIを再実行しないこと、Excel／PDFの形式選択、失敗表示と復帰、横幅を検証。
 - 正式な架空テスト入力から完成Excelを生成し、Excel本体で読み取り専用で開いて全セル・グラフ元データ・テキストボックス・A4縦2ページを検証。
 
-PDF出力の実装、変換エンジン導入、本番配備は次工程。既存の正式コメントに年固有文言が残るTier C課題は今回の出力層で改変・補完しない。
+Windows開発環境のPDF出力は[PDF出力](phase5-pdf-export.md)参照。Linux本番変換エンジンと本番配備は次工程。既存の正式コメントに年固有文言が残るTier C課題は今回の出力層で改変・補完しない。
