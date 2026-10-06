@@ -1,5 +1,7 @@
 # Phase 5 鑑定書Excel出力
 
+2026-10-06：Ubuntu本番でExcel利用可能、4件の実出力・構造・印刷設定確認済み。現在状態は [配備完了記録](vps-deployment.md#15-phase-7a本番配備完了の最終記録2026-10-06) を参照。
+
 ## 出力経路
 
 - 博士版の結果画面と履歴詳細画面の「鑑定書を出力」→「Excelで出力」。PDF出力は同じ完成Excelを変換する（[PDF出力](phase5-pdf-export.md)参照）。
@@ -45,9 +47,9 @@ SHA-256: `289b5d1093061487ba2e0e18bf6cd1c5c6056609daa31cbe0629e21489fa3b22`
 
 ## 現時点の利用者設定とトークン
 
-Phase 4と同じ `FORTUNE_ENV=development` と `FORTUNE_HISTORY_DEV_USER_ID` の明示設定を利用する。本番認証の代用にしない。認証設定がない場合は履歴／Excel出力を503で無効にする。
+Phase 7Aのサーバーsessionからownerを確定する。正常な本番設定では未認証の履歴／Excel出力は401。開発固定ownerの明示設定は専用回帰だけで使い、本番認証の代用にしない。
 
-未保存結果のトークンは同一APIプロセス内で1時間、最大256鑑定保持する。期限切れ・再起動・別プロセスへの接続の場合は、保存済み履歴から出力するか再鑑定する旨を表示する。複数worker／本番認証を導入する工程で、共有保持先と認証済みownerの取得方法を確定する。
+未保存結果のトークンは同一APIプロセス内で1時間、最大256鑑定保持する。期限切れ・再起動・別プロセスへの接続の場合は、保存済み履歴から出力するか再鑑定する旨を表示する。本番認証のowner取得は実装済み。tokenはuser_idと発行sessionのhashにも結び付け、他利用者・別sessionからの使用を拒否する。複数workerの共有保持先は未実装の後続工程で、当面1 worker。
 
 ## 検証
 
@@ -55,4 +57,4 @@ Phase 4と同じ `FORTUNE_ENV=development` と `FORTUNE_HISTORY_DEV_USER_ID` の
 - `tests/report_export_ui.cjs`：専用の一時履歴DBを設定したローカルAPI/UIで実行する。PC 1280px／スマホ375pxの未保存・保存済みダウンロード、出力時に鑑定APIを再実行しないこと、Excel／PDFの形式選択、失敗表示と復帰、横幅を検証。
 - 正式な架空テスト入力から完成Excelを生成し、Excel本体で読み取り専用で開いて全セル・グラフ元データ・テキストボックス・A4縦2ページを検証。
 
-Windows開発環境のPDF出力は[PDF出力](phase5-pdf-export.md)参照。Linux本番変換エンジンと本番配備は次工程。既存の正式コメントに年固有文言が残るTier C課題は今回の出力層で改変・補完しない。
+Windows開発環境のPDF出力は[PDF出力](phase5-pdf-export.md)参照。本番配備は完了。Linux PDF変換エンジンは後続工程で、現在の本番PDFはdisabled。既存の正式コメントに年固有文言が残るTier C課題は今回の出力層で改変・補完しない。

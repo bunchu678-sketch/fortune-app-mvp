@@ -1,5 +1,7 @@
 # Phase 5 鑑定書PDF出力
 
+2026-10-06：本番配備完了。Ubuntuは `FORTUNE_PDF_CONVERTER=disabled` を正式仕様とし、UI「PDF（現在利用できません）」、認証済み直接API503 / converter_unavailableを本番で確認済み。Excelは利用可能。現在状態は [配備完了記録](vps-deployment.md#15-phase-7a本番配備完了の最終記録2026-10-06) を参照。
+
 ## 出力経路
 
 結果画面と履歴詳細の「鑑定書を出力」でExcel／PDFを選択する。
@@ -56,5 +58,5 @@ owner分離、削除済み拒否、入力の限定はExcelと共通。
 今回のWindows adapterは開発環境用。本番Linux用adapterの実装は未実施。
 LibreOffice等の再現性、フォント、timeout、同時実行上限、temp領域、プロセス監視、配備方式を確定する。
 Gotenbergは変換エンジンそのものではなくLibreOffice等を呼ぶサービスとして検討する。
-既存の本番認証と複数worker時の未保存トークン共有保持先もPhase 7等で確定する。開発owner設定は本番認証の代用にしない。
-VPS変更や本番converterの構築は今回行っていない。
+本番認証はPhase 7Aで実装・配備済み。複数worker時の未保存トークン共有保持先は未実装の後続工程で、当面1 worker。開発owner設定は本番認証の代用にしない。
+Phase 5 PDF実装当時はVPS変更を行わなかったが、その後2026-10-06に正式配備済み。Linux converterは未構築であり、disabled運用は配備失敗・blockerではない。

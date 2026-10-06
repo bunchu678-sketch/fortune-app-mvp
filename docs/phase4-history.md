@@ -1,21 +1,22 @@
-# Phase 4 鑑定履歴（ローカル開発）
+# Phase 4 鑑定履歴
+
+2026-10-06：Phase 7A認証と接続し、本番配備完了。現在状態は [配備完了記録](vps-deployment.md#15-phase-7a本番配備完了の最終記録2026-10-06) を参照。
 
 ## 起動
 既存のPython仮想環境を使い、fortune-next-app/backend/start-local.ps1でAPIを起動する。
 フロントエンドはfortune-next-appでnpm run dev。アクセスは http://127.0.0.1:3000/ 。
 
-履歴APIはFORTUNE_ENV=developmentとFORTUNE_HISTORY_DEV_USER_IDの両方が明示設定された場合だけ有効。
-start-local.ps1はローカル専用（127.0.0.1）。本番ではこのスクリプトを使わない。
-設定がない場合／FORTUNE_ENV=productionの場合は履歴APIが503を返す。
-鑑定計算APIはその場合も従来どおり利用可能。
-Phase 7で本番認証を実装するまで、本番へ履歴機能を配備しない。
+履歴APIはPhase 7Aのサーバーsessionから認証済みownerを決定する。正常な本番設定で未認証の場合は401。
+開発固定ownerを使う回帰だけはFORTUNE_ENV=developmentとFORTUNE_HISTORY_DEV_USER_IDを明示する。本番で固定ownerを設定しない。
+start-local.ps1はローカル専用（127.0.0.1）。本番ではsystemdを使用する。
+通常鑑定は未ログインでも利用可能。認証と履歴の本番配備は2026-10-06に完了。
 
 ## 保存と差し替え境界
 - history_repository.py: SQLiteHistoryRepository。SQL、トランザクション、ownerスコープ。
 - history_service.py: HistoryService。保存の検証、再鑑定の準備、人物とグループの扱い。
 - fortune-next-app/backend/history_api.py: 計算APIとは別の履歴ルート。利用者IDをサーバー側で解決。
 - history_versions.py: 保存時のアプリ／計算／スキーマバージョン。
-将来はmake_serviceのrepository adapterとdevelopment_ownerを認証側resolverに交換する。
+Phase 7Aで認証側resolverへ接続済み。repository adapterによる将来のDB差し替え境界は維持する。
 クライアントのuser_id／owner_user_idは認証として使わない。
 
 既定のDBは正本のdata/history.sqlite3。FORTUNE_HISTORY_DB_PATHで変更可能。
@@ -69,7 +70,8 @@ PC1280px／スマホ375pxで新規、保存、詳細（計算API呼出なし）�
 複数人物候補、検索、削除キャンセル／実行、元スナップショット不変を確認。
 
 ## 残件
-本番認証と本番マルチユーザー分離、クラウドDB選定、バックアップ、30日後の物理削除はPhase 7以降。
-VPS配備、Excel/PDF出力、「特定日時を占う」物理削除は今回対象外。
+本番認証・マルチユーザー分離・VPS配備・Excel実出力は完了。Linux PDFは正式仕様としてdisabled。
+クラウドDB全面移行、backup自動運用、30日後物理削除は未実装の後続工程であり、配備blockerではない。
+「特定日時を占う」物理削除も別工程。Phase 4当時の対象外範囲と現在状態を区別する。
 
 補正・無記名の実画面テスト: tests/history_boundary_ui.cjs（同じ一時DB運用）。

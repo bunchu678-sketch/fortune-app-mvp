@@ -1,9 +1,18 @@
-# VPS final predeploy audit / deployment runbook
+# VPS deployment runbook / production completion record
+
+## 現在の正式状態（2026-10-06）
+
+**PRODUCTION_DEPLOY_SUCCESS**。Phase 7A implementation complete / production deployment complete。
+本番HEAD：`569d1494202782099e6b8197f7825750f5d463fb`。認証・履歴・Excel利用可能、Linux PDF disabled、配備blockerなし。
+詳細は [第15節の最終記録](#15-phase-7a本番配備完了の最終記録2026-10-06) を参照。
+第1〜14節は今回の初回配備用runbookと配備前監査の履歴。旧HEAD・不存在設定・未実行・承認待ちの記述は当時の状態であり、現在状態ではない。
+今後の配備は、その時点の公開HEAD・DB・設定を改めて確認し、別途承認されたTARGET/rollback target/backupを固定する。以下の旧前提をそのまま再実行しない。
+本記録の更新commitはdocsのみで、VPSへ追加配備しない。ローカル/GitHubのdocs更新HEADと上記公開HEADは区別する。
 
 監査日：2026-10-06（Asia/Tokyo）。本書のVPS変更コマンドは夜間には一つも実行していない。
 本番変更はユーザーの明示承認後だけ。sudo password、初期利用者passwordは本人が対話端末に入力し、チャット・Git・コマンド引数・ログには残さない。
 
-## 1. 次回Codexへ渡す実行指示
+## 1. 初回配備時にCodexへ渡した実行指示（履歴）
 
 本書を読んで配備する。開始時、ローカルmain・origin/main・GitHub mainの一致とcleanを確認し、
 ユーザーが承認した最終報告のcommitをTARGETとして固定する。動くorigin/mainだけを根拠に別commitを配備しない。
@@ -130,7 +139,7 @@ API mainがworkers=1を渡す。Webのbuild worker数はAPI worker数ではな�
 ## 5. nginx完成差分
 
 対象は/etc/nginx/sites-available/fortune-app（sites-enabledから既存symlink）。他サイト・global・Certbot証明書は変更しない。
-現在のlocation /だけを以下の2 locationへ置換する。
+初回配備前のlocation /だけの構成を以下の2 locationへ置換する差分。2026-10-06の本番配備で適用済み。
 
 ```diff
 +    location ^~ /api/ {
@@ -404,7 +413,7 @@ Git履歴を書き換えずdetached旧HEADで稼働させ、branch状態も報�
 DBを過去backupへ戻すことは自動rollbackに含めない。配備後の実利用者・session・鑑定を失うため、対象と損失を説明して別承認が必要。
 初回DB作成後に旧版へ戻す場合も新DBは残す。backup・失敗環境・空directoryの削除は別工程。
 
-## 12. 夜間の確認範囲と翌朝の条件
+## 12. 夜間の確認範囲と翌朝の条件（配備前の記録）
 
 アプリコードに安全境界の追加修正は不要。Argon2id、token hash保存、絶対期限、disable/password変更失効、
 CSRF、session由来owner、SQL owner条件、保存snapshot、未保存tokenのuser/session条件を再監査。
@@ -417,7 +426,7 @@ Notion引継ぎ記録は参照のみ。過去の未着手記録より現在の�
 夜間にこの未確認を成功扱いせず、nginx検査に失敗した場合は本番変更しない。
 
 
-## 13. 完了検証結果
+## 13. 夜間ローカル検証結果（配備前の記録）
 
 | 検証 | 既存venv | 新規requirements venv |
 | --- | --- | --- |
@@ -458,7 +467,7 @@ Ubuntuの実install/build/migration/login/export、maintenance/backup/rollback�
 initial userの本人email/password入力も配備時に必要（手順完成、未作成）。
 VPS production状態の変更なし。旧版正常・Git clean・API/Web PID不変を監査した。
 
-## 14. 本人sudo認証後のnginx最終read-only確認（2026-10-06）
+## 14. 本人sudo認証後のnginx最終read-only確認（2026-10-06、配備前の記録）
 
 本人が可視SSH TTYへsudo passwordを非表示入力。sudo -v後、同じTTYでsudo -n nginx -T、sudo -n nginx -tを実行。
 両方終了コード0、syntax is ok / test is successful。秘密鍵内容は読まず、設定出力は秘密値を伏せて取得した。
@@ -484,10 +493,93 @@ Cookie/Set-Cookie/Originを保持し、公開originはhttps://app.hakase-uranai.
 /healthは内部確認用のまま、公開API経路へ追加しない。
 候補設定そのもののsudo nginx -tは配備時Step 17で必須。今回の成功は現在設定の検査で、候補をVPSへ置いてはいない。
 
-### 最新の配備前判定
+### 当時の配備前判定
 
 **READY_FOR_PRODUCTION_DEPLOY_APPROVAL**
 
 夜間終了時の唯一のblockerだった権限付きnginx全設定・構文確認を完了。unresolved blockerなし。
 本人による初期利用者email/password入力は引き続き配備時に必要。
 次はユーザー承認後、本書の本番配備runbookを実行する。今回VPSのproduction状態を変更していない。
+
+## 15. Phase 7A本番配備完了の最終記録（2026-10-06）
+
+### 完了状態とGit
+
+- Phase 7A implementation complete / production deployment complete / authentication active。
+- 公開：`https://app.hakase-uranai.jp/`、博士版入力 `/`・結果 `/result`。`/product` 系を開発正本へ切り替える変更は行っていない。
+- 配備前HEAD：`d8fe9a970ddae6fa0a6b58115164a0b1825c2075`。
+- 公開HEAD：`569d1494202782099e6b8197f7825750f5d463fb`、VPS `/opt/apps/fortune-app` はmain / working tree clean。
+- 最終記録開始時、正本local main・origin/main・GitHub mainは上記公開HEADと一致してclean。本記録のdocs commit/push後はローカル/GitHubだけが先へ進み、VPSは公開HEADを維持する。
+- 最終記録時のread-only再確認：API/Web/nginxはactive / running / enabled、HTTPS `/` 200、HTTP→同domain HTTPS 301。
+
+### production構成
+
+| 項目 | 確定した値・状態 |
+| --- | --- |
+| EnvironmentFile | `/etc/fortune-app/production.env`、root:root、0600 |
+| FORTUNE_ENV | production |
+| FORTUNE_PUBLIC_ORIGIN | https://app.hakase-uranai.jp |
+| FORTUNE_HISTORY_DB_PATH | /var/lib/fortune-app/history.sqlite3 |
+| FORTUNE_PDF_CONVERTER | disabled |
+| Session / login制限 | TTL24時間、window900秒、account10、IP30 |
+| Proxy | FORTUNE_PROXY_HEADERS=1、FORTUNE_TRUSTED_PROXY_IPS=127.0.0.1 |
+| 開発固定owner | FORTUNE_HISTORY_DEV_USER_IDは未設定。本番認証の代用なし |
+| API | natsuki:natsuki、既存venv Python/backend/server.py、1 worker、UMask0077、Restart=on-failure |
+| Web | NODE_ENV=production、pnpm start、NEXT_PUBLIC_FORTUNE_API_URL空、既存WorkingDirectory・Restart=on-failure維持 |
+| nginx Web | location / → Next.js 127.0.0.1:3000 |
+| nginx API | location ^~ /api/ → Python 127.0.0.1:8765。proxy_passにURI/末尾slashを付けずpath/query維持 |
+
+正式requirementsによる導入、argon2-cffi25.1.0、pip check、frozen lockfileによるWeb依存導入、production buildは成功。
+nginxはHost=$host、X-Real-IP=$remote_addr、X-Forwarded-For=$remote_addr、X-Forwarded-Proto=$scheme、X-Forwarded-Host=$host、Forwarded除去。
+client IP headerの外部入力をそのまま信頼しない。Cookie/Origin保持、body1m・read/send60s。Certbot設定とHTTP redirectを維持。
+本番配備時のnginx -T/-t正常、構文成功後にreloadし、最終監査でも構文正常。
+
+### DB・認証
+
+DB `/var/lib/fortune-app/history.sqlite3`、owner/group natsuki:natsuki、親directory0700、DB0600。
+認証3table（users/auth_sessions/auth_login_attempts）＋履歴3table（persons/reading_groups/readings）。
+認証schema→履歴schemaの順で準備、integrity正常、foreign key error0。既存ownerの書換え・snapshot再計算・破壊的migrationなし。
+初期利用者は正式CLIで作成済み、active、Argon2id。本人のTTY非表示入力後、公開HTTPS login/me/Cookie/logoutとlogout後401を確認。
+実利用者email、password、password hash、raw session、Cookie値、private鑑定内容は本記録へ重複保存しない。
+
+### backup / rollback
+
+本番再配備前backup：`/var/backups/fortune-app/20261006T123513Z`。repository/venv/config archive一覧・checksum確認成功。
+既知DBはSQLite backup APIで保全し、backup integrity正常。設定・依存・Web build・所有権/permissionを保全。
+初回backup `/var/backups/fortune-app/20261005T234746Z` も保持。
+初回は初期利用者password文字数検査エラーで停止し、旧コード・venv・Web build・設定へのrollbackを実際に実施、旧版HTTPS正常を確認（rollback tested）。その後の承認済み再配備で成功。
+失敗環境と新DBは保全。DBを過去backupへ戻すrollback・DB削除/resetは行っていない。今回の再配備に追加rollbackは不要。
+
+### Excel / PDF / 本番smoke test
+
+PC1280px・スマートフォン375px・APIを含む公開HTTPS smoke test40項目PASS。
+HTTP301/HTTPS200、匿名通常鑑定、login/logout/me、invalid password、session失効、disabled user、rate limit429/Retry-After、Cookie Secure/HttpOnly/SameSite=Lax、CSRF、owner separation、history save/list/detail/memo/rerun/delete、Excel、PDF disabled、logsを確認。
+試験用A/Bだけを使用し、外部Forwarded/XFF偽装・任意user_idで認証/他人のreading/token出力を取得できないことも確認。
+通常鑑定結果は同じ入力の正式ローカル計算JSONと一致（可変export tokenを除く）。保存済み鑑定は当時のsnapshotを使い、出力時に再計算しない。
+Ubuntu本番で未保存/保存×PC/mobileのExcel4件を実download。ZIP/XML構造、A4縦・縮尺82%・35行目改ページ・印刷範囲A1:O69は既存仕様と一致、Excel available。
+顧客向けA4縦2ページ以内の方針を維持。今回Ubuntuで実印刷/PDFページ数を再検証したものではなく、既存Windows Excel/PDF検証と本番XLSX印刷設定確認を区別する。
+Linux PDF disabledは正式仕様：UI「PDF（現在利用できません）」、直接API503 / converter_unavailable。PDFは完成Excelから変換する設計を維持。
+検査開始以降のAPI/Web journal重大エラー0、対象nginx error0、監査したaccess logに想定外5xxなし。PDF unavailable等の予定503は配備障害と区別。
+終了時は専用試験利用者2名を無効化しsessionを失効、試験履歴を論理削除。有効な試験履歴0、物理削除なし。一般回帰は今後も利用者DBと分離した専用DBで行う。
+
+証跡は開発元 `C:\Users\bunch\Documents\Codex\fortune-app\outputs\predeploy-night-20261006` の `production-smoke.json`、`production-xlsx-validation.json`、`production-final-audit.json`、`deployment-success-20261006.md` と画面/Excel成果物。
+最終監査は全検査完了後の結果保存処理だけでTypeErrorが発生した。安全なfallbackに保存された全結果を照合し、ローカル監査writerを修正済み。アプリ/VPS構成の失敗とは区別する。
+
+### 残件と次工程
+
+**unresolved deployment blocker none**。Phase 7Aと今回の本番配備工程は正式完了。
+次はPhase 6「商品名・ブランド・URL・テーマ」へ戻る予定。ユーザーとChatGPTが仕様を確定し、別途実装指示後に着手する。
+今回、商品名・URLの決定、ロゴ作成、CSS変更、商品版画面実装、新機能実装は行っていない。
+
+以下は未実装の後続工程であり、今回の配備失敗やblockerではない。実装・運用時期は別途確定する。
+
+- password reset email、SMTP / email infrastructure（OAuth・自由登録も今回対象外）。
+- 30日後物理削除。
+- backup自動運用、monitoring（今回の手動backup・ログ監査は完了）。
+- Linux PDF converter（LibreOffice等の環境・再現性・採用判定は保留）。
+- multi-worker shared unsaved token（当面API1 worker、tokenはプロセス内保持）。
+- admin UI、contract / billing management。
+- cloud DB全面移行。
+- 既知Tier C課題、3ページ目以降の見方解説は別途検討。今回変更・実装なし。
+
+最終記録作業はdocsだけ。VPS Git、DB、environment、systemd、nginx、service、利用者、passwordは変更していない。

@@ -1,5 +1,14 @@
 # Phase 7A 本番認証・利用者識別基盤
 
+## 現在の正式状態（2026-10-06）
+
+Phase 7A implementation complete / production deployment complete。
+本番HEADは `569d1494202782099e6b8197f7825750f5d463fb`、認証・利用者分離・履歴・Excelは稼働中。
+production DBは `/var/lib/fortune-app/history.sqlite3`。Linux PDFは正式仕様としてdisabled、UIは「PDF（現在利用できません）」、認証済みの直接APIは503 / converter_unavailable。
+本番smoke test 40項目PASS、backup検証・実rollback確認済み、unresolved deployment blocker none。
+本番構成・証跡・残件は [配備完了記録](vps-deployment.md#15-phase-7a本番配備完了の最終記録2026-10-06) を参照。
+以下の日付付き実装・監査節は各時点の記録。配備前の未適用・次回作業という記述を現在の未完了状態として扱わない。
+
 ## 認証構造
 
 `POST /api/auth/login` → Argon2idによるパスワード照合 → 32 bytesの暗号学的乱数session token → HttpOnly Cookie。
@@ -7,7 +16,7 @@
 query、JSON、任意header、localStorage、frontend stateのuser_idは認証に使用しない。
 JWT、自由登録、初期ユーザーのハードコード、管理者API、管理画面は追加していない。
 
-同じoriginのNext.js `/api/*` rewriteを通してPython APIを呼ぶ。`NEXT_PUBLIC_FORTUNE_API_URL` は未設定または空にする。
+同じoriginの `/api/*` を使う。ローカル開発はNext.js rewrite、本番はnginxの `/api/` locationからPython APIへ直接転送する。`NEXT_PUBLIC_FORTUNE_API_URL` は未設定または空にする。
 ブラウザと別originのAPIへ認証Cookieを転送する構成は今回の対象外。
 
 ## DBと追加migration
@@ -122,7 +131,7 @@ create/set-passwordではgetpassによる非表示入力＋再入力を求める
 入力を隠せない端末・非対話入力は拒否する。emailは例示であり、実アカウントをコードやGitへ登録しない。
 CLIはOS上でDBへアクセスできる管理者の経路。利用者向けWeb APIとして公開しない。
 
-## VPS配備前に別途必要な作業
+## VPS配備前に別途必要な作業（初回配備時のチェックリスト）
 
 1. 今回はVPSを変更しない。配備指示を受けてから、旧HEAD・service・DB・作業ツリーを再監査する。
 2. SQLiteの既存データとownerを確認し、配備時のDB控えと復元手順を準備する。repo内一時DBへ置き換えない。
@@ -226,7 +235,7 @@ Uvicornへproxy_headersとforwarded_allow_ipsを明示して渡すため、別�
 workerは1、reloadは無効を維持。login limiterは引き続きrequest.client.hostを使い、独自XFF parserは追加しない。
 この設定を読むのはserver.pyのmain。uvicorn CLIで起動する場合は同等の限定flagが別途必要なので、本番は既存の直接起動を維持する。
 
-### VPS経路比較と推奨（未適用）
+### VPS経路比較と推奨（2026-10-05時点は未適用、現在はBを適用済み）
 
 | 案 | セキュリティ | 既存挙動・単純さ | rollback |
 | --- | --- | --- | --- |
@@ -315,7 +324,7 @@ Notionの2026-10-05引継ぎSessionsページは参照のみ。古い「Phase 7A
 VPSへ接続せず、本番DB・設定・サービス・Gitは未変更。ローカルblocker対応後、次工程は最終read-only配備前監査。
 
 
-## 2026-10-06 夜間最終predeploy
+## 2026-10-06 夜間最終predeploy（配備前の記録）
 
 本番設定差分・backup・migration・initial user・smoke・rollback・28工程の配備手順は [VPS deployment runbook](vps-deployment.md) に統合。
 本番状態は変更していない。production TLSと履歴メモ/再鑑定/削除を追加したローカルE2Eを実施。
