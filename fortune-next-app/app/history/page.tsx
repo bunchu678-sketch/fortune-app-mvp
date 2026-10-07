@@ -62,6 +62,7 @@ export default function HistoryPage() {
       <label>鑑定日（終了）<input type="date" value={end} onChange={e => setEnd(e.target.value)} /></label>
       <button type="submit" disabled={loading}>検索</button>
     </form>
+    <p><Link href="/history/deleted">削除した履歴を復旧する</Link></p>
     <p>保存日時の新しい順</p>
     {error ? <p role="alert">{error}</p> : null}
     {loading ? <p role="status">履歴を読み込み中…</p> : null}
@@ -78,6 +79,7 @@ export default function HistoryPage() {
     </article>)}</div>
     {deleting ? <div className="historyModal"><section role="dialog" aria-modal="true" aria-labelledby="delete-heading" className="historyCard">
       <h2 id="delete-heading">この鑑定履歴を削除しますか？</h2>
+      <p>削除後30日以内は、削除した履歴の一覧から復旧できます。</p>
       <p>{deleting.name}／{deleting.birth_date}／鑑定日 {deleting.reading_date}</p>
       <div className="historyActions"><button type="button" autoFocus disabled={busy} onClick={() => setDeleting(null)}>キャンセル</button>
         <button type="button" disabled={busy} onClick={remove}>削除する</button></div>

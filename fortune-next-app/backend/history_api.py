@@ -63,6 +63,16 @@ async def update_person(person_id: str, request: Request):
     return await handle(request, action, True)
 
 
+@router.get("/deleted")
+async def deleted(request: Request):
+    return await handle(request, lambda s,o,p: s.repository.deleted_list(o))
+
+
+@router.post("/{reading_id}/restore")
+async def restore(reading_id: str, request: Request):
+    return await handle(request, lambda s,o,p: s.repository.restore(o,reading_id))
+
+
 @router.get("/{reading_id}")
 async def detail(reading_id: str, request: Request):
     return await handle(request, lambda s, o, p: s.detail(o, reading_id))

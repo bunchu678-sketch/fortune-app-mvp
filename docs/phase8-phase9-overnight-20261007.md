@@ -179,3 +179,8 @@ Targeted reset22/22、mail9/9、related auth44/44、lifecycle12/12、product16/1
 
 Organization登録/active/suspended/deletion_pending数、User状態/最終login、Organization+Userごとの今月/累計保存件数/最終保存日時queryを追加。今月はAsia/Tokyoの保存日時境界、可変の鑑定日ではない。soft deletedを含む累計保存件数を明示、counter重複保存なし。未保存計算の永続recordが存在しないため全鑑定件数とは呼ばない。必要なtotal definitionは人間判断待ち。通常Web管理APIへ公開せず、鑑定本文・memo・password hashを返さない。
 Targeted usage9/9 PASS（他Org/他owner/未割当の除外、JST境界、状態、内容非公開）、related product16/16/lifecycle12/12は同じ新schemaで直前にPASS。
+
+### Unit 6: owner-only history recovery
+
+削除後30日より前だけ一覧/復旧可。通常list/detailへの即時非表示を維持、復旧はdeleted_at/updated_atだけ変更しsnapshot/memo/version/ID/source FKを保持。復旧APIは既存session owner/CSRF境界を利用しbodyのowner指定を無視。削除一覧は最小metadataのみ、memoや本文を返さない。期限切れは復旧できず、read-only physical-delete候補にsource依存有無を返すだけで実削除しない。/history/deletedを既存history CSSで追加、同一覧へのlogin return許可。
+Targeted recovery12/12、related history32/32、auth44/44、Excel46/46、PDF21/21 PASS。PC1280/スマホ375 mocked browser16/16、TypeScript PASS。新しいpurge scheduleや本番data操作なし。

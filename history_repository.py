@@ -1,6 +1,6 @@
 """SQLite adapter. All persisted objects and queries are scoped by owner."""
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
@@ -225,3 +225,50 @@ class SQLiteHistoryRepository:
     def current_person(self, owner, person_id):
         with self.connection() as db:
             return json.loads(self.person(db, owner, person_id)["current_input"])
+
+    @staticmethod
+    def recovery_window(deleted_at, now):
+        try:
+            deleted=datetime.fromisoformat(deleted_at)
+            if deleted.tzinfo is None or now.tzinfo is None: raise ValueError()
+        except (ValueError, TypeError):
+            raise HistoryError("履歴の削除日時を確認できません。",503) from None
+        deadline=deleted+timedelta(days=30)
+        return deleted<=now<deadline,deadline
+
+    def deleted_list(self, owner, now=None):
+        now=now or datetime.now(timezone.utc)
+        with self.connection() as db:
+            rows=db.execute("SELECT * FROM readings WHERE owner_user_id=? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC,id DESC",(owner,)).fetchall()
+            result=[]
+            for row in rows:
+                recoverable,deadline=self.recovery_window(row["deleted_at"],now)
+                if not recoverable: continue
+                form=json.loads(row["input_snapshot"])["form"]
+                result.append({"id":row["id"],"name":(form.get("surname","")+form.get("givenName","")).strip() or "無記名",
+                    "birth_date":form["birthDate"],"reading_date":row["reading_date"],"saved_at":row["saved_at"],
+                    "deleted_at":row["deleted_at"],"restore_until":deadline.astimezone(timezone.utc).isoformat(timespec="microseconds")})
+            return result
+
+    def restore(self, owner, reading_id, now=None):
+        now=now or datetime.now(timezone.utc)
+        with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row=db.execute("SELECT deleted_at FROM readings WHERE owner_user_id=? AND id=? AND deleted_at IS NOT NULL",(owner,reading_id)).fetchone()
+            if not row or not self.recovery_window(row["deleted_at"],now)[0]:
+                raise HistoryError("復旧可能な鑑定履歴が見つかりません。",404)
+            db.execute("UPDATE readings SET deleted_at=NULL,updated_at=? WHERE owner_user_id=? AND id=?",
+                       (now.astimezone(timezone.utc).isoformat(timespec="microseconds"),owner,reading_id))
+            return {"restored":True}
+
+    def deletion_candidates(self, owner, now=None):
+        """Read-only candidates. Physical deletion requires a separate source-FK policy."""
+        now=now or datetime.now(timezone.utc)
+        with self.connection() as db:
+            result=[]
+            for row in db.execute("SELECT id,deleted_at FROM readings WHERE owner_user_id=? AND deleted_at IS NOT NULL",(owner,)):
+                _,deadline=self.recovery_window(row["deleted_at"],now)
+                if deadline<=now:
+                    dependent=db.execute("SELECT 1 FROM readings WHERE owner_user_id=? AND source_reading_id=? LIMIT 1",(owner,row["id"])).fetchone()
+                    result.append({"id":row["id"],"has_dependents":bool(dependent)})
+            return result
