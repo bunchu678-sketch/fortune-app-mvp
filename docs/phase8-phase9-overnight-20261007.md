@@ -174,3 +174,8 @@ mail_delivery_cases9/9 PASS。全SMTP接続はMock factory、外部通信なし�
 SHA256-only reset token、30分expiry、single-use、競合transaction、password version検査、他token無効化、全session revokeを追加。admin password変更/停止/再開で旧tokenも無効化。account/IP budgetsは既存AuthSettingsと同じ暫定設定を別tableで利用、mail存在有無に関係なく適用。公開APIはCSRF/8192bytes制限/no-store。requestはgeneric202を返した後backgroundでlookup/deliveryし、SMTP応答時間・失敗をaccount存在確認に使わせない。サービス未設定時は全mailへ同じ503。実transportは自動接続せず、Phase11でtrusted設定が必要。
 /forgot-passwordと/reset-passwordを既存login CSSで追加。tokenはfragmentのみ、capture後URLから消し、localStorage/DBへ平文保存しない。成功後full navigationで認証UI状態を消し新passwordでloginを促す。StrictModeのeffect再実行と同一page上の別fragmentも検証した。
 Targeted reset22/22、mail9/9、related auth44/44、lifecycle12/12、product16/16 PASS。token parser Node4/4、mock APIのPC1280/スマホ375 browser20/20、TypeScript/Next production build PASS。初回検査のmodule読込問題と同一page fragment取替時のUI欠落を修正して再確認済み。実SMTP送信なし。
+
+### Unit 5: content-free derived usage queries
+
+Organization登録/active/suspended/deletion_pending数、User状態/最終login、Organization+Userごとの今月/累計保存件数/最終保存日時queryを追加。今月はAsia/Tokyoの保存日時境界、可変の鑑定日ではない。soft deletedを含む累計保存件数を明示、counter重複保存なし。未保存計算の永続recordが存在しないため全鑑定件数とは呼ばない。必要なtotal definitionは人間判断待ち。通常Web管理APIへ公開せず、鑑定本文・memo・password hashを返さない。
+Targeted usage9/9 PASS（他Org/他owner/未割当の除外、JST境界、状態、内容非公開）、related product16/16/lifecycle12/12は同じ新schemaで直前にPASS。
