@@ -146,6 +146,8 @@ class AuthRepository:
                            ("disabled" if action == "disable" else "active", timestamp(), row["id"]))
             if action in ("disable", "enable"):
                 set_account_state(db, row["id"], "suspended" if action == "disable" else "active", timestamp())
+            if encoded:
+                db.execute("UPDATE password_reset_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL", (timestamp(),row["id"]))
             if action != "enable":
                 db.execute("UPDATE auth_sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL",
                            (timestamp(), row["id"]))

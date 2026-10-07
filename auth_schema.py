@@ -27,8 +27,20 @@ def migrate_auth_extensions(db):
             user_id TEXT PRIMARY KEY REFERENCES users(id), last_login_at TEXT NOT NULL)""",
     ])
 
+    apply_migration(db, "auth-password-reset-002", [
+        """CREATE TABLE password_reset_tokens (token_hash TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id), password_version TEXT NOT NULL,
+            created_at TEXT NOT NULL, expires_at REAL NOT NULL, used_at TEXT)""",
+        "CREATE INDEX password_reset_user ON password_reset_tokens(user_id,used_at)",
+        """CREATE TABLE password_reset_attempts (id TEXT PRIMARY KEY, operation TEXT NOT NULL,
+            ip_key TEXT NOT NULL, account_key TEXT NOT NULL, attempted_at REAL NOT NULL)""",
+        "CREATE INDEX password_reset_rate_ip ON password_reset_attempts(operation,ip_key,attempted_at)",
+        "CREATE INDEX password_reset_rate_account ON password_reset_attempts(operation,account_key,attempted_at)",
+    ])
+
 
 def set_account_state(db, user_id, state, now):
+    db.execute("UPDATE password_reset_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL", (now,user_id))
     current = db.execute("SELECT * FROM user_account_lifecycle WHERE user_id=?", (user_id,)).fetchone()
     if state == "suspended" and current and current["state"] in ("suspended", "deletion_pending"):
         return

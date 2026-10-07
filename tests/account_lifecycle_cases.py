@@ -73,7 +73,7 @@ class LifecycleCases(unittest.TestCase):
         self.assertEqual(self.repo.state(self.other["id"]),before)
         self.assertIsNone(before["suspended_at"])
         with self.auth.connection() as db:
-            self.assertEqual(db.execute("SELECT count(*) FROM schema_migrations").fetchone()[0],1)
+            self.assertEqual(db.execute("SELECT count(*) FROM schema_migrations WHERE migration_key='auth-lifecycle-001'").fetchone()[0],1)
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(),[])
     def test_missing_user_is_rejected(self):
         with self.assertRaises(AuthError): self.repo.suspend("missing",NOW)

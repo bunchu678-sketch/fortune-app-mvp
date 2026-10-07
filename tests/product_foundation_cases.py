@@ -40,7 +40,7 @@ class FoundationCases(unittest.TestCase):
     def test_repeated_migration_is_idempotent(self):
         ProductRepository(self.path)
         with self.auth.connection() as db:
-            self.assertEqual(db.execute("SELECT count(*) FROM schema_migrations").fetchone()[0],2)
+            self.assertEqual(db.execute("SELECT count(*) FROM schema_migrations WHERE migration_key IN ('auth-lifecycle-001','product-foundation-001')").fetchone()[0],2)
             self.assertEqual(db.execute("SELECT count(*) FROM organizations").fetchone()[0],2)
     def test_one_user_multiple_org_roles(self):
         self.assertEqual(self.repo.resolve_context(self.org,self.a).role,"teacher")

@@ -31,10 +31,12 @@ from auth_api import router as auth_router, AuthBoundary, request_owner, session
 from report_export_service import export_tokens
 from pdf_converter import pdf_available
 from proxy_settings import proxy_settings
+from password_reset_api import router as password_reset_router
 
 app = FastAPI()
 app.add_middleware(AuthBoundary)
 app.include_router(auth_router)
+app.include_router(password_reset_router)
 app.include_router(history_router)
 app.include_router(export_router)
 

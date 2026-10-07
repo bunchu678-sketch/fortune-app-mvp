@@ -168,3 +168,9 @@ Targeted product_foundation_cases16/16、related history32/32、lifecycle12/12 P
 
 MailTransport/TextMail interface、test用Memory transport、Disabled transport、SMTP AUTH adapterを追加。STARTTLSまたはimplicit TLSのみ、証明書検証、header injection拒否、credential/tokenのrepr・server error露出抑止。自動env読込やlive transport選択は実装しておらず、実SMTP config/送信は行わない。後でResend/SES等を同interfaceで交換可能。
 mail_delivery_cases9/9 PASS。全SMTP接続はMock factory、外部通信なし。
+
+### Unit 4: password reset backend / minimal existing-style frontend
+
+SHA256-only reset token、30分expiry、single-use、競合transaction、password version検査、他token無効化、全session revokeを追加。admin password変更/停止/再開で旧tokenも無効化。account/IP budgetsは既存AuthSettingsと同じ暫定設定を別tableで利用、mail存在有無に関係なく適用。公開APIはCSRF/8192bytes制限/no-store。requestはgeneric202を返した後backgroundでlookup/deliveryし、SMTP応答時間・失敗をaccount存在確認に使わせない。サービス未設定時は全mailへ同じ503。実transportは自動接続せず、Phase11でtrusted設定が必要。
+/forgot-passwordと/reset-passwordを既存login CSSで追加。tokenはfragmentのみ、capture後URLから消し、localStorage/DBへ平文保存しない。成功後full navigationで認証UI状態を消し新passwordでloginを促す。StrictModeのeffect再実行と同一page上の別fragmentも検証した。
+Targeted reset22/22、mail9/9、related auth44/44、lifecycle12/12、product16/16 PASS。token parser Node4/4、mock APIのPC1280/スマホ375 browser20/20、TypeScript/Next production build PASS。初回検査のmodule読込問題と同一page fragment取替時のUI欠落を修正して再確認済み。実SMTP送信なし。
