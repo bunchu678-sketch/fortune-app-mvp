@@ -158,3 +158,8 @@ Phase11: production migration/deploy、subdomain DNS/TLS/nginx、SMTP credential
 
 追加side tableとschema_migrations台帳を導入。既存users.statusのCHECK制約と既存UUIDを維持し、旧利用者やsnapshotを自動書換えしない。disable/enableはsuspended/activeへ明示同期、login/authenticateは追加状態も検査。最終loginだけ保存しlogin回数等は追跡しない。停止は暦の1年（2/29→翌2/28）、実際にdeletion_pendingへ遷移した日時から30日、purge候補IDの取得まで。物理削除/schedulerはなし。旧disabledで停止開始日時がない場合は推測しない。
 Targeted account_lifecycle_cases 12/12、related auth44/44、history32/32 PASS。HEADとのauth差分をdifflibで確認、正式占術logicは未変更。
+
+### Unit 2: Organization / Membership / Contract / theme / scoped adapter
+
+追加tablesだけをexplicit ProductRepository初期化で作成。旧users UUID/履歴snapshot不変、旧履歴はunassignedのまま。複数Organization所属、role記録、Contract3状態/date/plan、logo/settings、Org固有theme、Membershipごとの選択保存。標準themeはwhite/blackのみ。Orgと元ownerの二重FKを持つexplicit reading scope mapでsame-orgの他userも別orgの同userも分離、1履歴を別Orgへ自動共有しない。既存history APIへの接続/backfillは未実施。roleは権限として解釈せず、Contract状態のaccess policyもこの基盤では未接続。
+Targeted product_foundation_cases16/16、related history32/32、lifecycle12/12 PASS。新adapter全文とFK/query対象を確認。
