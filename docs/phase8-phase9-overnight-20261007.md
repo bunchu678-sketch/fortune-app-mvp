@@ -189,3 +189,87 @@ Targeted recovery12/12、related history32/32、auth44/44、Excel46/46、PDF21/2
 
 Org slugを実subdomainへ使用可能な小文字/数字/hyphen、最大63文字、端のhyphen不可に限定。role/theme keyとは別検証にした。migration途中失敗でtable/台帳insertがrollbackされ旧snapshotが保持されること、同時初期化が一度だけ適用されることを追加検証。
 product_foundation_casesは19/19、related usage9/9 PASS。実DNS設定なし。
+
+## 最終回帰結果
+
+| Suite | final |
+|---|---|
+| Tier A / Tier B | 524/524 + 38/38 |
+| auth / history | 44/44 + 32/32 |
+| Excel / PDF | 46/46 + 21/21 |
+| product UI contracts / deploy blocker / predeploy / harness | 9/9 + 20/20 + 7/7 + 16/16 |
+| account lifecycle | 12/12 |
+| Organization/Membership/Contract/theme/migration | 19/19 |
+| mail abstraction / reset backend-API | 9/9 + 22/22 |
+| usage queries / history recovery | 9/9 + 12/12 |
+| Node JST / fragment parser | 5/5 + 4/4 |
+| reset UI PC/mobile / recovery UI PC/mobile | 20/20 + 16/16 |
+| TypeScript / Next.js production build | PASS |
+
+最終Python840件、Node9件、browser36項目、合計885件/項目PASS。最後の一括runでPython内訳はformal/observed562＋isolated suites278。Next buildはローカルのみ。generated next-env.d.tsは検査scriptで元bytesに戻し、TypeScript出力ファイルは作らない。browserはauth/history/reset APIをmockしたUI検証、backend securityは別の実ASGI/一時SQLite test。native Windows Excel/COMを使う実PDF E2E、本番smoke、S任意1325-input比較は今回未実施で、成功件数に含めない。Tier C K01〜K06はbaselineどおり、fixtureや正式な占術期待値は変更していない。
+
+## 変更・保全照合
+
+開始tracked121のうち115はGit filter考慮blobで開始HEADと一致。既存変更は6ファイルだけ: auth_service.py、history_repository.py、backend/server.py、backend/history_api.py、app/history/page.tsx、app/login/page.tsx。すべて今回の接続箇所。fortune_service、gogyou系、暦、命式、大運、月運、年運、comments、S、approved XLSX template、正式fixtureは未変更。新規21ファイルはaudit doc・各基盤/service/API/UI/testsで、終了tracked142。既存data DB/production DB/本番VPS/secret/DNS/SSL/systemd/nginx/Xserver/Notionは変更なし。テストはsynthetic disposable DBを作成・片付けるだけ。
+
+## Phase 9 再分類（終了時）
+
+| 元roadmap項目 | 終了状態 |
+|---|---|
+| 履歴DB/person/group/snapshot/保存/呼出/search/detail/re-reading/memo | 完了済みA、再実装していない |
+| 削除 | soft delete既存A＋30日復旧今回A。physical purge/source-FK保持方針はB |
+| Excel | 完了済みA、再実装不要 |
+| PDF | Windows/共通Excel経路A、Linux converterはB（方式選定後）、本番有効化E |
+| login/auth/owner/user identity | Phase7A完了A、今回追加停止状態とresetだけ接続 |
+| password reset | token/backend/API/minimal UI今回実装A。live mail設定E |
+| Organization/Membership/Contract | additive model/FK/explicit scope adapter今回A、全既存data割当/routing/契約access policyはB |
+| account lifecycle | state/一年/30日/復帰/session拒否/候補今回A。実physical deleteはB/E |
+| usage | content-free保存履歴proxy今回B。未保存含む鑑定件数定義は判断待ち |
+| admin UI | 未実装C。global管理者grant/bootstrap/Org管理roleの権限境界待ち |
+| brand/URL/theme | Org設定/theme保存/white-black基盤今回B、画面接続・先生logo/theme実設定は残件、DNS/TLS等E |
+| app/calculation version | 完了済みA、今回DB migration台帳を追加。占術versionは未変更 |
+| 特定日時完全削除 | D保留。商品専用境界/Doctor・S維持範囲の決定後 |
+
+## 保留: 人間判断が必要なこと（優先順）
+
+1. 既存User/履歴をどのOrganizationへ割り当てるか、既存博士URLを維持する商品context導入方式、複数所属の選択/URL対応。勝手なdefault Organization/backfillはしない。
+2. 商品版だけの特定日時廃止と、正規博士W/Sの機能維持範囲。共有moduleを全面削除すると現行正式OFF/ON互換契約を壊す。
+3. global管理者の初期grant方法と、先生/教室管理roleが見られるmetadataの範囲。通常管理画面に鑑定本文閲覧を作らない。Contract状態とMembershipの利用可否も決定が必要。
+4. 鑑定件数の正式定義（未保存成功計算を含むか、再実行/境界手動修正を別件扱いするか）。今あるqueryは保存履歴proxyを明示、全鑑定countと偽らない。
+5. physical purge時の再鑑定source FK/Person.current_input/Org membership参照の保持・匿名化方針。今回は候補だけ。旧disabledの実停止日時も推測できない。
+6. Linux PDF変換方式と正式template再現性の採用条件。Windows/正式Excelを作り直さない。
+7. help/鑑定支援の先生資料、年総合2026固定文の扱い、2050翌1月対応、先生確認中の占術競合/解釈。AIで文や流派規則を補わない。
+
+## Phase 11に送る実作業
+
+- 本番backup→restore確認→追加migration→承認済み商品版deploy。旧User/履歴Org backfillは別のレビュー対象。
+- trusted reset originとmail serviceの明示設定、Xserver SMTP AUTH host/port/credential/TLS確認、承認後の実送信。現在はrequestが同一503になる安全な未設定状態。token復旧URLは /reset-password#token=... 。originはHost/forwarded headerから決めない。
+- 先生subdomain DNS、TLS証明書、nginx routing、trusted origin/CSRF/複数所属切替の検証。
+- suspended→pending処理とphysical purgeのscheduler。まず人間承認したpurge方針をテストし、本番候補のdry run/backup確認後のみ実行。
+- SQLite日次整合backup、30日rotation、VPS外1系統、監視、定期restore検証。ライブDBファイル単純copyに依存せずSQLite backup API等で整合snapshotを取得。
+- Linux PDF converter方式確定後の環境導入・本番有効化。現在のdisabledは維持。
+
+## 再開時の技術情報
+
+AuthRepositoryは既存3認証tableを保持してauth_schema.pyのidempotent additive migrationを適用する。migration keysはauth-lifecycle-001、auth-password-reset-002。ProductRepository明示初期化でproduct-foundation-001を追加し、Orgを自動作成/割当しない。台帳はschema_migrations。追加FKはUUID Userへ接続、既存users INSERT列数/CHECKは維持。DB固有SQLはrepository/auth_schema内のみ、ON CONFLICT、BEGIN IMMEDIATE、sqlite3 APIは将来DB差替adapterで置き換える必要がある。
+AccountLifecycleRepository.advance_dueは本番schedulerへ未接続、purge_candidatesはIDの読み取りのみ。暦の一年、2/29は翌年2/28、pendingへ実際に移った日時から30日。HistoryRepository.restoreは削除から30日未満、deadline当日は拒否。UsageRepositoryはinternal management queryであって認可を付与するAPIではない。ProductRepository.contextのroleをそのままglobal adminへ昇格しない。Contract状態はモデルとして独立し、利用権限を勝手に付与しない。
+MailTransportは交換可能。SMTPMailTransportは引数で明示したTLS configでのみ動作、serverは自動でlive transportを設定しない。reset request endpointはapp.state.password_reset_serviceが未設定なら全mailへ503。実送信の接続はPhase11の承認済み設定工程。reset completeは既存auth resolver/sessionを作り直さずtransactionでpasswordとtoken/session状態を更新する。
+
+## Commit一覧（実装まで）
+
+```text
+c939515 Document Phase 8 audit and Phase 9 implementation gates
+2f346df Add additive account lifecycle and retention eligibility
+8f50aad Add organization membership contract and theme foundations
+46b20a9 Add replaceable mail transport and TLS SMTP adapter
+c31e642 Implement secure password reset with inert mail configuration
+8e0489a Add content-free organization and user usage queries
+29dbc78 Add owner-only history recovery within thirty days
+897d5db Validate tenant slugs and additive migration safety
+```
+
+この最終記録自体のcommitは `Record final overnight regression and handoff`。そのhashはbranch log/最終チャット報告を参照（自己hashを文書内へ埋めるとhashが変わるため）。
+
+## Git終了確認とpush
+
+最終記録commit前: branchは指定branch、mainとorigin/mainは開始e8b5308のまま、staged/untrackedなし。remoteの同名branchはまだ存在しないことをls-remoteで確認済み。最終記録をcommit後、全tracked142のindex/worktree hash照合とstaged/untracked再確認を行い、HEADをoriginの夜間branchだけへ通常pushする。force/main merge/main push/認証設定変更はしない。実push結果と最終HEADは最終チャット報告に記載する。
