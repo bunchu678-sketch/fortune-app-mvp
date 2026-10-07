@@ -163,3 +163,8 @@ Targeted account_lifecycle_cases 12/12、related auth44/44、history32/32 PASS�
 
 追加tablesだけをexplicit ProductRepository初期化で作成。旧users UUID/履歴snapshot不変、旧履歴はunassignedのまま。複数Organization所属、role記録、Contract3状態/date/plan、logo/settings、Org固有theme、Membershipごとの選択保存。標準themeはwhite/blackのみ。Orgと元ownerの二重FKを持つexplicit reading scope mapでsame-orgの他userも別orgの同userも分離、1履歴を別Orgへ自動共有しない。既存history APIへの接続/backfillは未実施。roleは権限として解釈せず、Contract状態のaccess policyもこの基盤では未接続。
 Targeted product_foundation_cases16/16、related history32/32、lifecycle12/12 PASS。新adapter全文とFK/query対象を確認。
+
+### Unit 3: mail abstraction / SMTP adapter
+
+MailTransport/TextMail interface、test用Memory transport、Disabled transport、SMTP AUTH adapterを追加。STARTTLSまたはimplicit TLSのみ、証明書検証、header injection拒否、credential/tokenのrepr・server error露出抑止。自動env読込やlive transport選択は実装しておらず、実SMTP config/送信は行わない。後でResend/SES等を同interfaceで交換可能。
+mail_delivery_cases9/9 PASS。全SMTP接続はMock factory、外部通信なし。
