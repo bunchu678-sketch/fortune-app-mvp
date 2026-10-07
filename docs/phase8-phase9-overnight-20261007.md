@@ -184,3 +184,8 @@ Targeted usage9/9 PASS（他Org/他owner/未割当の除外、JST境界、状態
 
 削除後30日より前だけ一覧/復旧可。通常list/detailへの即時非表示を維持、復旧はdeleted_at/updated_atだけ変更しsnapshot/memo/version/ID/source FKを保持。復旧APIは既存session owner/CSRF境界を利用しbodyのowner指定を無視。削除一覧は最小metadataのみ、memoや本文を返さない。期限切れは復旧できず、read-only physical-delete候補にsource依存有無を返すだけで実削除しない。/history/deletedを既存history CSSで追加、同一覧へのlogin return許可。
 Targeted recovery12/12、related history32/32、auth44/44、Excel46/46、PDF21/21 PASS。PC1280/スマホ375 mocked browser16/16、TypeScript PASS。新しいpurge scheduleや本番data操作なし。
+
+### Unit 7: product foundation validation
+
+Org slugを実subdomainへ使用可能な小文字/数字/hyphen、最大63文字、端のhyphen不可に限定。role/theme keyとは別検証にした。migration途中失敗でtable/台帳insertがrollbackされ旧snapshotが保持されること、同時初期化が一度だけ適用されることを追加検証。
+product_foundation_casesは19/19、related usage9/9 PASS。実DNS設定なし。

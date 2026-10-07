@@ -91,7 +91,9 @@ class ProductRepository:
         with self.auth.connection() as db: return self.context(db,organization_id,authenticated_user_id)
 
     def create_organization(self, display_name, slug, logo_reference=None, settings=None):
-        display_name=text(display_name); slug=key(slug)
+        display_name=text(display_name); slug=text(slug,63)
+        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?",slug):
+            raise HistoryError("Invalid organization subdomain slug",422)
         if logo_reference is not None: logo_reference=text(logo_reference,2048)
         if settings is not None and not isinstance(settings,dict): raise HistoryError("Invalid settings",422)
         values=(str(uuid4()),display_name,slug,logo_reference,encode(settings or {}),timestamp(),timestamp())

@@ -6,6 +6,8 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1])); sys.path.insert(0,s
 import tempfile
 import unittest
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
+from auth_schema import apply_migration
 from copy import deepcopy
 from auth_service import AuthRepository
 from history_service import HistoryService
@@ -100,5 +102,23 @@ class FoundationCases(unittest.TestCase):
     def test_key_injection_invalid(self):
         with self.assertRaises(HistoryError): self.repo.create_organization("Name","../bad")
         with self.assertRaises(HistoryError): self.repo.add_membership(self.org,self.a,"admin;DROP TABLE users")
+
+    def test_subdomain_slug_validation(self):
+        for slug in ["has_underscore","-starts-hyphen","ends-hyphen-","UPPER","a"*64,"a.b"]:
+            with self.assertRaises(HistoryError): self.repo.create_organization("Name",slug)
+        self.assertEqual(self.repo.create_organization("Numeric","9-school")["slug"],"9-school")
+    def test_failed_additive_migration_rolls_back_without_legacy_loss(self):
+        with self.assertRaises(sqlite3.Error):
+            with self.auth.connection() as db:
+                apply_migration(db,"test-deliberate-failure",["CREATE TABLE transient_test (id TEXT)","INVALID SQL"])
+        with self.auth.connection() as db:
+            self.assertIsNone(db.execute("SELECT 1 FROM sqlite_master WHERE name='transient_test'").fetchone())
+            self.assertIsNone(db.execute("SELECT 1 FROM schema_migrations WHERE migration_key='test-deliberate-failure'").fetchone())
+        self.assertEqual(self.legacy.detail(self.a,self.reading["id"]),self.reading)
+    def test_concurrent_migration_initialization_is_idempotent(self):
+        with ThreadPoolExecutor(max_workers=2) as workers: list(workers.map(lambda _:ProductRepository(self.path),range(2)))
+        with self.auth.connection() as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM schema_migrations WHERE migration_key='product-foundation-001'").fetchone()[0],1)
+        self.assertEqual(self.legacy.detail(self.a,self.reading["id"]),self.reading)
 
 if __name__=="__main__": unittest.main(verbosity=2)
