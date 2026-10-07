@@ -1,5 +1,7 @@
 """Server-side authentication. Additive SQLite tables; no history rewrites."""
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from auth_schema import migrate_auth_extensions, set_account_state
 import hashlib
 import os
 from pathlib import Path
@@ -112,6 +114,7 @@ class AuthRepository:
                 CREATE INDEX IF NOT EXISTS auth_login_ip ON auth_login_attempts(ip_key,attempted_at);
                 CREATE INDEX IF NOT EXISTS auth_login_account ON auth_login_attempts(account_key,attempted_at);
             """)
+            migrate_auth_extensions(db)
 
     def create_user(self, email, password):
         normalized = normalized_email(email)
@@ -131,6 +134,7 @@ class AuthRepository:
         if action not in ("disable", "enable", "set-password"):
             raise AuthError("管理操作を確認してください。", 422)
         with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT * FROM users WHERE normalized_email=?", (normalized,)).fetchone()
             if not row:
                 raise AuthError("アカウントが見つかりません。", 404)
@@ -140,6 +144,8 @@ class AuthRepository:
             else:
                 db.execute("UPDATE users SET status=?,updated_at=? WHERE id=?",
                            ("disabled" if action == "disable" else "active", timestamp(), row["id"]))
+            if action in ("disable", "enable"):
+                set_account_state(db, row["id"], "suspended" if action == "disable" else "active", timestamp())
             if action != "enable":
                 db.execute("UPDATE auth_sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL",
                            (timestamp(), row["id"]))
@@ -170,25 +176,30 @@ class AuthRepository:
         now = clock()
         self.admit_login(normalized, ip, settings, now)
         with self.connection() as db:
-            row = db.execute("SELECT * FROM users WHERE normalized_email=?", (normalized,)).fetchone()
+            row = db.execute("""SELECT u.*,COALESCE(l.state,'active') AS account_state FROM users u
+                LEFT JOIN user_account_lifecycle l ON l.user_id=u.id WHERE normalized_email=?""", (normalized,)).fetchone()
         try:
             valid = PASSWORD_HASHER.verify(row["password_hash"] if row else _DUMMY_HASH, password)
         except (VerificationError, InvalidHashError):
             valid = False
-        if not valid or not row or row["status"] != "active":
+        if not valid or not row or row["status"] != "active" or row["account_state"] != "active":
             raise AuthError("メールアドレスまたはパスワードが正しくありません。", 401)
         raw_token = secrets.token_urlsafe(32)
         # Serialize with administrative disable/password changes and recheck hash/status.
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
-            current = db.execute("SELECT * FROM users WHERE id=?", (row["id"],)).fetchone()
-            if current["status"] != "active" or current["password_hash"] != row["password_hash"]:
+            current = db.execute("""SELECT u.*,COALESCE(l.state,'active') AS account_state FROM users u
+                LEFT JOIN user_account_lifecycle l ON l.user_id=u.id WHERE u.id=?""", (row["id"],)).fetchone()
+            if current["status"] != "active" or current["account_state"] != "active" or current["password_hash"] != row["password_hash"]:
                 raise AuthError("メールアドレスまたはパスワードが正しくありません。", 401)
             if previous_token:
                 db.execute("UPDATE auth_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL",
                            (timestamp(), token_hash(previous_token)))
             db.execute("INSERT INTO auth_sessions VALUES (?,?,?,?,NULL)",
                        (token_hash(raw_token), row["id"], timestamp(), now+settings.ttl_seconds))
+            db.execute("""INSERT INTO user_activity VALUES (?,?) ON CONFLICT(user_id)
+                DO UPDATE SET last_login_at=excluded.last_login_at""",
+                (row["id"],datetime.fromtimestamp(now,timezone.utc).isoformat(timespec="microseconds")))
         return public_user(row), raw_token
 
     def authenticate(self, raw_token, clock=time.time):
@@ -196,8 +207,9 @@ class AuthRepository:
             raise AuthError("ログインしてください。", 401)
         with self.connection() as db:
             row = db.execute("""SELECT u.id,u.email FROM auth_sessions s JOIN users u ON u.id=s.user_id
+                LEFT JOIN user_account_lifecycle l ON l.user_id=u.id
                 WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?
-                AND u.status='active'""", (token_hash(raw_token), clock())).fetchone()
+                AND u.status='active' AND COALESCE(l.state,'active')='active'""", (token_hash(raw_token), clock())).fetchone()
         if not row:
             raise AuthError("ログインしてください。", 401)
         return public_user(row)
