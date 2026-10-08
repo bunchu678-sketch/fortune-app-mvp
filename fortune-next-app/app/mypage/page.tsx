@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LoginRequired, useAuth } from "../auth";
 import { useProductData, Personal } from "../product-client";
 import "../management.css";
+import ServiceContractPanel from "../service-contract";
 
 export default function MyPage() {
   const { user } = useAuth(); const { data, error, loading } = useProductData<Personal>("/api/account/summary");
@@ -18,6 +19,7 @@ export default function MyPage() {
         {data.memberships.length ? <section><h2>所属先</h2><ul>{data.memberships.map(item => <li key={item.organization_id}>
           {item.display_name}　<Link href={"/b2b/" + item.organization_id}>鑑定画面</Link>
           {item.role === "teacher" ? <>　<Link href={"/teacher/" + item.organization_id}>先生用管理画面</Link></> : null}
+          {item.role === "student" ? <ServiceContractPanel organizationId={item.organization_id} /> : null}
         </li>)}</ul></section> : null}
         <section><h2>アカウント設定</h2><p>メールアドレス：{data.email}</p><Link href="/forgot-password">パスワードを再設定</Link></section>
         {data.is_operator ? <section><Link href="/operations">しぜんとらぼ 運営管理</Link></section> : null}

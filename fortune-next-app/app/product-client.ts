@@ -31,4 +31,4 @@ export type Totals = { executions_this_month: number; executions_total: number; 
 export type Personal = Totals & { saved_histories_current: number; saved_histories_total: number; deleted_histories: number;
   email: string; is_operator: boolean; memberships: Array<{ organization_id: string; display_name: string; role: string }> };
 export type Organization = Totals & { id: string; display_name: string; slug: string; students: number };
-export const accountLabel = (state: string) => ({ active: "利用中", suspended: "停止中", deletion_pending: "削除待機" }[state] ?? state);
+export const accountLabel = (state: string) => ({ active: "利用中", suspended: "停止中", deletion_pending: "削除待機", terminated: "利用終了", deleted: "削除済み" }[state] ?? state);

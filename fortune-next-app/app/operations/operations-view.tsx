@@ -5,6 +5,7 @@ import { LoginRequired, useAuth } from "../auth";
 import { accountLabel, Organization, productRequest, useProductData, Totals } from "../product-client";
 import { savedTime } from "../history-client";
 import "../management.css";
+import ServiceContractPanel from "../service-contract";
 
 type Member = { user_id: string; display_name: string | null; email: string; role: string; account_state: string };
 type OrgDetail = Organization & { logo_reference: string | null; members: Member[]; teacher_contracts: Array<{ id: string; state: string }> };
@@ -82,12 +83,13 @@ export default function OperationsView({ view = "list", id = "" }: { view?: "lis
           <dt>今月の鑑定実行</dt><dd>{target.executions_this_month}件</dd><dt>累計鑑定実行</dt><dd>{target.executions_total}件</dd><dt>現在の保存履歴件数</dt><dd>{target.saved_histories_current}件</dd></dl>
           <section><h2>氏名設定</h2><form onSubmit={e => { e.preventDefault(); void action(base, { display_name: name }, "PATCH"); }}>
             <label>氏名<input required value={name} onChange={e => setName(e.target.value)} maxLength={200} /></label><button disabled={busy}>氏名を保存</button></form></section>
-          <section><h2>利用停止・再開</h2><div className="managementActions"><button disabled={busy || target.account_state !== "active" || target.id === user.id} onClick={() => {
+          <section><h2>利用停止・再開</h2><p>以下はアカウント全体の管理操作です。Organizationごとの休止は所属先の「この契約を休止」を使ってください。</p><div className="managementActions"><button disabled={busy || target.account_state !== "active" || target.id === user.id} onClick={() => {
             if (window.confirm("利用を停止しますか？dataは保持され、現在のsessionは失効します。")) void action(base + "/suspend", {}); }}>利用を停止</button>
             <button disabled={busy || target.account_state === "active" || target.id === user.id} onClick={() => {
               if (window.confirm("未納分の全額精算を確認して利用を再開しますか？")) void action(base + "/resume", {}); }}>利用を再開</button></div>
             {target.setup_pending ? <><p>初回password設定待ち</p><button disabled={busy || target.account_state !== "active"} onClick={() => void action(base + "/setup-mail", {})}>初回設定メールを再送</button></> : null}</section>
           <section><h2>Organization所属</h2><ul>{target.memberships.map(item => <li key={item.organization_id}>{item.display_name}／{item.role === "teacher" ? "先生" : "生徒"}
+            {item.role === "student" ? <ServiceContractPanel organizationId={item.organization_id} ownerId={target.id} /> : null}
             {item.minimum_term_until ? <>／再開後の最低契約期間：{when(item.minimum_term_until)}</> : null}</li>)}</ul>
             <form onSubmit={e => { e.preventDefault(); void action(base + "/membership", { organization_id: organization, role, initial_payment_confirmed: paid, monthly_fee: fee ? Number(fee) : null }); }}>
               <label>所属先<select required value={organization} onChange={e => setOrganization(e.target.value)}>{organizationOptions}</select></label>
