@@ -20,3 +20,13 @@ Python Tier A524/B38、既存isolated262、harness16 =840 PASS。既知Tier C6�
 未納記録は全額精算時のみ解消。未納1件でも再開拒否、休止中に新しい月額債務を記録しない。再開後2暦月の最低契約期間を保存（自動請求/解約は未実装）。価格は入力データで、共通ロジックに販売額/報酬率等を固定しない。
 猶予2暦月・督促14日間隔のpure previewのみ。起算日/初月料金未確定なので自動実行しない。休止一年+pending30日は既存実装を維持、物理削除なし。
 検証: operations21、auth44、lifecycle12、product foundation19、reset22 PASS。
+
+## Unit 2 成功鑑定回数・認可済みAPI
+成功した新規API鑑定をledgerへ記録。未保存も1件、失敗/履歴閲覧/memo/復旧は0件。UUID実行IDの同一owner+scope再送は1件、条件違いでIDを使い回すと409。過去の保存履歴を実行回数にbackfillしない。計測開始以後の件数。
+ledgerにはowner/org/日時/ID hash/ランダム鍵付き条件照合MACのみ保存、名前/生年月日/相談文/鑑定本文なし。JST月境界集計。B2CとB2B scopeを分け、teacher本人をOrg合計に含める。
+既存B2C anonymous経路はDB不要のまま。認証cookie付きは失効/停止を拒否。B2Bは必ずsession+有効Membership+生徒利用契約/入金を照合。Host/header/body自己申告では認可しない。先生契約の状態は利用権限に使わない。
+本人summary、先生専用allowlist（生徒氏名/状態とOrg合計のみ）、運営のcontent-free管理APIを分離。運営権限をすべての管理APIの処理前に確認し、mail設定等の処理より先に403で拒否。
+Org付き履歴保存はMembershipを再検査し、履歴+scopeを同じtransactionで保存。既存B2C snapshot/ユーザーID/owner認可は維持。
+初回設定mailは既存resetサービスを明示設定した場合のみqueue。未設定なら発行済みpending状態とmail disabledを返す。実送信なし。
+検証: execution15、実ASGI product API21、auth44/history32/recovery12/Excel46/PDF21/product UI9/deploy20 PASS。
+最初の全APIテストでmail設定の処理が認可より先に実行され、先生への拒否が503となる順序問題を発見。管理API共通の先行認可を追加し、全21件を再実行してPASS。

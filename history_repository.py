@@ -117,11 +117,20 @@ class SQLiteHistoryRepository:
                 })
             return candidates
 
-    def create(self, owner, payload, versions):
+    def create(self, owner, payload, versions, organization_id=None):
         snapshot, result = payload["input_snapshot"], payload["result_snapshot"]
         form, link = snapshot["form"], payload.get("link") or {"mode": "new_person"}
         now, reading_id = timestamp(), str(uuid4())
         with self.connection() as db:
+            if organization_id:
+                from operations_repository import OperationsRepository
+                db.execute("BEGIN IMMEDIATE")
+                OperationsRepository.member_access(db,organization_id,owner)
+                source_id=link.get("source_reading_id")
+                if source_id:
+                    source_scope=db.execute("SELECT organization_id FROM reading_organization_scopes WHERE reading_id=? AND owner_user_id=?",(source_id,owner)).fetchone()
+                    if source_scope and source_scope[0]!=organization_id:
+                        raise HistoryError("別Organizationの再鑑定元を使用できません。",404)
             person_id = link.get("person_id")
             source = None
             if link.get("source_reading_id"):
@@ -160,6 +169,8 @@ class SQLiteHistoryRepository:
                 reading_id, owner, person_id, group_id, link.get("source_reading_id"),
                 form["readingDate"], now, now, None, payload.get("memo", ""),
                 encode(snapshot), encode(result), *versions))
+            if organization_id:
+                db.execute("INSERT INTO reading_organization_scopes VALUES (?,?,?)",(reading_id,organization_id,owner))
             return self.reading(db, owner, reading_id)
 
     def detail(self, owner, reading_id):

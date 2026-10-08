@@ -32,6 +32,8 @@ from report_export_service import export_tokens
 from pdf_converter import pdf_available
 from proxy_settings import proxy_settings
 from password_reset_api import router as password_reset_router
+from product_api import router as product_router
+from fortune_endpoint import calculation
 
 app = FastAPI()
 app.add_middleware(AuthBoundary)
@@ -39,6 +41,7 @@ app.include_router(auth_router)
 app.include_router(password_reset_router)
 app.include_router(history_router)
 app.include_router(export_router)
+app.include_router(product_router)
 
 
 @app.get("/api/export-capabilities")
@@ -62,21 +65,12 @@ async def health():
 
 @app.post("/api/fortune")
 async def fortune(request: Request):
-    try:
-        raw_body = (await request.body()).decode("utf-8")
-        payload = json.loads(raw_body) if raw_body else {}
-        result = calculate_fortune(payload)
-        if result.get("ok") and payload.get("includeGogyoVariants"):
-            try:
-                owner = request_owner(request)
-            except (HistoryError, OSError, sqlite3.Error):
-                owner = None
-            if owner:
-                result = {**result, "excel_export_token": export_tokens.issue(owner, payload, result, session_scope(request))}
-        status_code = 200 if result.get("ok") else 422
-        return JSONResponse(status_code=status_code, content=result)
-    except Exception as exc:
-        return JSONResponse(status_code=500, content={"ok": False, "errors": [str(exc)]})
+    return await calculation(request)
+
+
+@app.post("/api/b2b/organizations/{org}/fortune")
+async def b2b_fortune(org: str, request: Request):
+    return await calculation(request,org)
 
 
 def main():
