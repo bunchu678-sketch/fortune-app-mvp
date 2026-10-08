@@ -178,21 +178,23 @@ class AuthRepository:
         now = clock()
         self.admit_login(normalized, ip, settings, now)
         with self.connection() as db:
-            row = db.execute("""SELECT u.*,COALESCE(l.state,'active') AS account_state FROM users u
+            row = db.execute("""SELECT u.*,COALESCE(l.state,'active') AS account_state,
+                CASE WHEN EXISTS(SELECT 1 FROM user_initial_setup i WHERE i.user_id=u.id AND i.completed_at IS NULL) THEN 1 ELSE 0 END AS setup_pending FROM users u
                 LEFT JOIN user_account_lifecycle l ON l.user_id=u.id WHERE normalized_email=?""", (normalized,)).fetchone()
         try:
             valid = PASSWORD_HASHER.verify(row["password_hash"] if row else _DUMMY_HASH, password)
         except (VerificationError, InvalidHashError):
             valid = False
-        if not valid or not row or row["status"] != "active" or row["account_state"] != "active":
+        if not valid or not row or row["status"] != "active" or row["account_state"] != "active" or row["setup_pending"]:
             raise AuthError("メールアドレスまたはパスワードが正しくありません。", 401)
         raw_token = secrets.token_urlsafe(32)
         # Serialize with administrative disable/password changes and recheck hash/status.
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
-            current = db.execute("""SELECT u.*,COALESCE(l.state,'active') AS account_state FROM users u
+            current = db.execute("""SELECT u.*,COALESCE(l.state,'active') AS account_state,
+                CASE WHEN EXISTS(SELECT 1 FROM user_initial_setup i WHERE i.user_id=u.id AND i.completed_at IS NULL) THEN 1 ELSE 0 END AS setup_pending FROM users u
                 LEFT JOIN user_account_lifecycle l ON l.user_id=u.id WHERE u.id=?""", (row["id"],)).fetchone()
-            if current["status"] != "active" or current["account_state"] != "active" or current["password_hash"] != row["password_hash"]:
+            if current["status"] != "active" or current["account_state"] != "active" or current["password_hash"] != row["password_hash"] or current["setup_pending"]:
                 raise AuthError("メールアドレスまたはパスワードが正しくありません。", 401)
             if previous_token:
                 db.execute("UPDATE auth_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL",
@@ -211,7 +213,8 @@ class AuthRepository:
             row = db.execute("""SELECT u.id,u.email FROM auth_sessions s JOIN users u ON u.id=s.user_id
                 LEFT JOIN user_account_lifecycle l ON l.user_id=u.id
                 WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?
-                AND u.status='active' AND COALESCE(l.state,'active')='active'""", (token_hash(raw_token), clock())).fetchone()
+                AND u.status='active' AND COALESCE(l.state,'active')='active'
+                AND NOT EXISTS(SELECT 1 FROM user_initial_setup i WHERE i.user_id=u.id AND i.completed_at IS NULL)""", (token_hash(raw_token), clock())).fetchone()
         if not row:
             raise AuthError("ログインしてください。", 401)
         return public_user(row)

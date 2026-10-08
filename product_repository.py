@@ -1,4 +1,5 @@
 """SQLite product adapter. Explicit additive setup; legacy history is never assigned implicitly."""
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date
 import json
@@ -90,7 +91,7 @@ class ProductRepository:
     def resolve_context(self, organization_id, authenticated_user_id):
         with self.auth.connection() as db: return self.context(db,organization_id,authenticated_user_id)
 
-    def create_organization(self, display_name, slug, logo_reference=None, settings=None):
+    def create_organization(self, display_name, slug, logo_reference=None, settings=None, *, connection=None):
         display_name=text(display_name); slug=text(slug,63)
         if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?",slug):
             raise HistoryError("Invalid organization subdomain slug",422)
@@ -98,7 +99,7 @@ class ProductRepository:
         if settings is not None and not isinstance(settings,dict): raise HistoryError("Invalid settings",422)
         values=(str(uuid4()),display_name,slug,logo_reference,encode(settings or {}),timestamp(),timestamp())
         try:
-            with self.auth.connection() as db:
+            with (nullcontext(connection) if connection is not None else self.auth.connection()) as db:
                 db.execute("INSERT INTO organizations VALUES (?,?,?,?,?,?,?)",values)
                 db.execute("INSERT INTO organization_themes VALUES (?,?,?,?)",
                            (values[0],"default","Standard",encode({"background":"white","foreground":"black"})))
@@ -106,10 +107,10 @@ class ProductRepository:
             raise HistoryError("Organization already exists",409) from None
         return {"id":values[0],"display_name":display_name,"slug":slug}
 
-    def add_membership(self, organization_id, user_id, role):
+    def add_membership(self, organization_id, user_id, role, *, connection=None):
         role=key(role); now=timestamp()
         try:
-            with self.auth.connection() as db:
+            with (nullcontext(connection) if connection is not None else self.auth.connection()) as db:
                 self.organization(db,organization_id)
                 if not db.execute("SELECT 1 FROM users WHERE id=?",(user_id,)).fetchone(): raise HistoryError("User not found",404)
                 db.execute("INSERT INTO memberships VALUES (?,?,?,?,NULL,?,?)",(str(uuid4()),organization_id,user_id,role,now,now))
@@ -145,20 +146,20 @@ class ProductRepository:
                     "settings":json.loads(org["settings_json"]),"themes":themes,"selected_theme_key":context.selected_theme_key,
                     "provider":"Powered by 博士の占いらぼ","service_name":"占い師向け鑑定支援システム"}
 
-    def create_contract(self, organization_id, state, start_date=None, end_date=None, plan=None):
+    def create_contract(self, organization_id, state, start_date=None, end_date=None, plan=None, *, connection=None):
         if state not in ("active","suspended","terminated"): raise HistoryError("Invalid contract state",422)
         start_date=day(start_date); end_date=day(end_date)
         if start_date and end_date and end_date<start_date: raise HistoryError("Invalid contract date range",422)
         if plan is not None: plan=text(plan)
         contract_id=str(uuid4()); now=timestamp()
-        with self.auth.connection() as db:
+        with (nullcontext(connection) if connection is not None else self.auth.connection()) as db:
             self.organization(db,organization_id)
             db.execute("INSERT INTO contracts VALUES (?,?,?,?,?,?,?,?)",(contract_id,organization_id,state,start_date,end_date,plan,now,now))
         return contract_id
 
-    def set_contract_state(self, organization_id, contract_id, state):
+    def set_contract_state(self, organization_id, contract_id, state, *, connection=None):
         if state not in ("active","suspended","terminated"): raise HistoryError("Invalid contract state",422)
-        with self.auth.connection() as db:
+        with (nullcontext(connection) if connection is not None else self.auth.connection()) as db:
             updated=db.execute("UPDATE contracts SET state=?,updated_at=? WHERE organization_id=? AND id=?",(state,timestamp(),organization_id,contract_id))
             if updated.rowcount != 1: raise HistoryError("Contract not found",404)
 

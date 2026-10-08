@@ -38,6 +38,11 @@ def migrate_auth_extensions(db):
         "CREATE INDEX password_reset_rate_account ON password_reset_attempts(operation,account_key,attempted_at)",
     ])
 
+    apply_migration(db, "auth-initial-setup-003", [
+        """CREATE TABLE user_initial_setup (user_id TEXT PRIMARY KEY REFERENCES users(id),
+            completed_at TEXT)""",
+    ])
+
 
 def set_account_state(db, user_id, state, now):
     db.execute("UPDATE password_reset_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL", (now,user_id))

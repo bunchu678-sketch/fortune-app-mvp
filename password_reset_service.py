@@ -73,6 +73,7 @@ class PasswordResetRepository:
             if not row or not hmac.compare_digest(row["password_version"],token_hash(row["password_hash"])):
                 raise AuthError(INVALID_LINK_MESSAGE,400)
             db.execute("UPDATE users SET password_hash=?,updated_at=? WHERE id=?",(encoded,stamp(now),row["user_id"]))
+            db.execute("UPDATE user_initial_setup SET completed_at=? WHERE user_id=?",(stamp(now),row["user_id"]))
             db.execute("UPDATE password_reset_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL",(stamp(now),row["user_id"]))
             db.execute("UPDATE auth_sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL",(stamp(now),row["user_id"]))
         return {"ok":True}
