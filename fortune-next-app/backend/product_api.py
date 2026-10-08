@@ -116,7 +116,7 @@ async def user_name(owner:str,request:Request):
 
 @router.post("/api/operations/users/{owner}/membership")
 async def membership(owner:str,request:Request):
-    return await handle(request,lambda o,e,u,p:o.assign(u["id"],p["organization_id"],owner,p["role"],p.get("initial_payment_confirmed",False),p.get("monthly_fee")),True)
+    return await handle(request,lambda o,e,u,p:o.assign(u["id"],p["organization_id"],owner,p["role"],p.get("initial_payment_confirmed",False),p.get("monthly_fee"),activate_new=True),True)
 
 
 @router.post("/api/operations/users/{owner}/suspend")
@@ -180,3 +180,38 @@ async def settle(owner:str,due_id:str,request:Request):
 @router.get("/api/operations/audit")
 async def audit(request:Request):
     return await handle(request,lambda o,e,u,p:o.audit_list(u["id"]))
+
+
+@router.get('/api/account/organizations/{org}/contract')
+async def own_contract(org:str,request:Request):
+    return await handle(request,lambda o,e,u,p:o.services.summary(org,u['id']))
+
+
+@router.post('/api/account/organizations/{org}/cancellation')
+async def own_cancel(org:str,request:Request):
+    return await handle(request,lambda o,e,u,p:o.services.cancel(u['id'],org),True)
+
+
+@router.post('/api/account/organizations/{org}/data-recovery')
+async def own_recovery(org:str,request:Request):
+    return await handle(request,lambda o,e,u,p:o.services.recover(u['id'],org),True)
+
+
+@router.get('/api/operations/users/{owner}/organizations/{org}/contract')
+async def service_detail(owner:str,org:str,request:Request):
+    return await handle(request,lambda o,e,u,p:{**o.services.summary(org,owner),
+        'arrears':o.services.arrears(u['id'],org,owner),
+        'deletion_plan':o.services.deletion_plan(u['id'],org,owner)})
+
+
+@router.post('/api/operations/users/{owner}/organizations/{org}/contract/{action}')
+async def service_action(owner:str,org:str,action:str,request:Request):
+    def apply(o,e,u,p):
+        if action=='activate':return o.services.activate(u['id'],org,owner)
+        if action=='paid-period':return o.services.paid_period(u['id'],org,owner,p['paid_through'])
+        if action=='suspend':return o.services.suspend(u['id'],org,owner)
+        if action=='resume':return o.services.resume(u['id'],org,owner)
+        if action=='cancellation':return o.services.cancel(owner,org,actor=u['id'])
+        if action=='data-recovery':return o.services.recover(owner,org,actor=u['id'])
+        raise HistoryError('操作を確認してください。',404)
+    return await handle(request,apply,True)

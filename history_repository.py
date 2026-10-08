@@ -81,6 +81,10 @@ class SQLiteHistoryRepository:
                          (owner, person_id)).fetchone()
         if not row:
             raise HistoryError("鑑定対象者が見つかりません。", 404)
+        from service_contract_repository import content_visible
+        readings=db.execute('SELECT id FROM readings WHERE owner_user_id=? AND person_id=?',(owner,person_id)).fetchall()
+        if readings and not any(content_visible(db,owner,r[0]) for r in readings):
+            raise HistoryError('鑑定対象者が見つかりません。',404)
         return dict(row)
 
     @staticmethod
@@ -89,6 +93,9 @@ class SQLiteHistoryRepository:
                          (owner, reading_id)).fetchone()
         if not row:
             raise HistoryError("鑑定履歴が見つかりません。", 404)
+        from service_contract_repository import content_visible
+        if not content_visible(db,owner,reading_id):
+            raise HistoryError('鑑定履歴が見つかりません。',404)
         data = dict(row)
         for key in ("input_snapshot", "result_snapshot"):
             data[key] = json.loads(data[key])
@@ -104,12 +111,15 @@ class SQLiteHistoryRepository:
                 AND EXISTS(SELECT 1 FROM readings r WHERE r.owner_user_id=persons.owner_user_id
                     AND r.person_id=persons.id AND r.deleted_at IS NULL)
                 ORDER BY created_at DESC""", (owner, surname, given, form.get("birthDate"))).fetchall()
+            from service_contract_repository import content_visible
             candidates = []
             for row in rows:
                 person = dict(row)
                 history = db.execute("""SELECT id,group_id,reading_date,saved_at FROM readings
                     WHERE owner_user_id=? AND person_id=? AND deleted_at IS NULL
                     ORDER BY saved_at DESC""", (owner, row["id"])).fetchall()
+                history=[h for h in history if content_visible(db,owner,h['id'])]
+                if not history: continue
                 candidates.append({
                     "id": row["id"], "surname": row["surname"], "givenName": row["given_name"],
                     "birthDate": row["birth_date"], "birthPlace": json.loads(person["current_input"]).get("form", {}).get("birthPlace", ""),
@@ -189,9 +199,10 @@ class SQLiteHistoryRepository:
             if not db.execute("SELECT id FROM reading_groups WHERE owner_user_id=? AND id=?",
                               (owner, group_id)).fetchone():
                 raise HistoryError("鑑定グループが見つかりません。", 404)
+            from service_contract_repository import content_visible
             return [dict(r) for r in db.execute("""SELECT id,reading_date,memo FROM readings
                 WHERE owner_user_id=? AND group_id=? AND deleted_at IS NULL AND id<>?
-                AND memo<>'' ORDER BY reading_date ASC,saved_at ASC""", (owner, group_id, exclude or ""))]
+                AND memo<>'' ORDER BY reading_date ASC,saved_at ASC""", (owner, group_id, exclude or "")) if content_visible(db,owner,r["id"])]
 
     def list(self, owner, keyword="", start="", end=""):
         with self.connection() as db:
@@ -200,7 +211,9 @@ class SQLiteHistoryRepository:
                 ORDER BY saved_at DESC,id DESC""", (owner, start, start, end, end)).fetchall()
             found = []
             needle = normalize(keyword).casefold()
+            from service_contract_repository import content_visible
             for row in rows:
+                if not content_visible(db,owner,row["id"]): continue
                 # List/search use contemporaneous input, not mutable current person data.
                 form = json.loads(row["input_snapshot"])["form"]
                 names = [form.get(k, "") for k in ("surname", "givenName", "surnameKana", "givenNameKana")]
@@ -259,7 +272,9 @@ class SQLiteHistoryRepository:
         with self.connection() as db:
             rows=db.execute("SELECT * FROM readings WHERE owner_user_id=? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC,id DESC",(owner,)).fetchall()
             result=[]
+            from service_contract_repository import content_visible
             for row in rows:
+                if not content_visible(db,owner,row["id"],now): continue
                 recoverable,deadline=self.recovery_window(row["deleted_at"],now)
                 if not recoverable: continue
                 form=json.loads(row["input_snapshot"])["form"]
@@ -273,6 +288,8 @@ class SQLiteHistoryRepository:
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             row=db.execute("SELECT deleted_at FROM readings WHERE owner_user_id=? AND id=? AND deleted_at IS NOT NULL",(owner,reading_id)).fetchone()
+            from service_contract_repository import content_visible
+            if not content_visible(db,owner,reading_id,now): raise HistoryError("復旧可能な鑑定履歴が見つかりません。",404)
             if not row or not self.recovery_window(row["deleted_at"],now)[0]:
                 raise HistoryError("復旧可能な鑑定履歴が見つかりません。",404)
             db.execute("UPDATE readings SET deleted_at=NULL,updated_at=? WHERE owner_user_id=? AND id=?",

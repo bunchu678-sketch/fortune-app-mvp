@@ -42,6 +42,9 @@ class OperationsRepository:
                 "CREATE INDEX audit_time ON management_audit(occurred_at)",
             ])
 
+        from service_contract_repository import ServiceContractRepository
+        self.services = ServiceContractRepository(self)
+
     @staticmethod
     def require_admin(db, actor):
         row = db.execute("""SELECT u.id FROM operating_administrator a JOIN users u ON u.id=a.user_id
@@ -87,6 +90,9 @@ class OperationsRepository:
             row=db.execute("SELECT state,initial_payment_confirmed FROM user_service_contracts WHERE organization_id=? AND user_id=?",(org,owner)).fetchone()
             if not row or row["state"]!="active" or not row["initial_payment_confirmed"]:
                 raise AuthError("利用契約を確認してください。",403)
+            from service_contract_repository import terms, effective_state
+            if effective_state(row['state'],terms(db,org,owner),None)!='active':
+                raise AuthError('利用契約を確認してください。',403)
         # Teacher collaboration contract is deliberately NOT an access dependency.
         return context
 
@@ -146,12 +152,25 @@ class OperationsRepository:
                 ON CONFLICT(organization_id,user_id) DO UPDATE SET initial_payment_confirmed=excluded.initial_payment_confirmed,
                 monthly_fee=excluded.monthly_fee,updated_at=excluded.updated_at""",(org,owner,int(payment_confirmed),monthly_fee,timestamp()))
 
-    def assign(self, actor, org, owner, role, payment_confirmed=False, monthly_fee=None):
+    def assign(self, actor, org, owner, role, payment_confirmed=False, monthly_fee=None, *, activate_new=False):
         with self.change(actor) as db:
             self.product.organization(db,org)
+            previous=db.execute("SELECT initial_payment_confirmed FROM user_service_contracts WHERE organization_id=? AND user_id=?",(org,owner)).fetchone()
             exists=db.execute("SELECT 1 FROM memberships WHERE organization_id=? AND user_id=?",(org,owner)).fetchone()
             if not exists: self.product.add_membership(org,owner,role,connection=db)
             self.membership(db,org,owner,role,payment_confirmed,monthly_fee)
+            if activate_new and role=='student' and payment_confirmed and (not previous or not previous[0]):
+                # A new server-side grant to an existing ready User is an actual eligibility event.
+                ready=db.execute("""SELECT 1 FROM users u LEFT JOIN user_account_lifecycle l ON l.user_id=u.id
+                    WHERE u.id=? AND u.status='active' AND COALESCE(l.state,'active')='active'
+                    AND NOT EXISTS(SELECT 1 FROM user_initial_setup i WHERE i.user_id=u.id AND i.completed_at IS NULL)""",(owner,)).fetchone()
+                if ready:
+                    from service_contract_repository import mark_activation
+                    mark_activation(db,org,owner,utc(None))
+                    self.audit(db,actor,'service-grant-activate',owner,org)
+                elif db.execute("SELECT 1 FROM user_initial_setup i JOIN users u ON u.id=i.user_id WHERE i.user_id=? AND i.completed_at IS NULL AND u.status='active'",(owner,)).fetchone():
+                    self.services.ensure(db,org,owner,utc(None))
+                    db.execute('UPDATE service_contract_terms SET awaiting_initial_setup=1 WHERE organization_id=? AND user_id=? AND activated_at IS NULL AND cancellation_requested_at IS NULL AND suspended_at IS NULL',(org,owner))
             self.audit(db,actor,"membership-set",owner,org)
 
     def issue_account(self, actor, org, email, display_name, payment_confirmed, monthly_fee=None):
@@ -166,6 +185,7 @@ class OperationsRepository:
                 db.execute("INSERT INTO user_initial_setup VALUES (?,NULL)",(owner,))
                 self.product.add_membership(org,owner,"student",connection=db)
                 self.membership(db,org,owner,"student",True,monthly_fee)
+                db.execute("INSERT INTO service_contract_terms(organization_id,user_id,awaiting_initial_setup,updated_at) VALUES (?,?,1,?)",(org,owner,now))
                 self.audit(db,actor,"account-issue",owner,org)
         except sqlite3.IntegrityError: raise HistoryError("同じメールアドレスは登録済みです。",409) from None
         return {"id":owner,"email":email.strip(),"setup_pending":True}
@@ -190,6 +210,7 @@ class OperationsRepository:
             value["memberships"]=[dict(r) for r in db.execute("""SELECT m.organization_id,m.role,o.display_name,c.state AS contract_state,
                 c.initial_payment_confirmed,c.monthly_fee,c.minimum_term_until FROM memberships m JOIN organizations o ON o.id=m.organization_id
                 LEFT JOIN user_service_contracts c ON c.organization_id=m.organization_id AND c.user_id=m.user_id WHERE m.user_id=?""",(owner,))]
+            value["service_contracts"]=[self.services.summary(m["organization_id"],owner,connection=db) for m in value["memberships"] if m["role"]=="student"]
             value["dues"]=[dict(r) for r in db.execute("SELECT id,organization_id,due_date,amount,confirmed_at,settled_at FROM manual_dues WHERE user_id=? ORDER BY due_date",(owner,))]
             return value
 
@@ -223,6 +244,26 @@ class OperationsRepository:
         with self.change(actor) as db:
             contract=db.execute("SELECT state FROM user_service_contracts WHERE organization_id=? AND user_id=?",(org,owner)).fetchone()
             if not contract: raise HistoryError("利用契約が見つかりません。",404)
+            from service_contract_repository import terms, effective_state, moment
+            from billing_policy import JST, first_billing_date
+            from datetime import date
+            value=terms(db,org,owner)
+            if date.fromisoformat(due_date)>utc(None).astimezone(JST).date():
+                raise HistoryError('将来の期日を未納として記録できません。',422)
+            if value and value['paid_through'] and due_date<=value['paid_through']:
+                raise HistoryError('支払済み期間を未納として記録できません。',409)
+            if effective_state(contract[0],value,utc(None))!='active':
+                raise HistoryError('休止・利用終了後に新しい月額料金を記録できません。',409)
+            from billing_policy import paid_access_end
+            from datetime import timedelta
+            anchor=paid_access_end(date.fromisoformat(due_date)-timedelta(days=1))
+            for pause in db.execute('SELECT started_at,ended_at FROM service_suspensions WHERE organization_id=? AND user_id=?',(org,owner)):
+                if moment(pause['started_at'])<=anchor and (not pause['ended_at'] or anchor<moment(pause['ended_at'])):
+                    raise HistoryError('休止期間の月額料金は記録できません。',422)
+            if value and value['activated_at']:
+                due=date.fromisoformat(due_date)
+                if due.day!=1 or due<first_billing_date(moment(value['activated_at'])) or due>utc(None).astimezone(JST).date():
+                    raise HistoryError('初月・将来・起算日前の未納は記録できません。',422)
             if contract[0]!="active": raise HistoryError("休止中に新しい月額料金を記録できません。",409)
             value=str(uuid4())
             try: db.execute("INSERT INTO manual_dues VALUES (?,?,?,?,?,?,NULL)",(value,org,owner,due_date,amount,timestamp()))
@@ -243,10 +284,15 @@ class OperationsRepository:
             context=self.member_access(db,org,owner)
             if context.role!="teacher": raise AuthError("先生用の権限がありません。",403)
             name=self.product.organization(db,org)["display_name"]
-            students=[dict(r) for r in db.execute(f"""SELECT COALESCE(p.display_name,'氏名未登録') AS display_name,{STATE} AS account_state
+            students=[dict(r) for r in db.execute(f"""SELECT m.user_id,COALESCE(p.display_name,'氏名未登録') AS display_name,{STATE} AS account_state
                 FROM memberships m JOIN users u ON u.id=m.user_id LEFT JOIN user_profiles p ON p.user_id=u.id
                 LEFT JOIN user_account_lifecycle l ON l.user_id=u.id WHERE m.organization_id=? AND m.role='student'
                 ORDER BY m.created_at""",(org,))]
+            from service_contract_repository import terms, effective_state
+            scoped_states={r['user_id']:effective_state(r['state'],terms(db,org,r['user_id']),None) for r in db.execute('SELECT user_id,state FROM user_service_contracts WHERE organization_id=?',(org,))}
+            for student in students:
+                student_owner=student.pop('user_id')
+                if student['account_state']=='active': student['account_state']=scoped_states.get(student_owner,'active')
             return {"organization_id":org,"display_name":name,"students":students}
 
     def teacher_contract(self, actor, org, state, contract_id=None):

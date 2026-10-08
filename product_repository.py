@@ -179,10 +179,11 @@ class ProductRepository:
     def scoped_readings(self, organization_id, authenticated_user_id):
         with self.auth.connection() as db:
             self.context(db,organization_id,authenticated_user_id)
+            from service_contract_repository import content_visible
             return [dict(r) for r in db.execute("""SELECT r.id,r.reading_date,r.saved_at FROM readings r
                 JOIN reading_organization_scopes s ON s.reading_id=r.id AND s.owner_user_id=r.owner_user_id
                 WHERE s.organization_id=? AND r.owner_user_id=? AND r.deleted_at IS NULL ORDER BY r.saved_at DESC""",
-                (organization_id,authenticated_user_id))]
+                (organization_id,authenticated_user_id)) if content_visible(db,authenticated_user_id,r["id"])]
 
     def scoped_detail(self, organization_id, authenticated_user_id, reading_id):
         with self.auth.connection() as db:
