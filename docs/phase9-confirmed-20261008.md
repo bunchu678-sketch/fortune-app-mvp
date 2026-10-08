@@ -30,3 +30,6 @@ Org付き履歴保存はMembershipを再検査し、履歴+scopeを同じtransac
 初回設定mailは既存resetサービスを明示設定した場合のみqueue。未設定なら発行済みpending状態とmail disabledを返す。実送信なし。
 検証: execution15、実ASGI product API21、auth44/history32/recovery12/Excel46/PDF21/product UI9/deploy20 PASS。
 最初の全APIテストでmail設定の処理が認可より先に実行され、先生への拒否が503となる順序問題を発見。管理API共通の先行認可を追加し、全21件を再実行してPASS。
+
+## Unit 3 JST暦月の保持・猶予計算
+明示された支払期日/再開日時をJSTの暦月に変換してから2か月を加算。JST1/31 00:00をUTCへ先に変換して1/30基準で計算するずれを防止。月末/うるう年を含めoperations22/22 PASS。previewのみで請求/休止/督促を実行しない。

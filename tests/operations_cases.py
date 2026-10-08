@@ -123,6 +123,15 @@ class OperationsCases(unittest.TestCase):
         self.assertFalse(arrears_preview(NOW,NOW,NOW+timedelta(days=13))["reminder_due"])
         self.assertTrue(arrears_preview(NOW,NOW,NOW+timedelta(days=14))["reminder_due"])
         self.assertEqual(arrears_preview(NOW,NOW,NOW,last_reminded_at=NOW+timedelta(days=14))["next_reminder_at"],NOW+timedelta(days=28))
+    def test_jst_calendar_month_deadlines_keep_month_end(self):
+        jst=timezone(timedelta(hours=9))
+        due=datetime(2026,1,31,tzinfo=jst)
+        result=arrears_preview(due,due,datetime(2026,3,30,23,59,tzinfo=jst))
+        self.assertFalse(result["suspension_due"])
+        self.assertEqual(result["suspension_eligible_at"],datetime(2026,3,31,tzinfo=jst))
+        self.assertTrue(arrears_preview(due,due,datetime(2026,3,31,tzinfo=jst))["suspension_due"])
+        from billing_policy import resume_commitment
+        self.assertEqual(resume_commitment(due),datetime(2026,3,31,tzinfo=jst))
     def test_leap_month_clamping(self):
         self.assertEqual(add_months(datetime(2028,1,31,tzinfo=timezone.utc),1).day,29)
         with self.assertRaises(ValueError):arrears_preview(NOW,NOW-timedelta(days=1),NOW)
