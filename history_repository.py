@@ -173,6 +173,13 @@ class SQLiteHistoryRepository:
                 db.execute("INSERT INTO reading_organization_scopes VALUES (?,?,?)",(reading_id,organization_id,owner))
             return self.reading(db, owner, reading_id)
 
+    def organization_scope(self, owner, reading_id):
+        with self.connection() as db:
+            if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='reading_organization_scopes'").fetchone():
+                return None
+            row=db.execute("SELECT organization_id FROM reading_organization_scopes WHERE reading_id=? AND owner_user_id=?",(reading_id,owner)).fetchone()
+            return row[0] if row else None
+
     def detail(self, owner, reading_id):
         with self.connection() as db:
             return self.reading(db, owner, reading_id)

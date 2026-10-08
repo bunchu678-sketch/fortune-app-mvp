@@ -1,0 +1,14 @@
+.managementPage { max-width: 1000px; overflow-wrap: anywhere; }
+.managementPage nav, .managementActions { display: flex; gap: 16px; flex-wrap: wrap; margin: 16px 0; }
+.managementPage form { display: grid; gap: 12px; max-width: 620px; margin: 20px 0; }
+.managementPage label { display: grid; gap: 6px; min-width: 0; }
+.managementPage input, .managementPage select { width: 100%; max-width: 100%; box-sizing: border-box; }
+.managementPage label.check { display: flex; align-items: center; gap: 8px; }
+.managementPage .check input { width: auto; }
+.managementPage button { padding: 8px 12px; }
+.managementPage ul { padding-left: 22px; }
+.managementPage li { margin: 14px 0; }
+.managementPage dl { display: grid; grid-template-columns: minmax(120px, 1fr) 2fr; gap: 8px; }
+.managementPage dd { margin: 0; }
+.managementPage section { margin: 28px 0; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (max-width: 760px) { .managementPage dl { grid-template-columns: 1fr; } .managementPage dd { margin-bottom: 8px; } }

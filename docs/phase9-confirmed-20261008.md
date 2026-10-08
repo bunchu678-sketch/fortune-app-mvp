@@ -33,3 +33,14 @@ Org付き履歴保存はMembershipを再検査し、履歴+scopeを同じtransac
 
 ## Unit 3 JST暦月の保持・猶予計算
 明示された支払期日/再開日時をJSTの暦月に変換してから2か月を加算。JST1/31 00:00をUTCへ先に変換して1/30基準で計算するずれを防止。月末/うるう年を含めoperations22/22 PASS。previewのみで請求/休止/督促を実行しない。
+
+## Unit 4 マイページ・先生画面・運営3階層・B2BのW再利用
+追加routes: /mypage、/teacher/[organizationId]、/operations、/operations/organizations/[organizationId]、/operations/users/[userId]、/b2b/[organizationId]。
+生徒は既存/historyと/deletedを再利用し、自分の実行回数・現在の保存件数・mail表示・reset導線を提供。先生は生徒氏名/状態とOrg今月/累計のみ、個別回数・個別日時・生徒履歴リンク・発行/停止操作なし。自分の履歴/回数はマイページへ。
+運営はOrganization作成/表示名/logo参照変更、User氏名/所属/手動発行/停止/再開/未納/精算、最終login/最終実行/回数、重要操作auditを表示。本文/鑑定対象者の詳細は取得しない。
+B2Bは正規W MainFortuneを再利用し、APIでsession+Membership+利用契約を再検査。保存/詳細/再鑑定でOrgを維持し、別Org source転用を拒否。既存snapshotは変更しない。
+B2CのURL/認証/履歴/特定日時計算を維持。B2Bの特定日時は採用保留なので新画面では有効化せず、APIでも要求を拒否する。共通Python/S/Dは削除・変更しない。
+UI実行IDはネットワーク再送/同条件の境界確認再送で維持し、成功終了後の新規操作で更新。同じ条件の自動preview再計算は加算しない。前後選択など条件が変わる正常API鑑定は別実行として計上する。
+B2C旧clientにはID省略を許容（各成功callは新規扱い）、新WとB2BはIDを送る。匿名B2CはUserがないためUser利用統計に記録しない。過去の未保存実行回数は再構成できず、表示は導入以後のledger件数である。
+検証: product API24/history32/recovery12/product UI9、Node実行ID4+既存9 PASS。PC1280/mobile375の管理/B2B50項目、既存reset20/復旧16 PASS。TypeScript/Next production build PASS。合成画面画像を目視し、はみ出し/欠落なし、一時UIサーバー3ports停止確認。
+最終回帰でB2C特定日時の既存異常入力500応答が422へ変わる差を検出。B2C calculation例外は既存response contractを保持して再実行し、Tier A524/B38 matched、fixture変更なし。

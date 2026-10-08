@@ -87,6 +87,7 @@ function AuthBar() {
   return <div className="authBar" aria-label="ログイン状態">
     {loading ? <span role="status">認証を確認中…</span> : user ? <>
       <span>{user.development ? "開発用固定利用者" : user.email + " でログイン中"}</span>
+      {!user.development ? <Link href="/mypage">マイページ</Link> : null}
       {!user.development ? <button type="button" disabled={busy} onClick={exit}>ログアウト</button> : null}
     </> : <Link href="/login">ログイン</Link>}
     {failure || error ? <p role="alert">{failure || error}</p> : null}

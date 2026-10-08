@@ -29,10 +29,18 @@ async def calculation(request,org=None):
             raw.extend(chunk)
         payload=json.loads(raw) if raw else {}
         if not isinstance(payload,dict):raise HistoryError("鑑定入力を確認してください。",422)
+        if org and (payload.get("specificDatetimeEnabled") or payload.get("specificDatetimeCandidates")):
+            raise HistoryError("先生版での特定日時機能は採用保留中です。",422)
         supplied=request.headers.get("idempotency-key")
         if org and supplied is None:raise HistoryError("鑑定実行IDを指定してください。",422)
         key=execution_key(supplied) if supplied is not None else str(uuid4())
-        result=await run_in_threadpool(calculate_fortune,payload)
+        try:
+            result=await run_in_threadpool(calculate_fortune,payload)
+        except Exception as exc:
+            if org is None:
+                # Preserve the existing B2C calculation-error contract (including specific datetime).
+                return JSONResponse({"ok":False,"errors":[str(exc)]},status_code=500,headers={"Cache-Control":"no-store"})
+            raise
         if result.get("ok"):
             if ledger:
                 await run_in_threadpool(ledger.record_success,user["id"],org,key,payload)

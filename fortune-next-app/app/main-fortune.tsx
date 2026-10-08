@@ -5,7 +5,8 @@ import { useAuth, useActiveView, API_BASE } from "./auth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarDays, ChevronDown, Loader2, RotateCcw, Sparkles } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { executionRequestIds } from "./execution-request";
 import { formatJstDate } from "./jst-date";
 import GogyoFigure from "./gogyo-figure";
 import { FortuneSaved, useFortuneState } from "./fortune-state";
@@ -462,11 +463,12 @@ export function ReadingPage({ saved, onChange }: {
     </main>;
 }
 
-export default function MainFortune({ mode }: { mode: "input" | "result" }) {
+export default function MainFortune({ mode, organizationId, organizationName }: { mode: "input" | "result"; organizationId?: string; organizationName?: string }) {
   const router = useRouter();
   const { user } = useAuth();
   const isActive = useActiveView();
   const { saved, setSaved, draft, setDraft } = useFortuneState();
+  const executions = useRef(executionRequestIds());
   const [form, setForm] = useState<FortuneForm>(() => ({ ...defaultForm(), ...draft?.form }));
   const [historyLink, setHistoryLink] = useState<HistoryLink | undefined>(draft?.link);
   const [pastMemos, setPastMemos] = useState<PastMemo[]>(draft?.pastMemos ?? []);
@@ -544,7 +546,8 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
     setResult(null);
     try {
       const effectiveForm = { ...form, name: displayName(form), furigana: displayKana(form),
-        readingDate: form.readingDate || formatJstDate(new Date()) };
+        readingDate: form.readingDate || formatJstDate(new Date()),
+        ...(organizationId ? { specificDatetimeEnabled: false } : {}) };
       if (!historyLink && user) {
         try {
           const candidates = await historyRequest<PersonCandidate[]>("/candidates", { method: "POST", body: JSON.stringify(effectiveForm) });
@@ -559,11 +562,11 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
           ...(Object.keys(inheritedBirth).length ? { boundarySelections: inheritedBirth } : {}),
           productAutoBoundary: true,
           includeGogyoVariants: true,
-          specificDatetimeCandidates: form.specificDatetimeEnabled ? visibleCandidates : [],
+          specificDatetimeCandidates: !organizationId && form.specificDatetimeEnabled ? visibleCandidates : [],
       };
       async function request(payload: Record<string, unknown>): Promise<FortuneResult> {
-        const response = await fetch(`${API_BASE}/api/fortune`, {
-          method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        const response = await fetch(`${API_BASE}${organizationId ? "/api/b2b/organizations/" + encodeURIComponent(organizationId) + "/fortune" : "/api/fortune"}`, {
+          method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "Idempotency-Key": executions.current.key(payload) }, body: JSON.stringify(payload),
         });
         return response.json();
       }
@@ -599,7 +602,8 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
         const age = value.personality?.current_life_stage_pair?.age;
         const currentStageName = typeof age === "number" ? ["幼年期", "青年期", "成熟期", "老年期"][age < 5 ? 0 : age < 30 ? 1 : age < 65 ? 2 : 3] : "";
         setSaved({ result: { ...value, display_snapshot: { basicRows, currentStageName } },
-          form: effectiveForm, manualChoices, boundarySelections, link: historyLink, pastMemos, memo: "" });
+          form: effectiveForm, manualChoices, boundarySelections, link: historyLink, pastMemos, memo: "", organizationId });
+        executions.current.complete();
         router.push("/result");
       };
       if (manualBoundary && found.length) {
@@ -632,6 +636,7 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
   }
 
   function resetForm() {
+    executions.current.complete();
     setForm(defaultForm());
     setDraft(null); setSaved(null); setHistoryLink(undefined); setPastMemos([]);
     setInheritedBirth({}); setInheritedChoices({}); setPersonCandidates([]); setHistoryHint("");
@@ -655,12 +660,13 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
     <main>
       <div className="appShell">
         <header className="topBar">
-          <div className="brandMark">
+          {!organizationId ? <div className="brandMark">
             <Image src="/logo_white.png" alt="四柱推命ロゴ" width={76} height={76} priority />
-          </div>
+          </div> : null}
           <div>
-            <p>四柱推命 鑑定補助</p>
-            <h1>鑑定結果を、見せる画面へ。</h1><Link href="/history">鑑定履歴</Link>
+            <p>{organizationId ? "占い師向け鑑定支援システム" : "四柱推命 鑑定補助"}</p>
+            <h1>{organizationName || "鑑定結果を、見せる画面へ。"}</h1><Link href="/history">鑑定履歴</Link>
+            {organizationId ? <p>Powered by 博士の占いらぼ</p> : null}
           </div>
         </header>
 
@@ -750,6 +756,7 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
               <textarea value={form.consultation} onChange={(event) => updateForm("consultation", event.target.value)} />
             </label>
 
+            {!organizationId ? <>
             <label className="checkLine prominent">
               <input
                 type="checkbox"
@@ -783,6 +790,8 @@ export default function MainFortune({ mode }: { mode: "input" | "result" }) {
                 ))}
               </div>
             ) : null}
+
+            </> : null}
 
             {boundaries.length ? <div className="boundaryPanel" role="group" aria-label="節入り・万年暦確認">
               <h3>節入り・万年暦確認</h3>

@@ -152,6 +152,27 @@ class ProductAPICases(unittest.TestCase):
         before=self.ledger.personal(self.ids["student"])["saved_histories_total"]
         self.assertEqual(self.call("POST","/api/history",{**payload,"organization_id":self.second})[0],404)
         self.assertEqual(self.ledger.personal(self.ids["student"])["saved_histories_total"],before)
+    def test_specific_datetime_b2c_preserved_b2b_pending(self):
+        payload={**FORM,"specificDatetimeEnabled":True,"specificDatetimeCandidates":[{"date":"2026-10-08","time":"10:00"}]}
+        status,_,body=self.call("POST","/api/fortune",payload,"b2c",headers={"Idempotency-Key":str(uuid4())})
+        self.assertEqual(status,200);self.assertEqual(len(json.loads(body)["specific_datetime"]["rows"]),1)
+        self.assertEqual(self.fortune(payload=payload)[0],422)
+        self.assertEqual(self.ledger.personal(self.ids["student"])["executions_total"],0)
+    def test_saved_org_preserved_on_detail_and_rerun(self):
+        payload={"organization_id":self.org,"input_snapshot":{"form":FORM},"result_snapshot":deepcopy(self.result),"link":{"mode":"new_person"}}
+        value=self.data("POST","/api/history",payload)
+        detail=self.data("GET",f"/api/history/{value['id']}")
+        self.assertEqual(detail["organization_id"],self.org)
+        draft=self.data("POST",f"/api/history/{value['id']}/rerun",{"mode":"new_group"})
+        self.assertEqual(draft["organizationId"],self.org)
+        self.assertEqual(self.ledger.personal(self.ids["student"])["executions_total"],0)
+    def test_cross_org_source_save_rejected_without_partial_data(self):
+        self.ops.assign(self.ids["admin"],self.second,self.ids["student"],"student",True)
+        source=self.history.create(self.ids["student"],{"input_snapshot":{"form":FORM},"result_snapshot":deepcopy(self.result),"link":{"mode":"new_person"}},organization_id=self.org)
+        draft=self.history.prepare(self.ids["student"],source["id"],"new_group")
+        before=self.ledger.personal(self.ids["student"])["saved_histories_total"]
+        status,_,_=self.call("POST","/api/history",{"organization_id":self.second,"input_snapshot":{"form":draft["form"]},"result_snapshot":deepcopy(self.result),"link":draft["link"]})
+        self.assertEqual(status,404);self.assertEqual(self.ledger.personal(self.ids["student"])["saved_histories_total"],before)
     def test_membership_payment_gate_and_host_not_authoritative(self):
         self.ops.assign(self.ids["admin"],self.second,self.ids["student"],"student",False)
         self.assertEqual(self.fortune(org=self.second)[0],403)

@@ -35,6 +35,7 @@ export function ReadingControls({ saved, onChange }: {
             method: "POST", body: JSON.stringify({
               input_snapshot: { form: saved.form, manualChoices: saved.manualChoices,
                 boundarySelections: saved.boundarySelections ?? {} },
+              ...(saved.organizationId ? { organization_id: saved.organizationId } : {}),
               result_snapshot: saved.result, memo: saved.memo ?? "", ...(saved.link ? { link: saved.link } : {}),
             }),
           });
@@ -53,7 +54,7 @@ export function ReadingControls({ saved, onChange }: {
       });
       if (!isActive()) return;
       setDraft(draft);
-      router.push("/");
+      router.push(draft.organizationId ? "/b2b/" + draft.organizationId : saved.organizationId ? "/b2b/" + saved.organizationId : "/");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "再鑑定の準備に失敗しました。"); }
     finally { setBusy(false); }
   }

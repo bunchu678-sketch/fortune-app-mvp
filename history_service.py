@@ -91,7 +91,9 @@ class HistoryService:
         # Only the resolved birth decision belongs to this person.
         birth_selection = snapshot.get("boundarySelections", {}).get("birth")
         choices = snapshot.get("manualChoices", {})
+        organization_id=self.repository.organization_scope(owner,reading_id)
         return {
+            **({"organizationId":organization_id} if organization_id else {}),
             "form": form, "manualChoices": {"birth": choices["birth"]} if "birth" in choices else {},
             "boundarySelections": {"birth": birth_selection} if birth_selection else {},
             "link": {"mode": mode, "person_id": reading["person_id"], "source_reading_id": reading_id,
@@ -101,4 +103,5 @@ class HistoryService:
 
     def detail(self, owner, reading_id):
         reading = self.repository.detail(owner, reading_id)
-        return {**reading, "past_memos": self.repository.memos(owner, reading["group_id"], reading_id)}
+        organization_id=self.repository.organization_scope(owner,reading_id)
+        return {**({"organization_id":organization_id} if organization_id else {}), **reading, "past_memos": self.repository.memos(owner, reading["group_id"], reading_id)}

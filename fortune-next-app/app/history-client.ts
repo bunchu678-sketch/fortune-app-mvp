@@ -7,6 +7,7 @@ export type HistoryLink = {
 };
 export type PastMemo = { id: string; reading_date: string; memo: string };
 export type HistoryRecord = {
+  organization_id?: string;
   id: string; person_id: string; group_id: string; reading_date: string;
   saved_at: string; updated_at: string; memo: string;
   input_snapshot: { form: Record<string, any>; manualChoices: Record<string, "before" | "after">;
@@ -18,6 +19,7 @@ export type PersonCandidate = {
   histories: Array<{ id: string; group_id: string; reading_date: string; saved_at: string }>;
 };
 export type RerunDraft = {
+  organizationId?: string;
   form: Record<string, any>; manualChoices: Record<string, "before" | "after">;
   boundarySelections: Record<string, any>; link: HistoryLink; pastMemos: PastMemo[];
 };

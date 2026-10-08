@@ -18,7 +18,7 @@ export default function LoginPage() {
     try {
       await login(email, password);
       const next = new URLSearchParams(window.location.search).get("next") ?? "/";
-      router.replace(next === "/history" || next === "/history/deleted" || /^\/history\/[a-f0-9-]+$/.test(next) ? next : "/");
+      router.replace(["/history", "/history/deleted", "/mypage", "/operations"].includes(next) || /^\/(?:history|b2b|teacher)\/[a-f0-9-]+$/.test(next) || /^\/operations\/(?:organizations|users)\/[a-f0-9-]+$/.test(next) ? next : "/");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "ログインに失敗しました。"); }
     finally { setPassword(""); setBusy(false); }
   }
