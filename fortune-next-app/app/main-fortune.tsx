@@ -392,8 +392,8 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
       <Section id="overall" title="今年一年の総合運勢">
         <div className="textBlock">
           <h3>{result.yearly_overall?.year}年 {result.yearly_overall?.year_kanchi}｜{result.yearly_overall?.tsuhensei}</h3>
-          <p className="keyword">テーマ：{result.yearly_overall?.theme || "未登録"}</p>
-          <p>{result.yearly_overall?.comment || result.yearly_overall?.error}</p>
+          {result.yearly_overall?.theme ? <p className="keyword">テーマ：{result.yearly_overall.theme}</p> : null}
+          <p>{result.yearly_overall?.comment || result.yearly_overall?.interpretation_message || result.yearly_overall?.error}</p>
         </div>
       </Section>
 

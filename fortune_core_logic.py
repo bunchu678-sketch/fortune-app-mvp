@@ -173,7 +173,6 @@ def build_juuni_unsei_summary_data(juuni_unsei_display_data):
             "reading_points": get_juuni_unsei_reading_points_display(pillar_key),
             "keywords": get_juuni_unsei_keywords_display(juuni_unsei),
             "public_comment": get_juuni_unsei_comment(juuni_unsei, "public"),
-            "private_comment": get_juuni_unsei_comment(juuni_unsei, "private"),
         })
     return rows
 

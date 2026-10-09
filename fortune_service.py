@@ -214,8 +214,6 @@ def build_life_stage_comments(life_stage_data):
             **row,
             "outer_comment": get_tsuhensei_comment(row.get("outer", ""), "public"),
             "inner_comment": get_tsuhensei_comment(row.get("inner", ""), "public"),
-            "outer_private_comment": get_tsuhensei_comment(row.get("outer", ""), "private"),
-            "inner_private_comment": get_tsuhensei_comment(row.get("inner", ""), "private"),
         })
     return rows
 
@@ -597,11 +595,6 @@ def calculate_fortune(payload):
                     star_data["month_zokkan_tsuhensei"],
                     star_data["month_tsuhensei"],
                     "public",
-                ),
-                "private_comment": get_month_pair_comment(
-                    star_data["month_zokkan_tsuhensei"],
-                    star_data["month_tsuhensei"],
-                    "private",
                 ),
             },
             "juuni_unsei": {

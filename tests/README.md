@@ -432,3 +432,18 @@ Playwrightが標準の検索パスにない場合は、プロセスのPLAYWRIGHT
 - 出生時刻既知では出生地補正後日時と節入り時刻の差が±5分以内、出生時刻不明では出生日が節入り日なら確認を要求する。選択は年柱・月柱へ一貫して反映し、日柱・時柱は元の出生日時を維持する。
 - Tier Aに30件を追加。以前の11件の参照確認済み四柱は期待干支を変えず、サービス経路で境界確認が返った場合に正式境界に対する前後選択を送る。
 - Tier Bの旧 `B-analysis-year`（2026-01-01 → 丙午）は西暦年直接算出という不具合の観測だった。正式な立春前の値である乙巳へ更新し、旧値と変更理由をfixtureに残した。他のTier B観測は変更しない。
+
+
+## K01・K03確定仕様の回帰（2026-10-09）
+
+根拠: ユーザー添付8da35e8d-d388-470b-b586-5e99e9b3251a。実装/制限/全検証は `docs/phase10-k01-k03-fix-20261009.md`。
+
+- K01は先生の年別正式文章のみ。2026原文10種類を開始HEADから固定したfixtureと照合。未登録年/星は計算成功を維持し本文空と案内を返す。年計算を変更しない。
+- K03はprivate122文章と通常13結果項目を除去。public全値と計算の不変を基準HEADのdigestで検証。保存/旧JSON取得/メモ/再鑑定/権限/Excel/PDFも検査。
+- `k01_k03_cases.py` の42件中32件を通常Tier Aへ追加。残り10件は隔離DB/API/移行試験。Tier A556、独立 *cases.py 全460（32件の重複に注意）。
+- S比較は削除したprivate入力225件だけ外し、14関数1100入力の計算/public/invalid比較を維持。S/Dを変更しない。
+- `k01_k03_ui.cjs` はlocalhost mockのみ、PC/スマホ48項目。Edge/Playwright既存環境を使用する。
+- 年別登録確認は `python -B yearly_overall_comments.py`。正式原稿だけ追加し年・版・全10星の登録状況を確認する。
+- DB移行は自動実行しない。`research/run_migrate_test_history.py` は明示対象・テスト確認・外部退避・dry run/transaction/検証rollbackを必要とする。
+- 旧 `gogyou_ui_smoke.cjs` は現在ないON/OFF checkboxを要求するため今回1 suite失敗。開始HEADも同じ。現行A/B/C画面に合う試験への整理はPhase 10へ引き継ぐ。
+- 旧 `history_ui_smoke.cjs` は10月1日固定の検索と当日再鑑定を混在。隔離サーバー/ブラウザ/runnerのテスト時計を揃えて実行する。期待値やOS時計は変更しない。

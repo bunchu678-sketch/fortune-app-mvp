@@ -6,6 +6,7 @@ import threading
 import time
 from report_data import build_reading_report, ReportError
 from report_xlsx import render_xlsx
+from reading_snapshot import public_result_snapshot
 
 
 class ExportTokens:
@@ -23,7 +24,7 @@ class ExportTokens:
         with self.lock:
             self._expire()
             token=secrets.token_urlsafe(32)
-            self.entries[token]=(self.clock()+self.ttl,owner,deepcopy(form),deepcopy(result),session_id)
+            self.entries[token]=(self.clock()+self.ttl,owner,deepcopy(form),public_result_snapshot(result),session_id)
             while len(self.entries)>self.capacity:self.entries.popitem(last=False)
             return token
 

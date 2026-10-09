@@ -54,7 +54,7 @@ class HistoryCases(unittest.TestCase):
         row = self.save()
         self.assertEqual(len({row["id"], row["person_id"], row["group_id"]}), 3)
         self.assertTrue(row["app_version"] and row["calculation_logic_version"])
-        self.assertEqual(row["data_schema_version"], 1)
+        self.assertEqual(row["data_schema_version"], 2)
 
     def test_candidate_normalization_and_optional_kana(self):
         self.save()

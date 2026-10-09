@@ -130,7 +130,7 @@ def build_reading_report(form, result):
     nikkan = personality.get("nikkan", {})
     keywords = text(nikkan.get("keywords"))
     cells["B25"] = "●干支から読み取れるもの" + ("　キーワード："+keywords if keywords else "")
-    texts = {"Phase5_Nikkan": text(nikkan.get("description")), "3": text(result.get("yearly_overall", {}).get("comment"))}
+    texts = {"Phase5_Nikkan": text(nikkan.get("description")), "3": text(result.get("yearly_overall", {}).get("comment") or result.get("yearly_overall", {}).get("interpretation_message") or result.get("yearly_overall", {}).get("error"))}
     stages = ("幼年期", "青年期", "成熟期", "老年期")
     life = personality.get("life_stage_tsuhensei", [])
     if len(life) != 4:
@@ -164,7 +164,7 @@ def build_reading_report(form, result):
             borders.add(i)
     year = result.get("yearly_overall", {})
     cells.update({"L60": year.get("year", ""), "M60": text(year.get("tenkan")), "N60": text(year.get("chishi")),
-                  "E61": text(year.get("tsuhensei")), "G61": "年運テーマ："+text(year.get("theme"))})
+                  "E61": text(year.get("tsuhensei")), "G61": "年運テーマ："+text(year.get("theme")) if year.get("theme") else ""})
     months = result.get("yearly_flow", {}).get("rows", [])
     if len(months) != 12 or [x.get("月番号") for x in months] != list(range(2,13))+[1]:
         raise ReportError("正式な月運12か月の結果が不足しています。")

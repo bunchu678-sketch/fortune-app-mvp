@@ -46,7 +46,12 @@ class HarnessTests(unittest.TestCase):
         with patch.object(tier_c,"probe",return_value=False):
             with contextlib.redirect_stdout(io.StringIO()):
                 issues=tier_c.probe_all()
-        self.assertTrue(all("CHANGED" in state for _,state in issues))
+        for case_id, state in issues:
+            self.assertIn("RESOLVED" if case_id in ("K01", "K03") else "CHANGED", state)
+        with patch.object(tier_c, "probe", return_value=True), contextlib.redirect_stdout(io.StringIO()):
+            regressed = dict(tier_c.probe_all())
+        self.assertIn("REGRESSION", regressed["K01"])
+        self.assertIn("REGRESSION", regressed["K03"])
         self.assertEqual(check.exit_code([],[]),0)
 
     def test_rounding_regression_detected(self):

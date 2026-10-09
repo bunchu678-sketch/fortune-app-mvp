@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import sqlite3
 from uuid import uuid4
+from reading_snapshot import public_result_snapshot
 
 
 class HistoryError(Exception):
@@ -99,6 +100,7 @@ class SQLiteHistoryRepository:
         data = dict(row)
         for key in ("input_snapshot", "result_snapshot"):
             data[key] = json.loads(data[key])
+        data["result_snapshot"] = public_result_snapshot(data["result_snapshot"])
         return data
 
     def candidates(self, owner, form):
@@ -128,7 +130,7 @@ class SQLiteHistoryRepository:
             return candidates
 
     def create(self, owner, payload, versions, organization_id=None):
-        snapshot, result = payload["input_snapshot"], payload["result_snapshot"]
+        snapshot, result = payload["input_snapshot"], public_result_snapshot(payload["result_snapshot"])
         form, link = snapshot["form"], payload.get("link") or {"mode": "new_person"}
         now, reading_id = timestamp(), str(uuid4())
         with self.connection() as db:
