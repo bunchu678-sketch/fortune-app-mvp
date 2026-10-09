@@ -1,5 +1,5 @@
 """Single-operator administration. Content-free projections and atomic audited writes."""
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import json
 import secrets
 import sqlite3
@@ -44,6 +44,8 @@ class OperationsRepository:
 
         from service_contract_repository import ServiceContractRepository
         self.services = ServiceContractRepository(self)
+        from retention_repository import RetentionRepository
+        self.retention = RetentionRepository(self)
 
     @staticmethod
     def require_admin(db, actor):
@@ -173,12 +175,13 @@ class OperationsRepository:
                     db.execute('UPDATE service_contract_terms SET awaiting_initial_setup=1 WHERE organization_id=? AND user_id=? AND activated_at IS NULL AND cancellation_requested_at IS NULL AND suspended_at IS NULL',(org,owner))
             self.audit(db,actor,"membership-set",owner,org)
 
-    def issue_account(self, actor, org, email, display_name, payment_confirmed, monthly_fee=None):
+    def issue_account(self, actor, org, email, display_name, payment_confirmed, monthly_fee=None, *, connection=None):
         if payment_confirmed is not True: raise HistoryError("入金確認後に発行してください。",422)
         normalized=normalized_email(email); name=text(display_name); encoded=password_hash(secrets.token_urlsafe(48))
         owner=str(uuid4()); now=timestamp()
         try:
-            with self.change(actor) as db:
+            with nullcontext(connection) if connection is not None else self.change(actor) as db:
+                self.require_admin(db,actor)
                 self.product.organization(db,org)
                 db.execute("INSERT INTO users VALUES (?,?,?,?,?,?,?)",(owner,email.strip(),normalized,encoded,"active",now,now))
                 db.execute("INSERT INTO user_profiles VALUES (?,?)",(owner,name))

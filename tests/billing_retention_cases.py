@@ -194,7 +194,7 @@ class BillingRetentionCases(unittest.TestCase):
         self.cancel();end=datetime(2026,11,1,tzinfo=JST)
         with self.assertRaises(HistoryError):self.services.recover(self.owner,self.org,end-timedelta(microseconds=1))
         value=self.services.recover(self.owner,self.org,end+timedelta(days=30)-timedelta(microseconds=1))
-        self.assertEqual(value['state'],'terminated');self.assertTrue(value['deletion_hold'])
+        self.assertEqual(value['state'],'terminated');self.assertFalse(value['deletion_hold'])
         with self.assertRaises(HistoryError):self.services.recover(self.owner,self.org,end+timedelta(days=30))
         with self.assertRaises(HistoryError):self.services.resume(self.admin,self.org,self.owner,end+timedelta(days=2))
     def test_cancel_and_recovery_other_owner_org_denied(self):
@@ -229,9 +229,9 @@ class BillingRetentionCases(unittest.TestCase):
         b=self.save(link={'mode':'existing_group','person_id':a['person_id'],'group_id':a['group_id'],'source_reading_id':a['id']})
         self.cancel();plan=self.services.deletion_plan(self.admin,self.org,self.owner,datetime(2026,12,1,tzinfo=JST))
         self.assertFalse(plan['can_delete']);self.assertEqual(plan['blocked_dependencies'][0]['dependent_id'],b['id'])
-    def test_recovered_data_not_automatically_purged(self):
+    def test_recovered_data_keeps_original_purge_deadline(self):
         self.cancel();self.services.recover(self.owner,self.org,datetime(2026,11,2,tzinfo=JST))
-        self.assertFalse(self.services.deletion_plan(self.admin,self.org,self.owner,datetime(2026,12,1,tzinfo=JST))['eligible'])
+        self.assertTrue(self.services.deletion_plan(self.admin,self.org,self.owner,datetime(2026,12,1,tzinfo=JST))['eligible'])
     def test_teacher_contract_termination_has_no_student_effect(self):
         self.activate();self.ops.teacher_contract(self.admin,self.org,'terminated');self.ops.context(self.org,self.owner)
     def test_audit_and_admin_dry_run_has_no_content(self):

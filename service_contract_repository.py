@@ -49,7 +49,7 @@ def content_visible(db, owner, reading_id, now=None):
     if value['purged_at']:
         return False
     if value['access_ends_at'] and now >= moment(value['access_ends_at']):
-        return bool(value['recovered_at'])
+        return bool(value['recovered_at']) and now < moment(value['access_ends_at']) + timedelta(days=30)
     if value['suspended_at'] and now >= suspension_retention(moment(value['suspended_at']))[0]:
         return False
     return True
@@ -113,7 +113,7 @@ class ServiceContractRepository:
                 'monthly_fee':contract['monthly_fee'], 'minimum_term_until':contract['minimum_term_until'],
                 'deletion_pending_at':stamp(pending) if pending else None,
                 'deletion_due_at':stamp(deadline) if deadline else None,
-                'deletion_hold':bool(value['recovered_at']),
+                'deletion_hold':False,
                 'cancellation_needs_review':bool(value['cancellation_requested_at'] and not value['access_ends_at']),
                 'automatic_actions_enabled':False}
 
@@ -251,11 +251,15 @@ class ServiceContractRepository:
         if any(row[2] for row in db.execute('PRAGMA database_list')) or not db.execute('PRAGMA foreign_keys').fetchone()[0]:
             raise HistoryError('物理削除はin-memory検証専用です。',403)
         now=utc(now)
-        with db:
-            db.execute('BEGIN IMMEDIATE')
+        from contextlib import nullcontext
+        nested=db.in_transaction
+        with nullcontext() if nested else db:
+            if not nested: db.execute('BEGIN IMMEDIATE')
             plan=self.deletion_plan(actor,org,owner,now,connection=db)
             if not plan['can_delete']:raise HistoryError('削除対象の確認が必要です。',409)
             ids=plan['reading_ids']
+            from retention_repository import record_deletion
+            record_deletion(db,'scope',owner,org,ids,now)
             groups=set(); persons=set()
             for rid in ids:
                 row=db.execute('SELECT group_id,person_id FROM readings WHERE id=? AND owner_user_id=?',(rid,owner)).fetchone()
@@ -287,7 +291,7 @@ def activate_initial_contracts(db, owner, now):
         WHERE t.user_id=? AND t.awaiting_initial_setup=1 AND t.activated_at IS NULL
         AND t.suspended_at IS NULL AND t.cancellation_requested_at IS NULL AND c.state='active'
         AND c.initial_payment_confirmed=1 AND m.role='student'""",(owner,)).fetchall():
-        db.execute("""UPDATE service_contract_terms SET activated_at=?,paid_through=?,awaiting_initial_setup=0,updated_at=?
+        db.execute("""UPDATE service_contract_terms SET activated_at=?,paid_through=COALESCE(paid_through,?),awaiting_initial_setup=0,updated_at=?
             WHERE organization_id=? AND user_id=?""",(stamp(now),month_end(utc(now).astimezone(JST).date()).isoformat(),stamp(now),row['organization_id'],owner))
         if row['monthly_fee'] is None:
             db.execute('UPDATE user_service_contracts SET monthly_fee=? WHERE organization_id=? AND user_id=?',(MONTHLY_FEE,row['organization_id'],owner))
