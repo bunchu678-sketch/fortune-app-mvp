@@ -113,8 +113,11 @@ const base = process.env.FORTUNE_UI_URL || "http://127.0.0.1:3000";
    assert.equal(await entries.count(),4);
    await layout();await page.screenshot({path:path.join(directory,device+"-list.png"),fullPage:true});
    await page.getByLabel("キーワード",{exact:true}).fill("カタカナABC");
-   await page.getByLabel("鑑定日（開始）",{exact:true}).fill("2026-10-01");
-   await page.getByLabel("鑑定日（終了）",{exact:true}).fill("2026-10-01");
+   // The original and rerun dates differ after Oct 1. Include both dates;
+   // retain the same >=4 search assertion and each snapshot's saved date.
+   const range=["2026-10-01",today].sort();
+   await page.getByLabel("鑑定日（開始）",{exact:true}).fill(range[0]);
+   await page.getByLabel("鑑定日（終了）",{exact:true}).fill(range[1]);
    await page.getByRole("button",{name:"検索",exact:true}).click();
    await page.waitForFunction(()=>!document.querySelector(".historySearch button")?.disabled);
    assert.ok(await entries.count()>=4);

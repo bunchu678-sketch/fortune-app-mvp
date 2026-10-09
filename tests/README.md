@@ -445,5 +445,14 @@ Playwrightが標準の検索パスにない場合は、プロセスのPLAYWRIGHT
 - `k01_k03_ui.cjs` はlocalhost mockのみ、PC/スマホ48項目。Edge/Playwright既存環境を使用する。
 - 年別登録確認は `python -B yearly_overall_comments.py`。正式原稿だけ追加し年・版・全10星の登録状況を確認する。
 - DB移行は自動実行しない。`research/run_migrate_test_history.py` は明示対象・テスト確認・外部退避・dry run/transaction/検証rollbackを必要とする。
-- 旧 `gogyou_ui_smoke.cjs` は現在ないON/OFF checkboxを要求するため今回1 suite失敗。開始HEADも同じ。現行A/B/C画面に合う試験への整理はPhase 10へ引き継ぐ。
-- 旧 `history_ui_smoke.cjs` は10月1日固定の検索と当日再鑑定を混在。隔離サーバー/ブラウザ/runnerのテスト時計を揃えて実行する。期待値やOS時計は変更しない。
+- `gogyou_ui_smoke.cjs` はPhase 10で正式A/B/Cへ更新。実計算から生成した合成応答をSVGへ接続し、通常/大運不能/立春待ち/立春前後をPC1280・スマホ390/320で81項目検査。所有するlocalhost frontendのみ起動しDB不要。数値の正解はTier Aの独立期待で保護する。
+- `history_ui_smoke.cjs` は元の10月1日と再鑑定の今日の両方を含む検索範囲へ修正。保存/再鑑定/検索/削除の既存判定を維持し、OS・API時計は変更しない。
+
+
+## Phase 10 総合・本人確認（2026-10-09）
+
+- `python -X utf8 -B -m unittest discover -s tests -p '*cases.py' -q`：既存460＋追加A〜F連携6件。`phase10_integration_cases.py` は既存fixtureを再利用し、初回設定用MemoryMailTransportを試験後に復元する。ASGI連携のPDFは記録adapterで同じ完成Excelを確認し、実Windows変換は別のUI E2Eで検査する。
+- `node tests/phase10_local_ui.cjs`：OS一時領域に新規DB・合成User/Orgを作り、所有するAPI8765/Next3000で履歴28シナリオ・境界1suite・出力12項目を実行。既存port占有時は停止し、既存サービスを終了しない。Playwrightは既存 `PLAYWRIGHT_MODULE`、Pythonは既存venv、PDFはWindows Excelを利用する。インストール不要。
+- `node tests/phase10_local_ui.cjs --review`：同じ隔離条件で本人確認環境を準備し、2026/2027の完成Excel/PDF・URL・合成login情報をOS一時領域へ保存。実アプリのserver-side認証を利用し、認可を迂回するrouteは追加しない。確認用情報・生成ファイルはGit対象外。終了はこのrunnerと所有serverだけを止める。
+- 実SMTP・実課金・file DBの物理purge・VPS・本番backup・Notion書込みは行わない。Linux PDF、外部backup、本番設定、本人/実スマホ確認は自動PASSへ含めない。
+- 全13領域の証拠・重複件数・保留・不合格の切り分けは `docs/phase10-regression-results-20261009.md`。
