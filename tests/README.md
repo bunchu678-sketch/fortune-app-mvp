@@ -456,3 +456,12 @@ Playwrightが標準の検索パスにない場合は、プロセスのPLAYWRIGHT
 - `node tests/phase10_local_ui.cjs --review`：同じ隔離条件で本人確認環境を準備し、2026/2027の完成Excel/PDF・URL・合成login情報をOS一時領域へ保存。実アプリのserver-side認証を利用し、認可を迂回するrouteは追加しない。確認用情報・生成ファイルはGit対象外。終了はこのrunnerと所有serverだけを止める。
 - 実SMTP・実課金・file DBの物理purge・VPS・本番backup・Notion書込みは行わない。Linux PDF、外部backup、本番設定、本人/実スマホ確認は自動PASSへ含めない。
 - 全13領域の証拠・重複件数・保留・不合格の切り分けは `docs/phase10-regression-results-20261009.md`。
+
+
+## Phase 10 会員画面の遷移（2026-10-09）
+
+- `node --test tests/member_navigation.test.mjs`：既存Nodeと同じTypeScript実行環境。役割・複数所属・情報不足・許可/拒否nextの38件。
+- `node tests/member_navigation_ui.cjs`：build済みWと既存Playwright/Edge/venvを使用。新規OS一時DB・合成User/Org、所有API8765/Next3000だけを起動し、終了時に所有プロセスだけ停止。port占有時は中断する。PC1280/390/320各52条件、実認証/認可、ログアウト失敗/Back/遅延応答/休止/初期入金未確認を検査。PDFはこの試験ではdisabled。実出力は既存auth_ui/phase10_local_uiで別検査する。
+- 合成スナップショットも通常画面保存と同じ`manualChoices`/`boundarySelections`を含める。旧本人確認用4履歴は自動補完せず、既存DBを変更しない。
+- `auth_ui.cjs`の通常ログイン期待は`/mypage`、ログアウト期待は`/login`。既存のsession失効・所有者隔離・出力の期待を維持。
+- 詳細/件数/本人残確認は `docs/phase10-member-navigation-20261009.md`。実SMTP/課金/本番/既存DB/Notion書込みなし。

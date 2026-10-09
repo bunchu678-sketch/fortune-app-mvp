@@ -21,6 +21,7 @@ async function check(name,fn){await fn();passed++;console.log(name+' PASS');}
    if(method==='POST')writes.push({p,body:req.postDataJSON()});
    if(p==='/api/operations/purchases'){if(method==='POST'){proofs=[req.postDataJSON()];return send({purchase_number:'P-001'});}return send(proofs);}
    if(p.endsWith('/recontract'))return send({setup_pending:true,mail_delivery:'disabled',initial_fee_required:false,deleted_history_restorable:false});
+   if(p==='/api/account/summary')return send({email:'admin@example.test',is_operator:who==='admin',memberships:[],executions_total:0,executions_this_month:0,saved_histories_current:0});
    if(p==='/api/operations/organizations')return send([{id:org,display_name:'合成教室',students:1,executions_total:2,executions_this_month:1}]);
    if(p==='/api/operations/users/'+owner)return send({id:owner,email:'student@example.test',display_name:'合成生徒',account_state:'active',last_login_at:null,last_execution_at:null,memberships:[],dues:[],executions_total:1,executions_this_month:1,saved_histories_current:0});
    if(p.endsWith('/retention'))return send({can_delete:false,blockers:['b2c_active_or_unknown'],automatic_actions_enabled:false});

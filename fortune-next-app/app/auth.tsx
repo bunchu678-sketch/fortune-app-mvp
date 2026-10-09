@@ -1,12 +1,12 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { flushSync } from "react-dom";
 import { createContext, Fragment, ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useFortuneState } from "./fortune-state";
 import "./auth.css";
 
 export type AuthUser = { id: string; email: string; development?: boolean };
-type AuthState = { user: AuthUser | null; loading: boolean; error: string; refresh: () => Promise<void>; login: (email: string, password: string) => Promise<void>; logout: () => Promise<void> };
+type AuthState = { user: AuthUser | null; loading: boolean; error: string; refresh: () => Promise<void>; login: (email: string, password: string) => Promise<AuthUser>; isCurrentUser: (id: string) => boolean; logout: () => Promise<void> };
 const Context = createContext<AuthState | null>(null);
 export const API_BASE = (process.env.NEXT_PUBLIC_FORTUNE_API_URL ?? "").replace(/\/+$/, "");
 
@@ -44,19 +44,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
     const onFocus = () => { void refresh(); };
+    // Clear authenticated DOM/state before it can enter the browser back/forward cache.
+    const onPageHide = () => { ++requestSequence.current; if (identity.current) flushSync(() => apply(null)); };
+    window.addEventListener("pagehide", onPageHide);
     window.addEventListener("focus", onFocus); window.addEventListener("pageshow", onFocus);
     const timer = window.setInterval(onFocus, 60000);
-    return () => { window.removeEventListener("focus", onFocus); window.removeEventListener("pageshow", onFocus); window.clearInterval(timer); };
-  }, [refresh]);
+    return () => { window.removeEventListener("pagehide", onPageHide); window.removeEventListener("focus", onFocus); window.removeEventListener("pageshow", onFocus); window.clearInterval(timer); };
+  }, [refresh, apply]);
   async function login(email: string, password: string) {
     ++requestSequence.current;
-    const value = await authRequest("login", { email, password }); ++requestSequence.current; apply(value); setError("");
+    const value = await authRequest("login", { email, password }); ++requestSequence.current; apply(value); setError(""); return value as AuthUser;
   }
   async function logout() {
     ++requestSequence.current;
-    await authRequest("logout", {}); ++requestSequence.current; apply(null); setError("");
+    await authRequest("logout", {}); ++requestSequence.current; flushSync(() => { apply(null); setError(""); });
   }
-  return <Context.Provider value={{ user, loading, error, refresh, login, logout }}>
+  return <Context.Provider value={{ user, loading, error, refresh, login, isCurrentUser: id => identity.current === id, logout }}>
     <AuthBar /><Fragment key={generation}>{children}</Fragment>
   </Context.Provider>;
 }
@@ -75,12 +78,12 @@ export function useActiveView() {
 
 function AuthBar() {
   const { user, loading, error, logout } = useAuth();
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
   async function exit() {
     setBusy(true); setFailure("");
-    try { await logout(); router.replace("/"); }
+    // A fresh document also discards cached protected routes after successful logout.
+    try { await logout(); window.location.replace("/login"); }
     catch (caught) { setFailure(caught instanceof Error ? caught.message : "ログアウトに失敗しました。"); }
     finally { setBusy(false); }
   }

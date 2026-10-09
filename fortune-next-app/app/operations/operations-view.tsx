@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { LoginRequired, useAuth } from "../auth";
-import { accountLabel, Organization, productRequest, useProductData, Totals } from "../product-client";
+import { accountLabel, Organization, productRequest, useProductData, Totals, Personal } from "../product-client";
 import { savedTime } from "../history-client";
 import "../management.css";
 import ServiceContractPanel from "../service-contract";
+import MemberStart from "../member-start";
 import PurchaseRetentionPanel, { UserRetentionPanel } from "./retention-controls";
 
 type Member = { user_id: string; display_name: string | null; email: string; role: string; account_state: string };
@@ -19,6 +20,7 @@ const when = (value: string | null) => value ? savedTime(value) : "記録なし"
 
 export default function OperationsView({ view = "list", id = "" }: { view?: "list" | "organization" | "user"; id?: string }) {
   const { user } = useAuth();
+  const personal = useProductData<Personal>("/api/account/summary");
   const path = view === "organization" ? "/api/operations/organizations/" + encodeURIComponent(id) : view === "user" ? "/api/operations/users/" + encodeURIComponent(id) : "/api/operations/organizations";
   const result = useProductData<Organization[] | OrgDetail | User>(path);
   const organizations = useProductData<Organization[]>("/api/operations/organizations");
@@ -47,6 +49,7 @@ export default function OperationsView({ view = "list", id = "" }: { view?: "lis
       {failure ? <p role="alert">{failure}</p> : null}{message ? <p role="status">{message}</p> : null}
       {result.data ? <>
         {view === "list" ? <>
+          {personal.data ? <><MemberStart account={personal.data} /><p>自分の利用状況：今月{personal.data.executions_this_month}件／累計{personal.data.executions_total}件／保存履歴{personal.data.saved_histories_current}件</p></> : personal.error ? <p role="alert">{personal.error}</p> : <p role="status">自分の利用状況を確認中…</p>}
           <section><h2>Organization一覧</h2><ul>{(result.data as Organization[]).map(item => <li key={item.id}>
             <Link href={"/operations/organizations/" + item.id}>{item.display_name}</Link>　生徒{item.students}名／今月{item.executions_this_month}件／累計{item.executions_total}件
           </li>)}</ul></section>

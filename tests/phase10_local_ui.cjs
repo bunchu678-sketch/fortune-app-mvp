@@ -37,7 +37,7 @@ function stop(){for(const p of children)if(p.pid)spawnSync('taskkill',['/PID',St
  "for role in ('b2c','student'):",
  " for year in (2026,2027):",
  "  form={**FORM,'surname':'合成確認','givenName':str(year),'name':'合成確認'+str(year),'readingDate':str(year)+'-09-30'}",
- "  row=history.create(ids[role],{'input_snapshot':{'form':form},'result_snapshot':calculate_fortune(form),'memo':'合成の自由記入メモ','link':{'mode':'new_person'}},organization_id=org if role=='student' else None)",
+ "  row=history.create(ids[role],{'input_snapshot':{'form':form,'manualChoices':{},'boundarySelections':{}},'result_snapshot':calculate_fortune(form),'memo':'合成の自由記入メモ','link':{'mode':'new_person'}},organization_id=org if role=='student' else None)",
  "  rows[role+'_'+str(year)]=row['id']",
  "cookie=a.login('phase10.runner@example.test',v['password'])[1]",
  "print(json.dumps({'org':org,'rows':rows,'cookie':cookie,'review_cookie':a.login('phase10.student@example.test',v['password'])[1]}))"
