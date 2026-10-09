@@ -35,7 +35,7 @@ export default function ServiceContractPanel({ organizationId, ownerId }: { orga
       <dt>データ削除予定</dt><dd>{time(value.deletion_due_at)}</dd></dl>
       <p>初回利用月は購入代金に含みます。日割り料金は計算しません。日割り返金は原則行いません。</p>
       {value.cancellation_needs_review ? <p role="status">解約申請を受け付けました。支払済み期間を運営が確認するまで終了日は未確定です。</p> : null}
-      {value.deletion_hold ? <p role="status">データ復旧済み。利用再開・再契約と今後の保持期間は運営へ確認してください。</p> : null}
+      {value.recovered_at ? <p role="status">データ復旧だけでは削除予定日は延長されません。再契約・利用再開は別途運営へ確認してください。</p> : null}
       {operator ? <>
         <p>未納判定：{value.arrears?.suspension_due ? "手動確認済み未納が猶予期限に達しています" : "自動休止の対象ではありません"}</p>
         <p>督促予定：{time(value.arrears?.next_reminder_at)}／自動送信は無効です。</p>

@@ -215,3 +215,38 @@ async def service_action(owner:str,org:str,action:str,request:Request):
         if action=='data-recovery':return o.services.recover(owner,org,actor=u['id'])
         raise HistoryError('操作を確認してください。',404)
     return await handle(request,apply,True)
+
+
+@router.get('/api/operations/purchases')
+async def purchases(request:Request):
+    return await handle(request,lambda o,e,u,p:o.retention.purchases(u['id']))
+
+
+@router.post('/api/operations/purchases')
+async def register_purchase(request:Request):
+    return await handle(request,lambda o,e,u,p:o.retention.register_purchase(u['id'],p['purchase_number'],p['organization_id'],p['purchased_on'],p['email'],p['payment_confirmed'],p['review_on'],p.get('user_id')),True)
+
+
+@router.post('/api/operations/purchases/{number}/recontract')
+async def recontract(number:str,request:Request):
+    return await handle(request,lambda o,e,u,p:o.retention.recontract(u['id'],number,p['organization_id'],p['email'],p['display_name'],p.get('identity_verified'),p.get('monthly_payment_confirmed'),p['paid_through']),True)
+
+
+@router.get('/api/operations/users/{owner}/retention')
+async def user_retention(owner:str,request:Request):
+    return await handle(request,lambda o,e,u,p:o.retention.user_plan(u['id'],owner))
+
+
+@router.post('/api/operations/users/{owner}/b2c-retention')
+async def confirm_b2c_retention(owner:str,request:Request):
+    return await handle(request,lambda o,e,u,p:o.retention.confirm_b2c(u['id'],owner,p['state']),True)
+
+
+@router.get('/api/operations/retention-reviews')
+async def retention_reviews(request:Request):
+    return await handle(request,lambda o,e,u,p:o.retention.retention_reviews(u['id']))
+
+
+@router.post('/api/operations/retention-reviews/{kind}/{identifier}')
+async def retention_review(kind:str,identifier:str,request:Request):
+    return await handle(request,lambda o,e,u,p:o.retention.review(u['id'],kind,identifier,p['review_on'],p['basis']),True)

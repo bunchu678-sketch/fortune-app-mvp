@@ -6,6 +6,7 @@ import { accountLabel, Organization, productRequest, useProductData, Totals } fr
 import { savedTime } from "../history-client";
 import "../management.css";
 import ServiceContractPanel from "../service-contract";
+import PurchaseRetentionPanel, { UserRetentionPanel } from "./retention-controls";
 
 type Member = { user_id: string; display_name: string | null; email: string; role: string; account_state: string };
 type OrgDetail = Organization & { logo_reference: string | null; members: Member[]; teacher_contracts: Array<{ id: string; state: string }> };
@@ -55,6 +56,7 @@ export default function OperationsView({ view = "list", id = "" }: { view?: "lis
             <button disabled={busy}>作成する</button></form></section>
           <section><h2>User一覧</h2>{users.error ? <p role="alert">{users.error}</p> : <ul>{users.data?.map(item => <li key={item.id}>
             <Link href={"/operations/users/" + item.id}>{item.display_name || item.email}</Link>　{accountLabel(item.account_state)}</li>)}</ul>}</section>
+          <PurchaseRetentionPanel organizations={organizations.data || []} />
           <section><h2>最近の管理操作</h2>{audit.error ? <p role="alert">{audit.error}</p> : <ul>{audit.data?.map(item => <li key={item.id}>
             {when(item.occurred_at)}　{item.action}　対象ID：{item.target_id}</li>)}</ul>}</section>
         </> : null}
@@ -81,6 +83,7 @@ export default function OperationsView({ view = "list", id = "" }: { view?: "lis
         {target ? <><h2>{target.display_name || target.email}</h2><dl><dt>account状態</dt><dd>{accountLabel(target.account_state)}</dd>
           <dt>メールアドレス</dt><dd>{target.email}</dd><dt>最終login</dt><dd>{when(target.last_login_at)}</dd><dt>最終鑑定実行</dt><dd>{when(target.last_execution_at)}</dd>
           <dt>今月の鑑定実行</dt><dd>{target.executions_this_month}件</dd><dt>累計鑑定実行</dt><dd>{target.executions_total}件</dd><dt>現在の保存履歴件数</dt><dd>{target.saved_histories_current}件</dd></dl>
+          <UserRetentionPanel ownerId={target.id} />
           <section><h2>氏名設定</h2><form onSubmit={e => { e.preventDefault(); void action(base, { display_name: name }, "PATCH"); }}>
             <label>氏名<input required value={name} onChange={e => setName(e.target.value)} maxLength={200} /></label><button disabled={busy}>氏名を保存</button></form></section>
           <section><h2>利用停止・再開</h2><p>以下はアカウント全体の管理操作です。Organizationごとの休止は所属先の「この契約を休止」を使ってください。</p><div className="managementActions"><button disabled={busy || target.account_state !== "active" || target.id === user.id} onClick={() => {

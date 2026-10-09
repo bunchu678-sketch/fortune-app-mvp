@@ -39,7 +39,7 @@ async function check(name,fn){await fn();passed++;console.log(name+' PASS');}
    return send([]);
   });
   page.on('dialog',dialog=>dialog.accept());
-  await page.goto(base+'/mypage');const panel=page.locator('.serviceContract');await panel.getByRole('heading',{name:'自分の利用契約'}).waitFor();
+  await page.goto(base+'/mypage');const panel=page.locator('.serviceContract');await panel.getByRole('heading',{name:'自分の利用契約'}).waitFor();await panel.getByText('2000円',{exact:true}).waitFor();
   await check(width+' own contractual dates and no invoice history',async()=>{assert((await panel.innerText()).includes('2000円'));assert.equal(await panel.locator('input').count(),0);});
   await check(width+' cancellation uses own authenticated endpoint',async()=>{await panel.getByRole('button',{name:'正式解約を申請',exact:true}).click();await panel.getByRole('button',{name:'正式解約を申請',exact:true}).isDisabled().then(assert);assert(writes.at(-1).p===`/api/account/organizations/${org}/cancellation`);assert.deepEqual(writes.at(-1).body,{});});
   state='terminated';await page.reload();await panel.getByText('利用終了',{exact:true}).waitFor();
