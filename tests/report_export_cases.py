@@ -130,14 +130,23 @@ class ReportCases(unittest.TestCase):
             centers.append((int(pos.get('x'))+radius,int(pos.get('y'))+radius))
         for i in range(5):
             node=anchors[f'Gogyo_Sheng_{i}_{(i+1)%5}']
-            shape=node.find('x:cxnSp',NS)
+            shape=node.find('x:sp',NS)
             self.assertIsNotNone(shape)
             self.assertEqual(shape.find('x:spPr/a:ln/a:tailEnd',NS).get('type'),'arrow')
-            self.assertEqual(shape.find('x:spPr/a:ln/a:solidFill/a:schemeClr',NS).get('val'),'accent3')
+            self.assertEqual(shape.find('x:spPr/a:ln/a:solidFill/a:srgbClr',NS).get('val'),'9EB9A8')
             transform=shape.find('x:spPr/a:xfrm',NS);off=transform.find('a:off',NS);ext=transform.find('a:ext',NS)
             x,y,w,h=(int(off.get('x')),int(off.get('y')),int(ext.get('cx')),int(ext.get('cy')))
-            start=(x+w if transform.get('flipH')=='1' else x,y+h if transform.get('flipV')=='1' else y)
-            end=(x if transform.get('flipH')=='1' else x+w,y if transform.get('flipV')=='1' else y+h)
+            curve=shape.find('x:spPr/a:custGeom/a:pathLst/a:path',NS)
+            self.assertIsNotNone(curve)
+            points=curve.findall('.//a:pt',NS)
+            self.assertEqual(len(points),4)
+            start=(x+int(points[0].get('x')),y+int(points[0].get('y')))
+            end=(x+int(points[-1].get('x')),y+int(points[-1].get('y')))
+            self.assertIsNotNone(curve.find('a:cubicBezTo',NS))
+            # Control points must bow away from the straight chord.
+            control=(x+int(points[1].get('x')),y+int(points[1].get('y')))
+            cross=(end[0]-start[0])*(control[1]-start[1])-(end[1]-start[1])*(control[0]-start[0])
+            self.assertGreater(abs(cross),12700**2)
             for point,center in ((start,centers[i]),(end,centers[(i+1)%5])):
                 self.assertGreater(math.dist(point,center),radius+6*12700)
             self.assertGreater(math.dist(start,end),30*12700)
@@ -215,13 +224,19 @@ class ReportCases(unittest.TestCase):
             old_drawing=ET.fromstring(z.read('xl/drawings/drawing2.xml'))
         sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
         old_rows={n.get('r'):n for n in original.findall('s:sheetData/s:row',NS)}
-        for row in sheet.findall('s:sheetData/s:row',NS):
-            number=int(row.get('r'))
-            if number>68:continue
-            old=old_rows[row.get('r')]
-            expected=float(old.get('ht',15))+(SECTION_GAP_PT if number in SECTION_HEADING_ROWS else 0)
-            if number==68:expected-=ADVICE_BOTTOM_INSET_PT
-            self.assertEqual(float(row.get('ht',15)),expected)
+        new_rows={n.get('r'):n for n in sheet.findall('s:sheetData/s:row',NS)}
+        for start,end in ((1,35),(36,68)):
+            expected=sum(float(old_rows[str(n)].get('ht',15)) for n in range(start,end+1))
+            expected+=sum(SECTION_GAP_PT for n in SECTION_HEADING_ROWS if start<=n<=end)
+            if end==68:expected-=ADVICE_BOTTOM_INSET_PT
+            actual=sum(float(new_rows[str(n)].get('ht',15)) for n in range(start,end+1))
+            self.assertAlmostEqual(actual,expected,places=3)
+        self.assertGreaterEqual(float(new_rows['18'].get('ht')),20)
+        for n in range(19,25):
+            if self.report.cells['C'+str(n)] or self.report.cells['E'+str(n)]:
+                self.assertGreaterEqual(float(new_rows[str(n)].get('ht')),20)
+        for n in (37,39,40,42):
+            self.assertGreaterEqual(float(new_rows[str(n)].get('ht')),18)
         new_drawing=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
         for old,new in zip(old_drawing,new_drawing):
             props=old.find('.//x:cNvPr',NS)
@@ -350,6 +365,46 @@ class ReportCases(unittest.TestCase):
             self.assertEqual(self.report.texts[f'Phase5_Juuni{i}'],row['public_comment'])
             self.assertIn(row['keywords'],self.cells[('C' if i%2==0 else 'I')+('39' if i<2 else '42')])
 
+    def test_acceptance_headings_keywords_and_year_cells(self):
+        for key,col,head,foot in [('year','C',37,39),('month','I',37,39),('day','C',40,42),('hour','I',40,42)]:
+            row=next(r for r in self.result['personality']['juuni_unsei']['rows'] if r['pillar_key']==key)
+            self.assertTrue(self.cells[col+str(head)].endswith('：'+row['juuni_unsei']))
+            self.assertEqual(self.cells[col+str(foot)],'キーワード：'+row['keywords'])
+        self.assertEqual(self.cells['B60'],'●年運')
+        self.assertEqual(self.cells['I60'],'太罫線：接木運の境界')
+        year=self.result['yearly_overall']
+        self.assertEqual([self.cells[a] for a in ('L61','M61','N61')],[str(year['year']),year['tenkan'],year['chishi']])
+        self.assertTrue(all(self.cells[a]=='' for a in ('L60','M60','N60')))
+        sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
+        merges={n.get('ref') for n in sheet.find('s:mergeCells',NS)}
+        self.assertTrue({'B60:H60','I60:N60','G61:K61'}<=merges)
+        self.assertFalse({'B60:K60','G61:N61'} & merges)
+
+    def test_readable_date_and_no_day_diagonal(self):
+        sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
+        styles=ET.fromstring(self.parts['xl/styles.xml'])
+        xfs=list(styles.find('s:cellXfs',NS));fonts=list(styles.find('s:fonts',NS));borders=list(styles.find('s:borders',NS))
+        def xf(address):
+            return xfs[int(sheet.find("s:sheetData/s:row/s:c[@r='%s']"%address,NS).get('s'))]
+        for address in ('C2','D2'):
+            self.assertEqual(fonts[int(xf(address).get('fontId'))].find('s:sz',NS).get('val'),'11')
+        border=borders[int(xf('E10').get('borderId'))]
+        self.assertNotEqual(border.get('diagonalUp'),'1')
+        self.assertNotEqual(border.get('diagonalDown'),'1')
+        self.assertIsNone(border.find('s:diagonal',NS))
+        self.assertEqual(self.cells['E10'],'－')
+        self.assertIsNone(fonts[int(xf('I60').get('fontId'))].find('s:b',NS))
+
+    def test_special_multiline_padding_without_changing_official_text(self):
+        result=deepcopy(self.result)
+        result['special_meishiki']['rows']=[{'判定':'複数行確認','結果':'一行目の正式説明\n二行目の正式説明'}]
+        report=build_reading_report(FORM,result)
+        parts=unpack(render_xlsx(report));sheet=ET.fromstring(parts['xl/worksheets/sheet2.xml'])
+        row=sheet.find("s:sheetData/s:row[@r='19']",NS)
+        self.assertGreaterEqual(float(row.get('ht')),36)
+        self.assertEqual(sheet_cells(parts)['E19'],'一行目の正式説明\n二行目の正式説明')
+        self.assertEqual(sheet.find('s:pageSetup',NS).get('scale'),str(REPORT_PRINT_SCALE))
+
     def test_chart_sources_and_caches(self):
         thinking=self.result['personality']['juuni_unsei']['thinking']
         self.assertEqual(float(self.cells['X103']),thinking['work_type']['現場型攻め'])
@@ -382,7 +437,7 @@ class ReportCases(unittest.TestCase):
             self.assertEqual(border.find('s:right',NS).get('style'),expected)
 
     def test_year_and_months_kubou(self):
-        self.assertEqual(self.cells['L60'],'2026');self.assertEqual(self.cells['E61'],self.result['yearly_overall']['tsuhensei'])
+        self.assertEqual(self.cells['L61'],'2026');self.assertEqual(self.cells['E61'],self.result['yearly_overall']['tsuhensei'])
         for col,row in zip('CDEFGHIJKLMN',self.result['yearly_flow']['rows']):
             self.assertEqual(self.cells[col+'65'],row['地支'])
         self.assertTrue(self.report.kubou_months)

@@ -7,6 +7,7 @@ import math
 from io import BytesIO
 from pathlib import Path
 import re
+import unicodedata
 from xml.dom import minidom
 from zipfile import ZipFile, ZIP_DEFLATED
 from report_data import ReadingReport, ReportError
@@ -89,6 +90,115 @@ class Styles:
         self.cache[key] = value
         return value
 
+
+
+def presentation_cells(report):
+    """Rearrange supplied report fields only; preserve the official report projection."""
+    values = dict(report.cells)
+    values.update({"B60": "●年運", "I60": "太罫線：接木運の境界",
+                   "L60": "", "M60": "", "N60": ""})
+    for col in "LMN":
+        values[col+"61"] = report.cells[col+"60"]
+    for col, heading, footer in (("C",37,39),("I",37,39),("C",40,42),("I",40,42)):
+        star, separator, keywords = str(report.cells[col+str(footer)]).partition("　キーワード：")
+        address = col+str(heading)
+        if star and address in values:
+            values[address] += "：" + star
+        values[col+str(footer)] = "キーワード：" + keywords if separator else ""
+    return values
+
+
+def acceptance_layout(sheet, styles, report):
+    """Local print formatting; keep spare blank special rows and page heights useful."""
+    rows = {int(r.getAttribute("r")):r for r in sheet.getElementsByTagNameNS(S,"row")}
+    cells = {c.getAttribute("r"):c for r in rows.values() for c in children(r,"c")}
+    merges = first(sheet.documentElement,"mergeCells")
+    for merge in list(children(merges)):
+        if merge.getAttribute("ref") in ("B60:K60","G61:N61"):
+            merges.removeChild(merge)
+    for ref in ("B60:H60","I60:N60","G61:K61"):
+        new(merges,S,"mergeCell",{"ref":ref})
+    merges.setAttribute("count",str(len(children(merges))))
+
+    def style(address, size=None, bold=None, wrap=False, plain=False, diagonal=False, source=None):
+        cell = cells[address]
+        xf = children(styles.xfs)[int(cells[source or address].getAttribute("s") or 0)].cloneNode(True)
+        font = children(styles.fonts)[int(xf.getAttribute("fontId") or 0)].cloneNode(True)
+        if size is not None:
+            first(font,"sz").setAttribute("val",str(size))
+        if bold is not None:
+            for item in list(children(font,"b")):font.removeChild(item)
+            if bold:new(font,S,"b")
+        styles.fonts.appendChild(font)
+        xf.setAttribute("fontId",str(len(children(styles.fonts))-1));xf.setAttribute("applyFont","1")
+        alignment = first(xf,"alignment")
+        if alignment is None:alignment=new(xf,S,"alignment")
+        for key,value in {"vertical":"center","horizontal":"left","wrapText":"1" if wrap else "0",
+                          "shrinkToFit":"0" if wrap else "1"}.items():
+            alignment.setAttribute(key,value)
+        xf.setAttribute("applyAlignment","1")
+        if plain:
+            xf.setAttribute("borderId","0");xf.setAttribute("fillId","0")
+            xf.setAttribute("applyBorder","1");xf.setAttribute("applyFill","1")
+        if diagonal:
+            border=children(styles.borders)[int(xf.getAttribute("borderId") or 0)].cloneNode(True)
+            for key in ("diagonalUp","diagonalDown"):
+                if border.hasAttribute(key):border.removeAttribute(key)
+            edge=first(border,"diagonal")
+            if edge is not None:border.removeChild(edge)
+            styles.borders.appendChild(border)
+            xf.setAttribute("borderId",str(len(children(styles.borders))-1));xf.setAttribute("applyBorder","1")
+        styles.xfs.appendChild(xf);cell.setAttribute("s",str(len(children(styles.xfs))-1))
+
+    for address in ("C2","D2"):style(address,size=11)
+    style("E10",diagonal=True)  # The dash is official display data; remove only its diagonal.
+    style("B18",size=11,bold=True)
+    for address in ("C37","I37","C40","I40"):style(address,size=11,bold=True)
+    for address in ("C39","I39","C42","I42"):style(address,size=10)
+    style("B60",size=11,bold=True,plain=True)
+    style("I60",size=10,bold=False,plain=True)
+    for col in "LMN":
+        style(col+"61",source=col+"60")
+        style(col+"60",plain=True)
+    style("G61",wrap=False)
+
+    deltas={}
+    def height(number,value):
+        old=float(rows[number].getAttribute("ht") or 15)
+        rows[number].setAttribute("ht",f"{value:g}");rows[number].setAttribute("customHeight","1")
+        deltas[number]=value-old
+
+    height(18,20)
+    budget=sum(float(rows[n].getAttribute("ht")) for n in range(19,25))-deltas[18]
+    needs={}
+    for n in range(19,25):
+        left,right=(str(report.cells[col+str(n)]) for col in ("C","E"))
+        if left or right:
+            def lines(value,capacity):
+                return sum(max(1,math.ceil(sum(2 if unicodedata.east_asian_width(c) in "WF" else 1
+                                              for c in line)/capacity)) for line in value.split("\n"))
+            needs[n]=max(20,16*max(lines(left,16),lines(right,86))+4)
+        style("C"+str(n),wrap=True);style("E"+str(n),wrap=True)
+    empty=6-len(needs)
+    total=max(budget,sum(needs.values())+empty*2)
+    blank=(total-sum(needs.values()))/empty if empty else 0
+    for n in range(19,25):height(n,needs.get(n,blank))
+    # Move existing whitespace into the enlarged headings/keyword strips on page two.
+    for n in (37,40):height(n,19)
+    for n in (39,42):height(n,18)
+    extra=sum(deltas.get(n,0) for n in (37,39,40,42))
+    for n in (43,55):
+        taken=min(extra,SECTION_GAP_PT)
+        height(n,float(rows[n].getAttribute("ht"))-taken);extra-=taken
+    # Unusually many wrapped special entries must fit rather than truncate their content.
+    growth=sum(v for n,v in deltas.items() if n<=35)
+    if growth>0.01:
+        current=sum(float(rows[n].getAttribute("ht") or 15) for n in rows if n<=35)
+        first(sheet.documentElement,"pageSetup").setAttribute(
+            "scale",str(math.floor(REPORT_PRINT_SCALE*(current-growth)/current)))
+    for collection in (styles.fonts,styles.borders,styles.xfs):
+        collection.setAttribute("count",str(len(children(collection))))
+    return deltas
 
 def write_sheet(doc, values, styles, report, shared):
     data = first(doc.documentElement,"sheetData")
@@ -175,8 +285,8 @@ def hide_gogyo_cell_text(sheet, styles):
     styles.xfs.setAttribute("count", str(len(children(styles.xfs))))
 
 
-def apply_report_layout(sheet, drawing, styles):
-    """Add half a line above headings without changing prose/font/body-box sizes."""
+def apply_report_layout(sheet, drawing, styles, report):
+    """Preserve the page structure while applying the requested print formatting."""
     merges = first(sheet.documentElement, "mergeCells")
     if not any(n.getAttribute("ref") == "D2:F2" for n in children(merges)):
         new(merges, S, "mergeCell", {"ref": "D2:F2"})
@@ -200,12 +310,15 @@ def apply_report_layout(sheet, drawing, styles):
             cell.setAttribute("s", str(len(children(styles.xfs)) - 1))
     styles.xfs.setAttribute("count", str(len(children(styles.xfs))))
     first(sheet.documentElement, "pageSetup").setAttribute("scale", str(REPORT_PRINT_SCALE))
+    layout_deltas = acceptance_layout(sheet, styles, report)
     # Excel uses the row anchors; synchronize cached physical transforms too.
     for anchor in children(drawing.documentElement, "twoCellAnchor"):
         start = int(content(first(first(anchor, "from"), "row"))) + 1
         end = int(content(first(first(anchor, "to"), "row"))) + 1
-        before = sum(SECTION_GAP_PT for row in SECTION_HEADING_ROWS if row < start) * 12700
-        after = sum(SECTION_GAP_PT for row in SECTION_HEADING_ROWS if row < end) * 12700
+        before = (sum(SECTION_GAP_PT for row in SECTION_HEADING_ROWS if row < start) +
+                  sum(delta for row,delta in layout_deltas.items() if row < start)) * 12700
+        after = (sum(SECTION_GAP_PT for row in SECTION_HEADING_ROWS if row < end) +
+                 sum(delta for row,delta in layout_deltas.items() if row < end)) * 12700
         for transform in anchor.getElementsByTagNameNS(A, "xfrm"):
             off, ext = first(transform, "off"), first(transform, "ext")
             off.setAttribute("y", str(int(off.getAttribute("y")) + round(before)))
@@ -272,8 +385,13 @@ def polish_gogyo_layout(doc, report):
         props = first(shape, "spPr")
         no_fill = first(props, "noFill")
         fill = doc.createElementNS(A, "a:solidFill")
-        new(fill, A, "a:srgbClr", {"val": "FFFFFF"})
+        new(fill, A, "a:srgbClr", {"val": "232825"})
         props.replaceChild(fill, no_fill)
+        outline = first(props,"ln")
+        for color in list(children(outline,"solidFill")):outline.removeChild(color)
+        outline_fill = new(outline,A,"a:solidFill")
+        new(outline_fill,A,"a:srgbClr",{"val":"F4EFE6"})
+        if outline.firstChild is not outline_fill:outline.insertBefore(outline_fill,outline.firstChild)
         body = first(shape, "txBody")
         for child in list(body.childNodes): body.removeChild(child)
         body_props = new(body, A, "a:bodyPr", {"anchor": "ctr", "anchorCtr": "1", "wrap": "none",
@@ -284,12 +402,12 @@ def polish_gogyo_layout(doc, report):
         new(paragraph, A, "a:pPr", {"algn": "ctr", "marL": "0", "marR": "0", "indent": "0"})
         run = new(paragraph, A, "a:r")
         run_props = new(run, A, "a:rPr", {"lang": "ja-JP", "sz": "1600", "b": "1"})
-        new(new(run_props, A, "a:solidFill"), A, "a:srgbClr", {"val": "000000"})
+        new(new(run_props, A, "a:solidFill"), A, "a:srgbClr", {"val": "F4EFE6"})
         for font in ("latin", "ea"): new(run_props, A, "a:"+font, {"typeface": "游ゴシック"})
         new(run, A, "a:t", value=report.cells[GOGYO_CELLS[i]])
 
     # Five complete edges follow the official chart_order (a rotation of 木火土金水).
-    # Both sets of arrows stop outside the node outlines; native line colours are preserved.
+    # Both sets of arrows stop outside the node outlines and use the Web palette.
     for ident, source, target in [(9+i, i, (i+1)%5) for i in range(5)] + [
             (14,3,0), (15,0,2), (16,2,4), (17,1,3), (18,4,1)]:
         start, end = points[source], points[target]
@@ -298,18 +416,47 @@ def polish_gogyo_layout(doc, report):
         clearance = radius + 7 * 12700
         sx, sy = start[0]+dx/distance*clearance, start[1]+dy/distance*clearance
         ex, ey = end[0]-dx/distance*clearance, end[1]-dy/distance*clearance
-        shape = place(ident, min(sx,ex), min(sy,ey), abs(ex-sx), abs(ey-sy), ex<sx, ey<sy)
+        if ident < 14:
+            # Match the Web SVG's short clockwise arc (radius = chord * 1.55).
+            chord=math.hypot(ex-sx,ey-sy);arc_radius=chord*1.55
+            sag=arc_radius-math.sqrt(arc_radius**2-(chord/2)**2)
+            nx,ny=-(ey-sy)/chord,(ex-sx)/chord
+            control=4*sag/3
+            curve=[(sx,sy),(sx+(ex-sx)/3-nx*control,sy+(ey-sy)/3-ny*control),
+                   (ex-(ex-sx)/3-nx*control,ey-(ey-sy)/3-ny*control),(ex,ey)]
+            x,y=min(p[0] for p in curve),min(p[1] for p in curve)
+            w,h=max(p[0] for p in curve)-x,max(p[1] for p in curve)-y
+            shape=place(ident,x,y,w,h)
+        else:
+            shape = place(ident, min(sx,ex), min(sy,ey), abs(ex-sx), abs(ey-sy), ex<sx, ey<sy)
         shape.getElementsByTagNameNS(X, "cNvPr")[0].setAttribute(
             "name", f"Gogyo_{'Sheng' if ident<14 else 'Ke'}_{source}_{target}")
         geom = first(first(shape, "spPr"), "prstGeom")
         geom.setAttribute("prst", "straightConnector1")
         for adjustment in list(children(first(geom, "avLst"))): first(geom, "avLst").removeChild(adjustment)
-        # Arc shapes become native connectors, so Excel renders a full line with its end arrow.
+        line=first(first(shape,"spPr"),"ln")
+        line.setAttribute("w",str(round((2.8 if ident<14 else 2.3)*12700)))
+        for fill in list(children(line,"solidFill")):line.removeChild(fill)
+        line_fill=new(line,A,"a:solidFill")
+        new(line_fill,A,"a:srgbClr",{"val":"9EB9A8" if ident<14 else "D7A96B"})
+        if line.firstChild is not line_fill:line.insertBefore(line_fill,line.firstChild)
+        # Native custom curves retain Excel/PDF arrowheads without raster images.
         if ident < 14:
-            replacement = doc.createElementNS(X, "xdr:cxnSp")
-            nv = new(replacement, X, "xdr:nvCxnSpPr")
+            props=first(shape,"spPr")
+            custom=doc.createElementNS(A,"a:custGeom")
+            for name in ("avLst","gdLst","ahLst","cxnLst"):new(custom,A,"a:"+name)
+            new(custom,A,"a:rect",{"l":"0","t":"0","r":"r","b":"b"})
+            path_node=new(new(custom,A,"a:pathLst"),A,"a:path",
+                          {"w":round(w),"h":round(h),"fill":"none","stroke":"1"})
+            move=new(path_node,A,"a:moveTo")
+            new(move,A,"a:pt",{"x":round(curve[0][0]-x),"y":round(curve[0][1]-y)})
+            bezier=new(path_node,A,"a:cubicBezTo")
+            for px,py in curve[1:]:new(bezier,A,"a:pt",{"x":round(px-x),"y":round(py-y)})
+            props.replaceChild(custom,geom)
+            replacement = doc.createElementNS(X, "xdr:sp")
+            nv = new(replacement, X, "xdr:nvSpPr")
             nv.appendChild(shape.getElementsByTagNameNS(X, "cNvPr")[0])
-            new(nv, X, "xdr:cNvCxnSpPr")
+            new(nv, X, "xdr:cNvSpPr")
             replacement.appendChild(first(shape, "spPr"))
             style = first(shape, "style")
             if style is not None: replacement.appendChild(style)
@@ -364,11 +511,11 @@ def render_xlsx(report: ReadingReport, template_path=TEMPLATE_PATH):
         strings.append("".join(content(n) if n.localName=="t" else "".join(content(t) for t in children(n,"t")) for n in children(si) if n.localName in ("t","r")))
     style_doc=minidom.parseString(files["xl/styles.xml"]);styles=Styles(style_doc)
     sheet=minidom.parseString(files["xl/worksheets/sheet2.xml"])
-    write_sheet(sheet,{**report.cells,**report.chart_cells},styles,report,strings)
+    write_sheet(sheet,{**presentation_cells(report),**report.chart_cells},styles,report,strings)
     hide_gogyo_cell_text(sheet, styles)
     drawing=minidom.parseString(files["xl/drawings/drawing2.xml"])
     write_shapes(drawing,report.texts)
-    apply_report_layout(sheet, drawing, styles)
+    apply_report_layout(sheet, drawing, styles, report)
     workbook=minidom.parseString(files["xl/workbook.xml"])
     protect_advice_bottom_border(sheet, drawing, workbook)
     files["xl/workbook.xml"]=serialize(workbook)

@@ -155,7 +155,7 @@ class InterpretationCases(unittest.TestCase):
         tokens = ExportTokens(); token = tokens.issue("synthetic", form, result)
         _, xlsx = export_reading("synthetic", {"export_token": token}, tokens=tokens)
         parts = unpack(xlsx); cells = sheet_cells(parts)
-        self.assertEqual(cells["L60"], "2027")
+        self.assertEqual(cells["L61"], "2027")
         self.assertEqual(cells.get("G61", ""), "")
         raw = b"".join(parts.values())
         self.assertIn(UNREGISTERED_MESSAGE.encode(), raw)
