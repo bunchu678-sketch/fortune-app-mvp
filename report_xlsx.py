@@ -24,6 +24,8 @@ SECTION_GAP_PT = 7.5
 SECTION_HEADING_ROWS = (25, 29, 34, 36, 43, 55, 60, 62, 67)
 REPORT_PRINT_SCALE = 82
 ADVICE_BOTTOM_INSET_PT = 6
+POLISH_HEADING_HEIGHT_PT = 24
+POLISH_ADVICE_SPACE_PT = 18.7
 
 
 def children(node, local=None):
@@ -96,7 +98,7 @@ def presentation_cells(report):
     """Rearrange supplied report fields only; preserve the official report projection."""
     values = dict(report.cells)
     values.update({"B60": "●年運", "I60": "太罫線：接木運の境界",
-                   "L60": "", "M60": "", "N60": ""})
+                   "L60": "", "M60": "", "N60": "", "H4": ""})
     for col in "LMN":
         values[col+"61"] = report.cells[col+"60"]
     for col, heading, footer in (("C",37,39),("I",37,39),("C",40,42),("I",40,42)):
@@ -109,7 +111,7 @@ def presentation_cells(report):
 
 
 def acceptance_layout(sheet, styles, report):
-    """Local print formatting; keep spare blank special rows and page heights useful."""
+    """Format headings and populated rows without squeezing unused table rows."""
     rows = {int(r.getAttribute("r")):r for r in sheet.getElementsByTagNameNS(S,"row")}
     cells = {c.getAttribute("r"):c for r in rows.values() for c in children(r,"c")}
     merges = first(sheet.documentElement,"mergeCells")
@@ -120,7 +122,7 @@ def acceptance_layout(sheet, styles, report):
         new(merges,S,"mergeCell",{"ref":ref})
     merges.setAttribute("count",str(len(children(merges))))
 
-    def style(address, size=None, bold=None, wrap=False, plain=False, diagonal=False, source=None):
+    def style(address, size=None, bold=None, wrap=False, plain=False, diagonal=False, source=None, horizontal="left"):
         cell = cells[address]
         xf = children(styles.xfs)[int(cells[source or address].getAttribute("s") or 0)].cloneNode(True)
         font = children(styles.fonts)[int(xf.getAttribute("fontId") or 0)].cloneNode(True)
@@ -133,7 +135,7 @@ def acceptance_layout(sheet, styles, report):
         xf.setAttribute("fontId",str(len(children(styles.fonts))-1));xf.setAttribute("applyFont","1")
         alignment = first(xf,"alignment")
         if alignment is None:alignment=new(xf,S,"alignment")
-        for key,value in {"vertical":"center","horizontal":"left","wrapText":"1" if wrap else "0",
+        for key,value in {"vertical":"center","horizontal":horizontal,"wrapText":"1" if wrap else "0",
                           "shrinkToFit":"0" if wrap else "1"}.items():
             alignment.setAttribute(key,value)
         xf.setAttribute("applyAlignment","1")
@@ -151,8 +153,9 @@ def acceptance_layout(sheet, styles, report):
         styles.xfs.appendChild(xf);cell.setAttribute("s",str(len(children(styles.xfs))-1))
 
     for address in ("C2","D2"):style(address,size=11)
-    style("E10",diagonal=True)  # The dash is official display data; remove only its diagonal.
+    style("E10",diagonal=True,horizontal="center")  # Keep the official dash and its outer borders.
     style("B18",size=11,bold=True)
+    for address in ("B43","B55"):style(address,size=11,bold=True)
     for address in ("C37","I37","C40","I40"):style(address,size=11,bold=True)
     for address in ("C39","I39","C42","I42"):style(address,size=10)
     style("B60",size=11,bold=True,plain=True)
@@ -163,13 +166,13 @@ def acceptance_layout(sheet, styles, report):
     style("G61",wrap=False)
 
     deltas={}
-    def height(number,value):
+    def height(number,value,hidden=False):
         old=float(rows[number].getAttribute("ht") or 15)
         rows[number].setAttribute("ht",f"{value:g}");rows[number].setAttribute("customHeight","1")
-        deltas[number]=value-old
+        rows[number].setAttribute("hidden","1" if hidden else "0")
+        deltas[number]=(0 if hidden else value)-old
 
     height(18,20)
-    budget=sum(float(rows[n].getAttribute("ht")) for n in range(19,25))-deltas[18]
     needs={}
     for n in range(19,25):
         left,right=(str(report.cells[col+str(n)]) for col in ("C","E"))
@@ -179,23 +182,17 @@ def acceptance_layout(sheet, styles, report):
                                               for c in line)/capacity)) for line in value.split("\n"))
             needs[n]=max(20,16*max(lines(left,16),lines(right,86))+4)
         style("C"+str(n),wrap=True);style("E"+str(n),wrap=True)
-    empty=6-len(needs)
-    total=max(budget,sum(needs.values())+empty*2)
-    blank=(total-sum(needs.values()))/empty if empty else 0
-    for n in range(19,25):height(n,needs.get(n,blank))
-    # Move existing whitespace into the enlarged headings/keyword strips on page two.
+    # Keep each populated row at its required height. Hide unused rows rather
+    # than printing hairline blank bands; zero results retain one ordinary blank row.
+    for n in range(19,25):
+        hide=n not in needs and not (n==19 and not needs)
+        height(n,needs.get(n,20),hidden=hide)
     for n in (37,40):height(n,19)
     for n in (39,42):height(n,18)
-    extra=sum(deltas.get(n,0) for n in (37,39,40,42))
-    for n in (43,55):
-        taken=min(extra,SECTION_GAP_PT)
-        height(n,float(rows[n].getAttribute("ht"))-taken);extra-=taken
-    # Unusually many wrapped special entries must fit rather than truncate their content.
-    growth=sum(v for n,v in deltas.items() if n<=35)
-    if growth>0.01:
-        current=sum(float(rows[n].getAttribute("ht") or 15) for n in rows if n<=35)
-        first(sheet.documentElement,"pageSetup").setAttribute(
-            "scale",str(math.floor(REPORT_PRINT_SCALE*(current-growth)/current)))
+    for n in (43,55):height(n,POLISH_HEADING_HEIGHT_PT)
+    # Transfer unused space at the end of the advice box to the section headings.
+    # This preserves page-two height and chart sizes at the approved 82% scale.
+    height(68,float(rows[68].getAttribute("ht"))-POLISH_ADVICE_SPACE_PT)
     for collection in (styles.fonts,styles.borders,styles.xfs):
         collection.setAttribute("count",str(len(children(collection))))
     return deltas
@@ -383,14 +380,12 @@ def polish_gogyo_layout(doc, report):
         shape = place(ident, x-radius, y-radius, radius*2, radius*2)
         shape.getElementsByTagNameNS(X, "cNvPr")[0].setAttribute("name", f"Gogyo_Node_{i}")
         props = first(shape, "spPr")
-        no_fill = first(props, "noFill")
-        fill = doc.createElementNS(A, "a:solidFill")
-        new(fill, A, "a:srgbClr", {"val": "232825"})
-        props.replaceChild(fill, no_fill)
+        # Preserve the template's actual noFill (transparent), not a white fill.
+        assert first(props,"noFill") is not None
         outline = first(props,"ln")
         for color in list(children(outline,"solidFill")):outline.removeChild(color)
         outline_fill = new(outline,A,"a:solidFill")
-        new(outline_fill,A,"a:srgbClr",{"val":"F4EFE6"})
+        new(outline_fill,A,"a:srgbClr",{"val":"5B655F"})
         if outline.firstChild is not outline_fill:outline.insertBefore(outline_fill,outline.firstChild)
         body = first(shape, "txBody")
         for child in list(body.childNodes): body.removeChild(child)
@@ -402,7 +397,7 @@ def polish_gogyo_layout(doc, report):
         new(paragraph, A, "a:pPr", {"algn": "ctr", "marL": "0", "marR": "0", "indent": "0"})
         run = new(paragraph, A, "a:r")
         run_props = new(run, A, "a:rPr", {"lang": "ja-JP", "sz": "1600", "b": "1"})
-        new(new(run_props, A, "a:solidFill"), A, "a:srgbClr", {"val": "F4EFE6"})
+        new(new(run_props, A, "a:solidFill"), A, "a:srgbClr", {"val": "232825"})
         for font in ("latin", "ea"): new(run_props, A, "a:"+font, {"typeface": "游ゴシック"})
         new(run, A, "a:t", value=report.cells[GOGYO_CELLS[i]])
 

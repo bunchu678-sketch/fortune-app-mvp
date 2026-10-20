@@ -22,7 +22,7 @@ from fortune_service import calculate_fortune
 from history_repository import SQLiteHistoryRepository, HistoryError
 from history_service import HistoryService
 from report_data import build_reading_report, difference, ReportError
-from report_xlsx import render_xlsx, TEMPLATE_PATH, TEMPLATE_SHA256, GOGYO_CELLS, GOGYO_DRAWING_IDS, SECTION_HEADING_ROWS, SECTION_GAP_PT, REPORT_PRINT_SCALE, ADVICE_BOTTOM_INSET_PT
+from report_xlsx import render_xlsx, TEMPLATE_PATH, TEMPLATE_SHA256, GOGYO_CELLS, GOGYO_DRAWING_IDS, SECTION_HEADING_ROWS, SECTION_GAP_PT, REPORT_PRINT_SCALE, ADVICE_BOTTOM_INSET_PT, POLISH_ADVICE_SPACE_PT
 from report_export_service import ExportTokens, export_reading
 from tier_b import api_app
 
@@ -229,8 +229,12 @@ class ReportCases(unittest.TestCase):
             expected=sum(float(old_rows[str(n)].get('ht',15)) for n in range(start,end+1))
             expected+=sum(SECTION_GAP_PT for n in SECTION_HEADING_ROWS if start<=n<=end)
             if end==68:expected-=ADVICE_BOTTOM_INSET_PT
-            actual=sum(float(new_rows[str(n)].get('ht',15)) for n in range(start,end+1))
-            self.assertAlmostEqual(actual,expected,places=3)
+            actual=sum(0 if new_rows[str(n)].get('hidden')=='1' else float(new_rows[str(n)].get('ht',15))
+                       for n in range(start,end+1))
+            if start==1:
+                self.assertLess(actual,expected)  # Unused special rows no longer print.
+            else:
+                self.assertAlmostEqual(actual,expected,places=3)
         self.assertGreaterEqual(float(new_rows['18'].get('ht')),20)
         for n in range(19,25):
             if self.report.cells['C'+str(n)] or self.report.cells['E'+str(n)]:
@@ -242,7 +246,7 @@ class ReportCases(unittest.TestCase):
             props=old.find('.//x:cNvPr',NS)
             if not props.get('name').startswith('Phase5_') and props.get('id')!='3':continue
             expected_extent=dict(old.find('.//a:xfrm/a:ext',NS).attrib)
-            if props.get('id')=='3':expected_extent['cy']=str(int(expected_extent['cy'])-ADVICE_BOTTOM_INSET_PT*12700)
+            if props.get('id')=='3':expected_extent['cy']=str(int(expected_extent['cy'])-round((ADVICE_BOTTOM_INSET_PT+POLISH_ADVICE_SPACE_PT)*12700))
             self.assertEqual(expected_extent,new.find('.//a:xfrm/a:ext',NS).attrib)
             self.assertEqual(ET.tostring(old.find('.//x:txBody/a:bodyPr',NS)),ET.tostring(new.find('.//x:txBody/a:bodyPr',NS)))
             self.assertEqual(ET.tostring(old.find('.//x:txBody/a:p/a:r/a:rPr',NS)),ET.tostring(new.find('.//x:txBody/a:p/a:r/a:rPr',NS)))
@@ -314,7 +318,7 @@ class ReportCases(unittest.TestCase):
         with ZipFile(TEMPLATE_PATH) as z:original=ET.fromstring(z.read('xl/worksheets/sheet2.xml'))
         before=float(original.find("s:sheetData/s:row[@r='68']",NS).get('ht'))
         after=float(sheet.find("s:sheetData/s:row[@r='68']",NS).get('ht'))
-        self.assertEqual(after+float(gutter.get('ht')),before)
+        self.assertAlmostEqual(after+float(gutter.get('ht'))+POLISH_ADVICE_SPACE_PT,before)
 
     def test_meishiki_and_kubou(self):
         for col,key in zip('DEFG',('hour','day','month','year')):
@@ -404,6 +408,78 @@ class ReportCases(unittest.TestCase):
         self.assertGreaterEqual(float(row.get('ht')),36)
         self.assertEqual(sheet_cells(parts)['E19'],'一行目の正式説明\n二行目の正式説明')
         self.assertEqual(sheet.find('s:pageSetup',NS).get('scale'),str(REPORT_PRINT_SCALE))
+
+    def test_polish_transparent_nodes_and_removed_caption(self):
+        drawing=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
+        for i in range(5):
+            anchor=next(a for a in drawing if a.find('.//x:cNvPr',NS).get('name')==f'Gogyo_Node_{i}')
+            props=anchor.find('x:sp/x:spPr',NS)
+            self.assertIsNotNone(props.find('a:noFill',NS))
+            self.assertIsNone(props.find('a:solidFill',NS))
+            self.assertEqual(props.find('a:ln/a:solidFill/a:srgbClr',NS).get('val'),'5B655F')
+            run=anchor.find('x:sp/x:txBody/a:p/a:r',NS)
+            self.assertEqual(run.find('a:rPr/a:solidFill/a:srgbClr',NS).get('val'),'232825')
+            self.assertEqual(run.findtext('a:t','',NS),self.cells[GOGYO_CELLS[i]])
+        self.assertEqual(self.cells['H4'],'')
+        self.assertNotIn('元命式のみ'.encode(),b''.join(self.parts.values()))
+
+    def test_polish_heading_padding_and_centered_dash(self):
+        sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml']);styles=ET.fromstring(self.parts['xl/styles.xml'])
+        xfs=list(styles.find('s:cellXfs',NS))
+        for address in ('B43','B55','E10'):
+            cell=sheet.find("s:sheetData/s:row/s:c[@r='%s']"%address,NS)
+            alignment=xfs[int(cell.get('s'))].find('s:alignment',NS)
+            self.assertEqual(alignment.get('vertical'),'center')
+            if address=='E10':self.assertEqual(alignment.get('horizontal'),'center')
+        for n in (43,55):
+            self.assertGreaterEqual(float(sheet.find("s:sheetData/s:row[@r='%s']"%n,NS).get('ht')),24)
+
+    def test_polish_special_counts_long_text_and_newlines(self):
+        cases=[[],[{'判定':'確認','結果':'合成説明'}],
+               [{'判定':'確認'+str(i),'結果':'合成説明'} for i in range(2)],
+               [{'判定':'確認'+str(i),'結果':'合成説明'} for i in range(6)],
+               [{'判定':'長文確認','結果':'合成の長文を省略しない表示確認。'*8}],
+               [{'判定':'改行確認','結果':chr(10).join(['一行目の合成説明','二行目の合成説明','三行目の合成説明'])}]]
+        for entries in cases:
+            with self.subTest(count=len(entries),content=str(entries)[:20]):
+                result=deepcopy(self.result);result['special_meishiki']['rows']=entries
+                parts=unpack(render_xlsx(build_reading_report(FORM,result)))
+                sheet=ET.fromstring(parts['xl/worksheets/sheet2.xml']);values=sheet_cells(parts)
+                rows=[sheet.find("s:sheetData/s:row[@r='%s']"%n,NS) for n in range(19,25)]
+                visible=[r for r in rows if r.get('hidden')!='1']
+                self.assertEqual(len(visible),max(1,len(entries)))
+                self.assertTrue(all(float(r.get('ht'))>=20 for r in rows))
+                for i,entry in enumerate(entries):
+                    self.assertEqual(values['C'+str(19+i)],entry['判定'])
+                    self.assertEqual(values['E'+str(19+i)],entry['結果'])
+                if entries and (chr(10) in entries[0]['結果'] or len(entries[0]['結果'])>80):
+                    self.assertGreater(float(rows[0].get('ht')),20)
+                self.assertEqual(sheet.find('s:pageSetup',NS).get('scale'),str(REPORT_PRINT_SCALE))
+                self.assertEqual(sheet.find('s:rowBreaks/s:brk',NS).get('id'),'35')
+
+    def test_polish_drawing_transforms_follow_effective_row_heights(self):
+        with ZipFile(TEMPLATE_PATH) as z:
+            original=ET.fromstring(z.read('xl/worksheets/sheet2.xml'))
+            old_drawing=ET.fromstring(z.read('xl/drawings/drawing2.xml'))
+        sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
+        def heights(root):
+            return {int(r.get('r')):0 if r.get('hidden')=='1' else float(r.get('ht',15))
+                    for r in root.findall('s:sheetData/s:row',NS)}
+        old_h,new_h=heights(original),heights(sheet)
+        drawing=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
+        for old,new in zip(old_drawing,drawing):
+            name=old.find('.//x:cNvPr',NS).get('name')
+            if not name.startswith('Phase5_') and old.find('.//x:cNvPr',NS).get('id')!='3':continue
+            start=int(old.findtext('x:from/x:row','',NS))+1;end=int(old.findtext('x:to/x:row','',NS))+1
+            shift=sum(new_h[n]-old_h[n] for n in range(1,start))*12700
+            resize=sum(new_h[n]-old_h[n] for n in range(start,end))*12700
+            a,b=old.find('.//a:xfrm',NS),new.find('.//a:xfrm',NS)
+            self.assertAlmostEqual(int(b.find('a:off',NS).get('y'))-int(a.find('a:off',NS).get('y')),shift,delta=1)
+            self.assertAlmostEqual(int(b.find('a:ext',NS).get('cy'))-int(a.find('a:ext',NS).get('cy')),resize,delta=1)
+        for old,new in zip(old_drawing,drawing):
+            if old.find('.//c:chart',NS) is None:continue
+            for name in ('from','to'):
+                self.assertEqual(ET.tostring(old.find('x:'+name,NS)),ET.tostring(new.find('x:'+name,NS)))
 
     def test_chart_sources_and_caches(self):
         thinking=self.result['personality']['juuni_unsei']['thinking']
