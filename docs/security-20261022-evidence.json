@@ -1,0 +1,1020 @@
+{
+  "date": "2026-10-22",
+  "track": "main",
+  "branch": "security-main-next-node-20261022",
+  "base_head": "e8b53082775744a74f66502e8fb8f3cef72974c1",
+  "code_commit": "bdc6de9906557ccc0c0083d53d1fb4a8fb713b9a",
+  "production_applied": false,
+  "windows_global_node_replaced": false,
+  "audit_before": {
+    "advisories": {
+      "1117015": {
+        "findings": [
+          {
+            "version": "8.4.31",
+            "paths": [
+              ".>next>postcss"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1117015,
+        "title": "PostCSS has XSS via Unescaped </style> in its CSS Stringify Output",
+        "module_name": "postcss",
+        "vulnerable_versions": "<8.5.10",
+        "patched_versions": ">=8.5.10",
+        "severity": "moderate",
+        "cwe": "CWE-79",
+        "github_advisory_id": "GHSA-qx2v-qp2m-jg93",
+        "url": "https://github.com/advisories/GHSA-qx2v-qp2m-jg93"
+      },
+      "1124066": {
+        "findings": [
+          {
+            "version": "0.34.5",
+            "paths": [
+              ".>next>sharp"
+            ],
+            "dev": false,
+            "optional": true,
+            "bundled": false
+          }
+        ],
+        "id": 1124066,
+        "title": "sharp inherited vulnerabilities in libvips: CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591",
+        "module_name": "sharp",
+        "vulnerable_versions": "<0.35.0",
+        "patched_versions": ">=0.35.0",
+        "severity": "high",
+        "cwe": "CWE-1395",
+        "github_advisory_id": "GHSA-f88m-g3jw-g9cj",
+        "url": "https://github.com/advisories/GHSA-f88m-g3jw-g9cj"
+      },
+      "1124170": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1124170,
+        "title": "Next.js: Middleware / Proxy bypass in App Router applications using Turbopack and single locale",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.2.11",
+        "patched_versions": ">=16.2.11",
+        "severity": "high",
+        "cwe": "CWE-285",
+        "github_advisory_id": "GHSA-6gpp-xcg3-4w24",
+        "url": "https://github.com/advisories/GHSA-6gpp-xcg3-4w24"
+      },
+      "1124171": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1124171,
+        "title": "Next.js: Denial of Service in App Router using Server Actions",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.2.11",
+        "patched_versions": ">=16.2.11",
+        "severity": "high",
+        "cwe": "CWE-834",
+        "github_advisory_id": "GHSA-m99w-x7hq-7vfj",
+        "url": "https://github.com/advisories/GHSA-m99w-x7hq-7vfj"
+      },
+      "1124184": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1124184,
+        "title": "Next.js: Server-Side Request Forgery in Server Actions on custom servers",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.2.11",
+        "patched_versions": ">=16.2.11",
+        "severity": "high",
+        "cwe": "CWE-918",
+        "github_advisory_id": "GHSA-89xv-2m56-2m9x",
+        "url": "https://github.com/advisories/GHSA-89xv-2m56-2m9x"
+      },
+      "1124186": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1124186,
+        "title": "Next.js: Cache confusion of response bodies for requests with bodies",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.2.11",
+        "patched_versions": ">=16.2.11",
+        "severity": "moderate",
+        "cwe": "CWE-524",
+        "github_advisory_id": "GHSA-68g3-v927-f742",
+        "url": "https://github.com/advisories/GHSA-68g3-v927-f742"
+      },
+      "1124188": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1124188,
+        "title": "Next.js: Cache confusion of response bodies for requests with bodies containing invalid UTF-8 byte sequences",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.2.11",
+        "patched_versions": ">=16.2.11",
+        "severity": "moderate",
+        "cwe": "CWE-116",
+        "github_advisory_id": "GHSA-4633-3j49-mh5q",
+        "url": "https://github.com/advisories/GHSA-4633-3j49-mh5q"
+      },
+      "1124190": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1124190,
+        "title": "Next.js: Unbounded Server Action payload in Edge runtime",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.2.11",
+        "patched_versions": ">=16.2.11",
+        "severity": "moderate",
+        "cwe": "CWE-770",
+        "github_advisory_id": "GHSA-4c39-4ccg-62r3",
+        "url": "https://github.com/advisories/GHSA-4c39-4ccg-62r3"
+      },
+      "1124192": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1124192,
+        "title": "Next.js: Server-Side Request Forgery in rewrites via attacker-controlled destination hostname",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.2.11",
+        "patched_versions": ">=16.2.11",
+        "severity": "high",
+        "cwe": "CWE-918",
+        "github_advisory_id": "GHSA-p9j2-gv94-2wf4",
+        "url": "https://github.com/advisories/GHSA-p9j2-gv94-2wf4"
+      },
+      "1124194": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1124194,
+        "title": "Next.js: Denial of Service in the Image Optimization API using SVGs",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.2.11",
+        "patched_versions": ">=16.2.11",
+        "severity": "moderate",
+        "cwe": "CWE-407",
+        "github_advisory_id": "GHSA-q8wf-6r8g-63ch",
+        "url": "https://github.com/advisories/GHSA-q8wf-6r8g-63ch"
+      },
+      "1124196": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1124196,
+        "title": "Next.js: Unauthenticated disclosure of internal Server Function endpoints",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.2.11",
+        "patched_versions": ">=16.2.11",
+        "severity": "moderate",
+        "cwe": "CWE-201",
+        "github_advisory_id": "GHSA-955p-x3mx-jcvp",
+        "url": "https://github.com/advisories/GHSA-955p-x3mx-jcvp"
+      },
+      "1124252": {
+        "findings": [
+          {
+            "version": "8.4.31",
+            "paths": [
+              ".>next>postcss"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1124252,
+        "title": "PostCSS: Arbitrary file read and information disclosure via attacker-controlled sourceMappingURL in CSS comments",
+        "module_name": "postcss",
+        "vulnerable_versions": "<=8.5.11",
+        "patched_versions": ">=8.5.12",
+        "severity": "high",
+        "cwe": "CWE-22, CWE-200",
+        "github_advisory_id": "GHSA-6g55-p6wh-862q",
+        "url": "https://github.com/advisories/GHSA-6g55-p6wh-862q"
+      },
+      "1130709": {
+        "findings": [
+          {
+            "version": "8.4.31",
+            "paths": [
+              ".>next>postcss"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1130709,
+        "title": "PostCSS: incomplete fix of GHSA-6g55-p6wh-862q — attacker-controlled sourceMappingURL reads arbitrary .map files when `from` is unset",
+        "module_name": "postcss",
+        "vulnerable_versions": "<=8.5.22",
+        "patched_versions": ">=8.5.23",
+        "severity": "moderate",
+        "cwe": "CWE-22, CWE-200",
+        "github_advisory_id": "GHSA-fxqj-rqcc-2cmp",
+        "url": "https://github.com/advisories/GHSA-fxqj-rqcc-2cmp"
+      },
+      "1138811": {
+        "findings": [
+          {
+            "version": "3.3.15",
+            "paths": [
+              ".>next>postcss>nanoid"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1138811,
+        "title": "nanoid: non-secure generators can loop indefinitely with negative size",
+        "module_name": "nanoid",
+        "vulnerable_versions": "<3.3.16",
+        "patched_versions": ">=3.3.16",
+        "severity": "high",
+        "cwe": "CWE-835",
+        "github_advisory_id": "GHSA-28wg-ghj8-5hjv",
+        "url": "https://github.com/advisories/GHSA-28wg-ghj8-5hjv"
+      },
+      "1139427": {
+        "findings": [
+          {
+            "version": "3.3.15",
+            "paths": [
+              ".>next>postcss>nanoid"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1139427,
+        "title": "nanoid: custom generators can loop indefinitely when size is zero",
+        "module_name": "nanoid",
+        "vulnerable_versions": "<3.3.18",
+        "patched_versions": ">=3.3.18",
+        "severity": "high",
+        "cwe": "CWE-835",
+        "github_advisory_id": "GHSA-2v37-7h3g-55p8",
+        "url": "https://github.com/advisories/GHSA-2v37-7h3g-55p8"
+      },
+      "1139510": {
+        "findings": [
+          {
+            "version": "8.4.31",
+            "paths": [
+              ".>next>postcss"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1139510,
+        "title": "PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Arbitrary .map File Disclosure",
+        "module_name": "postcss",
+        "vulnerable_versions": "<=8.5.17",
+        "patched_versions": ">=8.5.18",
+        "severity": "high",
+        "cwe": "CWE-22",
+        "github_advisory_id": "GHSA-r28c-9q8g-f849",
+        "url": "https://github.com/advisories/GHSA-r28c-9q8g-f849"
+      },
+      "1193676": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1193676,
+        "title": "Next.js: Unauthenticated Remote Code Execution on windows-hosted servers",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.3.3",
+        "patched_versions": ">=16.3.3",
+        "severity": "critical",
+        "cwe": "CWE-22",
+        "github_advisory_id": "GHSA-p293-qw3h-jr36",
+        "url": "https://github.com/advisories/GHSA-p293-qw3h-jr36"
+      },
+      "1193686": {
+        "findings": [
+          {
+            "version": "2.10.40",
+            "paths": [
+              ".>next>baseline-browser-mapping"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1193686,
+        "title": "baseline-browser-mapping process termination on invalid input causes denial of service",
+        "module_name": "baseline-browser-mapping",
+        "vulnerable_versions": ">=2.0.0 <2.11.0",
+        "patched_versions": ">=2.11.0",
+        "severity": "moderate",
+        "cwe": "CWE-705",
+        "github_advisory_id": "GHSA-w5vr-8v7q-w6rv",
+        "url": "https://github.com/advisories/GHSA-w5vr-8v7q-w6rv"
+      },
+      "1193725": {
+        "findings": [
+          {
+            "version": "0.34.5",
+            "paths": [
+              ".>next>sharp"
+            ],
+            "dev": false,
+            "optional": true,
+            "bundled": false
+          }
+        ],
+        "id": 1193725,
+        "title": "sharp: Vulnerabilities in libheif: GHSA-g89c-p67h-r497 and GHSA-2jg2-4ch7-h545",
+        "module_name": "sharp",
+        "vulnerable_versions": "<0.35.4",
+        "patched_versions": ">=0.35.4",
+        "severity": "high",
+        "cwe": "CWE-122",
+        "github_advisory_id": "GHSA-rgj7-g3m4-5g8c",
+        "url": "https://github.com/advisories/GHSA-rgj7-g3m4-5g8c"
+      },
+      "1193732": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1193732,
+        "title": "Next.js: Unauthenticated Remote Code Execution in Image Optimization API when AVIF files are used",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.3.3",
+        "patched_versions": ">=16.3.3",
+        "severity": "critical",
+        "cwe": "CWE-1395",
+        "github_advisory_id": "GHSA-2xp9-vwfh-vxw4",
+        "url": "https://github.com/advisories/GHSA-2xp9-vwfh-vxw4"
+      },
+      "1240609": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1240609,
+        "title": "Next.js: Remote Code Execution in next/og ImageResponse",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.2.0 <16.3.6",
+        "patched_versions": ">=16.3.6",
+        "severity": "critical",
+        "cwe": "CWE-1395",
+        "github_advisory_id": "GHSA-vcvr-r3jv-pc5j",
+        "url": "https://github.com/advisories/GHSA-vcvr-r3jv-pc5j"
+      },
+      "1241209": {
+        "findings": [
+          {
+            "version": "1.2.1",
+            "paths": [
+              ".>next>postcss>source-map-js"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1241209,
+        "title": "source-map-js allows event-loop denial of service through indexed source-map section offsets",
+        "module_name": "source-map-js",
+        "vulnerable_versions": ">=1.0.0 <1.2.2",
+        "patched_versions": ">=1.2.2",
+        "severity": "high",
+        "cwe": "CWE-1284",
+        "github_advisory_id": "GHSA-68fv-2mgg-jv7q",
+        "url": "https://github.com/advisories/GHSA-68fv-2mgg-jv7q"
+      },
+      "1241331": {
+        "findings": [
+          {
+            "version": "0.34.5",
+            "paths": [
+              ".>next>sharp"
+            ],
+            "dev": false,
+            "optional": true,
+            "bundled": false
+          }
+        ],
+        "id": 1241331,
+        "title": "sharp : Vulnerability in librsvg dependency CVE-2026-96889",
+        "module_name": "sharp",
+        "vulnerable_versions": "<0.35.5",
+        "patched_versions": ">=0.35.5",
+        "severity": "high",
+        "cwe": "CWE-416, CWE-1395",
+        "github_advisory_id": "GHSA-wq5f-xc86-pv6w",
+        "url": "https://github.com/advisories/GHSA-wq5f-xc86-pv6w"
+      },
+      "1241490": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1241490,
+        "title": "Next.js has cache poisoning of SSG and ISR pages in self-hosted applications",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.3.8",
+        "patched_versions": ">=16.3.8",
+        "severity": "moderate",
+        "cwe": "CWE-524",
+        "github_advisory_id": "GHSA-4jqv-mc3x-m676",
+        "url": "https://github.com/advisories/GHSA-4jqv-mc3x-m676"
+      },
+      "1241492": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1241492,
+        "title": "Next.js has information disclosure in development server's Model Context Protocol endpoint",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.3.8",
+        "patched_versions": ">=16.3.8",
+        "severity": "low",
+        "cwe": "CWE-346",
+        "github_advisory_id": "GHSA-39w2-rjm5-chcv",
+        "url": "https://github.com/advisories/GHSA-39w2-rjm5-chcv"
+      },
+      "1241493": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1241493,
+        "title": "Next.js has information disclosure in App Router metadata image routes via dynamicParams bypass",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.3.8",
+        "patched_versions": ">=16.3.8",
+        "severity": "moderate",
+        "cwe": "CWE-346",
+        "github_advisory_id": "GHSA-f87g-xv8r-7p7x",
+        "url": "https://github.com/advisories/GHSA-f87g-xv8r-7p7x"
+      },
+      "1241495": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1241495,
+        "title": "Next.js has cache poisoning in SSG/ISR rendering that leads to cross-user content substitution and persistent denial of service",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.3.8",
+        "patched_versions": ">=16.3.8",
+        "severity": "moderate",
+        "cwe": "CWE-524",
+        "github_advisory_id": "GHSA-mcj8-r9mp-w47p",
+        "url": "https://github.com/advisories/GHSA-mcj8-r9mp-w47p"
+      },
+      "1241496": {
+        "findings": [
+          {
+            "version": "16.2.9",
+            "paths": [
+              ".>next"
+            ],
+            "dev": false,
+            "optional": false,
+            "bundled": false
+          }
+        ],
+        "id": 1241496,
+        "title": "Next.js has Server-Side Request Forgery in Image Optimization",
+        "module_name": "next",
+        "vulnerable_versions": ">=16.0.0 <16.3.8",
+        "patched_versions": ">=16.3.8",
+        "severity": "high",
+        "cwe": "CWE-918",
+        "github_advisory_id": "GHSA-cjq9-62q9-8jv4",
+        "url": "https://github.com/advisories/GHSA-cjq9-62q9-8jv4"
+      }
+    },
+    "metadata": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 1,
+        "moderate": 11,
+        "high": 13,
+        "critical": 3
+      },
+      "dependencies": 16,
+      "devDependencies": 6,
+      "optionalDependencies": 37,
+      "totalDependencies": 59
+    }
+  },
+  "audit_after": {
+    "advisories": {},
+    "metadata": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0
+      },
+      "dependencies": 18,
+      "devDependencies": 4,
+      "optionalDependencies": 39,
+      "totalDependencies": 61
+    }
+  },
+  "python_suites": [
+    {
+      "suite": "test_harness.py",
+      "exit": 0,
+      "seconds": 1.12,
+      "tests": 16
+    },
+    {
+      "suite": "auth_cases.py",
+      "exit": 0,
+      "seconds": 43.05,
+      "tests": 44
+    },
+    {
+      "suite": "deploy_blocker_cases.py",
+      "exit": 0,
+      "seconds": 2.58,
+      "tests": 20
+    },
+    {
+      "suite": "history_cases.py",
+      "exit": 0,
+      "seconds": 9.09,
+      "tests": 32
+    },
+    {
+      "suite": "predeploy_cases.py",
+      "exit": 0,
+      "seconds": 26.75,
+      "tests": 7
+    },
+    {
+      "suite": "product_ui_cases.py",
+      "exit": 0,
+      "seconds": 1.45,
+      "tests": 9
+    },
+    {
+      "suite": "report_export_cases.py",
+      "exit": 0,
+      "seconds": 22.88,
+      "tests": 46
+    },
+    {
+      "suite": "report_pdf_cases.py",
+      "exit": 0,
+      "seconds": 16.89,
+      "tests": 21
+    },
+    {
+      "suite": "sekki_confirmation_cases.py",
+      "exit": 0,
+      "seconds": 0.66,
+      "tests": null
+    }
+  ],
+  "python_unittest_executions": 195,
+  "tier_a": 524,
+  "tier_b": 38,
+  "node_tests": 5,
+  "ui": {
+    "main_auth": 34
+  },
+  "build": "PASS",
+  "typescript": "PASS",
+  "clean_frozen_reinstall": "PASS",
+  "sharp_native": "PASS",
+  "unchanged_assets": {
+    "unchanged_file_count": 63,
+    "hashes": {
+      "adapters/stop_owned_excel.ps1": {
+        "git_blob": "cb4949eb59d08f3cdc647a180006e0989e635a58",
+        "disk_sha256": "5465e7ea25012b92932508c3dbcbcdb952c2eab3318793aeb9e1f9e0921e25d3"
+      },
+      "adapters/windows_excel_pdf.ps1": {
+        "git_blob": "14d53e1ce3e5fbfbec9d5a87fed41630dbac798f",
+        "disk_sha256": "5a9a4dea3fda423504e5fd8089289442e9e742c883efabc638766282efffff67"
+      },
+      "app.py": {
+        "git_blob": "8bd609ed75b093dc35065a22fe8c9edb8d700ff6",
+        "disk_sha256": "a884ca26e4f2aaea9bed0fd73d4667e8bb0f2b4ba51c7749e9778912321fbca0"
+      },
+      "auth_service.py": {
+        "git_blob": "0071cc677be6815d748598140ac5c1bf41d32e43",
+        "disk_sha256": "4c542782dedd1646c3d1f5c7de79d1f75bfd34b8430ecc096547dd96907cc853"
+      },
+      "boundary_confirmation.py": {
+        "git_blob": "687d4e3bbaa9e31264ddff064dadca83fe24a5eb",
+        "disk_sha256": "e69246a47c503aff4260893423eab89ff302d31f7f45504ff2b349d13f117280"
+      },
+      "calendar_logic.py": {
+        "git_blob": "f921978c3a10e2b24d56df7eef64d9a3b83a978e",
+        "disk_sha256": "fa566e338d34708d23af9f4c81f073e0264d7c18e60ebc3023cf7e2f21a8ec90"
+      },
+      "calendar_reference.py": {
+        "git_blob": "38f26888f52a3c6cba00813de1059fcce8d6429f",
+        "disk_sha256": "7d13d5d741334c51c265ae3b29801f5665b8551483cddbf92b8354098ab705ba"
+      },
+      "chart_render.py": {
+        "git_blob": "410fbec1db95ac450c06d163d4791471b3ab19b4",
+        "disk_sha256": "10c4dedef0c234c9f43db05173629fd628027c3303ec5e6496bcc57e8784d7e8"
+      },
+      "comments.py": {
+        "git_blob": "39e7d2b35efd2943229a921cf0790b463f9395a6",
+        "disk_sha256": "907ac60a3f0b8b575d016f95d51a338dab2dc4894890a8896a85746199ef578a"
+      },
+      "daiun_logic.py": {
+        "git_blob": "e126d8f202d059ca65b8e83dd2a66b29bcf24a0d",
+        "disk_sha256": "1ec50c00ebc1d871441e86be431c2c9191cded74d9689e266705ffcba307cc9b"
+      },
+      "fortune-next-app/backend/auth_api.py": {
+        "git_blob": "b2fe44aff2bc56566abd9ea44fd48a0706a8bb51",
+        "disk_sha256": "22b60247a5045fd900c38538d81942b08eef6064311018585c8d14c12e1c51f6"
+      },
+      "fortune-next-app/backend/export_api.py": {
+        "git_blob": "815003e0291e18b69d5d5dc3cd95e1713246fbf3",
+        "disk_sha256": "55fb44b06ead82d242e9cb3217163527738c40bd5a9837d6a890844115ac3311"
+      },
+      "fortune-next-app/backend/history_api.py": {
+        "git_blob": "33de06a4726c7b5b6e4a1f0b0d3ac433f59cca99",
+        "disk_sha256": "c88fabdec9e9c947cf4ca4ec0e9c1121f34f819373bc5b4758fc23f60b4bedc9"
+      },
+      "fortune-next-app/backend/server.py": {
+        "git_blob": "820a5c9b7edecb1e7f6c0c77fc2df97c97b4670c",
+        "disk_sha256": "306e22b8e3fce2b43bfdc6d839c83e3535d8888dcdae231033ea2827d04e89f4"
+      },
+      "fortune_core_logic.py": {
+        "git_blob": "7b45c80cfb02d216ffd8e26c18fc308a9686c6ce",
+        "disk_sha256": "dca3fcd75e94157ad9e113ba4b27164f091b83a9936377d6058cf5d46b683198"
+      },
+      "fortune_data.py": {
+        "git_blob": "af8af8dbe99f9fe86b619532cd9728e307c97a9e",
+        "disk_sha256": "1d2fea0f6c5b2e9cece37eda20a000886248a1b979c5afe14c977f22b31eda49"
+      },
+      "fortune_service.py": {
+        "git_blob": "1506e2e407aa34dfaee80925a082f87c329185cd",
+        "disk_sha256": "0fe94d16b2019a387ade3abe95fb58816b0e2c564cab5be76b962fbba6dc74e8"
+      },
+      "gogyo_variants.py": {
+        "git_blob": "55963be35bc256b133460749b381de83c6007265",
+        "disk_sha256": "d940403d711a571898806b6258f2ede79ea5de92f867369286c5220f28484954"
+      },
+      "gogyou_external_effects.py": {
+        "git_blob": "791dc31b9625615beba6a6ddc3b171e27ba2ec3f",
+        "disk_sha256": "52c6b9c2cd5939a23a0017042c46eaa31e0c602f16ed4cd491f356a0fb33c819"
+      },
+      "gogyou_logic.py": {
+        "git_blob": "37953725def752a94b43092390a18c8eb59d679b",
+        "disk_sha256": "1f791420612e661aea480fc0ac5d2cc5450c64eb9b797b1d2ee16d988d5a6e3b"
+      },
+      "history_repository.py": {
+        "git_blob": "52bdcd77a7448f846d7a207c705e5cd3b9b398d1",
+        "disk_sha256": "7445fbf70ecd013ca710d6972fc50cf547d14a87e11ea135949d813e8f96540f"
+      },
+      "history_service.py": {
+        "git_blob": "23b850ace3858c3d770dcaeba7d00fe57bfa8caa",
+        "disk_sha256": "7dae444a44482c766062ba068d21e3db2edf3b4ab8f4156536165afbfd103638"
+      },
+      "history_versions.py": {
+        "git_blob": "5f514f20371211c4bc61e0a72b0a2021c1fe34a3",
+        "disk_sha256": "ae0516c31d7754fe79efd4ba874664a4ae90504340b7f88f98aee3d92f2cfdb7"
+      },
+      "meishiki_model.py": {
+        "git_blob": "8e26841ff9ce1160e1146bca3034dcf8f29131c0",
+        "disk_sha256": "09022a86d777ce625193fec9ca9614a539899a347ea1bdb0a22eda66ff7b4601"
+      },
+      "meishiki_validation.py": {
+        "git_blob": "b90099718170bbc208ee2fdf1238f6bfc9f35f47",
+        "disk_sha256": "20f92f1bca10200aaf8caddab57aeaa5c362b0c56a0cc1023b37c5b598f31633"
+      },
+      "pdf_converter.py": {
+        "git_blob": "542ba50efecabfa950e4aeb19b6f4d1fba49c4f1",
+        "disk_sha256": "1228ff4ee7e059c941f84e37e080a1ca410cd1c073205bb4db6b9ce35cd6e9ab"
+      },
+      "personality_logic.py": {
+        "git_blob": "7bb4d854578aad14db686025f76348090c280c35",
+        "disk_sha256": "6bbb9b5190d6f7f14a4f3d9d807dba8397f13a9c8c0a560cbe69d33d6c06f1f7"
+      },
+      "proxy_settings.py": {
+        "git_blob": "7b4a13b05cdf5ba785d2a87c8bf0834b18cb6c70",
+        "disk_sha256": "0de392df1987b7069af2b0514c932dea9c786fdef0e629edb7afb0726bc00c0e"
+      },
+      "report_data.py": {
+        "git_blob": "7f7a233aeddb2d8e7084e463097fd0f53c893283",
+        "disk_sha256": "1dc5774a75ee4c91a2e1343fad328b2de8b6b24f46340d22748ab0150197ef4e"
+      },
+      "report_export_service.py": {
+        "git_blob": "2b8c7e501267e850a7a15f8ed05e00a2c159dba6",
+        "disk_sha256": "67584c215a2c701196949e27ad7c5cd86760a8f34e9181fc785280951acc95e7"
+      },
+      "report_pdf.py": {
+        "git_blob": "6244284ab9b61253c7061b904170b579e6d8bd62",
+        "disk_sha256": "8dd2524b35828a4e8863906172f63e65da7214b2d9dae96648d4300dd9b314f4"
+      },
+      "report_xlsx.py": {
+        "git_blob": "36d16bd8b388ad083586c4bcd63583accf028d07",
+        "disk_sha256": "5790e8dd5aa98cfa97c6bb21e1323dd9aa8579b0fbb6d7925c84e3160563b479"
+      },
+      "scripts/manage_user.py": {
+        "git_blob": "7f875089d2cd358731a171de81b4c26364b44038",
+        "disk_sha256": "894b6e71d9d6fc3e8f7af34823679ce7ba34205156dbb1990a643107a79306b6"
+      },
+      "sekki_data.py": {
+        "git_blob": "308b133e3884a901cc2f8e22ad4775c5c86f31e0",
+        "disk_sha256": "358ee7532d1f43b8301dc733049eff6da3816600b61d51b137ed9b052115dca1"
+      },
+      "special_chart_logic.py": {
+        "git_blob": "0373da64c6ba119b85162416a15e37d055ae602b",
+        "disk_sha256": "26a94b84164b7ecab1c488af9fff225157bd07788f1a385672b31ff0247e7b76"
+      },
+      "specific_datetime_logic.py": {
+        "git_blob": "46604e4fdc71c215f068904fefdd677878c18641",
+        "disk_sha256": "d02768cbea391ad8435bbb068d27f7b345dc96b9eeb3def9cce624be3a8d1183"
+      },
+      "taizan_sekki_correction.py": {
+        "git_blob": "d3cf003dc2db7c4bf93f794923e305157b7f14f2",
+        "disk_sha256": "6bb0b10ec1ab97102fc77fa97f7ff0a9272889e3a5c49054bc37c075f47b7d68"
+      },
+      "templates/README.md": {
+        "git_blob": "a30ea3487877681fcf6a17916e50ec8f0cc8b455",
+        "disk_sha256": "6249bbb883b1eecbfc30a85a811ffe3c2726eb1ddc95403a7f57f31c44aceee6"
+      },
+      "templates/kanteisho.xlsx": {
+        "git_blob": "a7b5122d99cb00df31430c10694e7583eeff4347",
+        "disk_sha256": "289b5d1093061487ba2e0e18bf6cd1c5c6056609daa31cbe0629e21489fa3b22"
+      },
+      "tests/auth_cases.py": {
+        "git_blob": "0c4a55c9d08eebb5496fed8c5b24d45ca2c9313b",
+        "disk_sha256": "ba6c41775291764c8b9d1959d61d0684cf49bf8fef146ad5e77595483d42a4b6"
+      },
+      "tests/check.py": {
+        "git_blob": "2fd8188f18378bc6eb06cfc8386d5b6026d6e250",
+        "disk_sha256": "e186b2573c1545783e991f5080b9e8fd74a8aff54e38d95a6a527808ebfb93d9"
+      },
+      "tests/comparison.py": {
+        "git_blob": "caa2f33ee24f85b8ad88878c1ea50ba8ebc212aa",
+        "disk_sha256": "73a24e22ef4cebba9feab885583890accef0bff917381fff1359c04daa958493"
+      },
+      "tests/deploy_blocker_cases.py": {
+        "git_blob": "e60ec5a5f95a0a17cd11a77a90b17f7f82f2881c",
+        "disk_sha256": "52fde8f63e1ffe813b9246d17e2c6228763bb0c5e73d8a0a29beaf2db0509fbc"
+      },
+      "tests/gogyou_concurrent.py": {
+        "git_blob": "26ce601c36d4e7c2734baee183aa5ab43b483c14",
+        "disk_sha256": "bb9f77f892b20efa49fe561ac880c586b27868729adc5ec4e4c83c7f6ff9f156"
+      },
+      "tests/gogyou_daiun_effects.py": {
+        "git_blob": "3208d4d7f00f2e3df161c1c15e23a25966f591a6",
+        "disk_sha256": "b2da10ea872aadc44b5da7d988615bd13a0948b4a28e2391f315adda45ea5bc3"
+      },
+      "tests/gogyou_priority.py": {
+        "git_blob": "519bf4a5ad9de64cb0db9675672fbb1b69ebeeb8",
+        "disk_sha256": "702457fc0c6178cb47984da0a2a5d3e1992b5bd6b0c4e8bf979d3521074e440f"
+      },
+      "tests/gogyou_year_effects.py": {
+        "git_blob": "066a00de5857b92a4dd4bfcef98aff0b42cd83c4",
+        "disk_sha256": "a17ef7cbce5e8d847935a0581c8b70e32565dd4c7ef8deb3c34af076b3020882"
+      },
+      "tests/history_cases.py": {
+        "git_blob": "94d57cf0da1b33660ed8d271383ab860d383ccc6",
+        "disk_sha256": "71dc7d85b9f2f55406a0060ff1b5f97738c686fa6eff034f46efd2eab8f500ee"
+      },
+      "tests/predeploy_cases.py": {
+        "git_blob": "b03ba3e881e5a8749ac3c78320d54dd6bb59cb4c",
+        "disk_sha256": "74124dea92ef38b1d245e36deb1175d45cb9738487eb67ab822b6004eb240dfe"
+      },
+      "tests/product_ui_cases.py": {
+        "git_blob": "2133c4419111f6fff6acd655cf0f9871feac160c",
+        "disk_sha256": "e745729d4479240ecf35ce2a9852e72eb9e9fd4523c2efb20b903c30b32cbdbd"
+      },
+      "tests/report_export_cases.py": {
+        "git_blob": "6ced165864603fd47983d7be32a1c943b0a42d0f",
+        "disk_sha256": "c68bd7cad1a7f66e8d2de8e69562e2292bcc7ba30f0b55e626e9e33388d76743"
+      },
+      "tests/report_pdf_cases.py": {
+        "git_blob": "67e797419562faa8e6df8133e370d2823e9dfb1b",
+        "disk_sha256": "0c71a967370ff46c923496960164c82a308b8ee468a644e1a6c5f629f8ec1613"
+      },
+      "tests/sekki_confirmation_cases.py": {
+        "git_blob": "879626fa492729e925d45fefb6f6cb1513153ae4",
+        "disk_sha256": "c6d86d3e6521292d87dbf941a28f66f84dbf67bbe5929cd4f897f6d501b1d142"
+      },
+      "tests/sekki_reference.py": {
+        "git_blob": "73c6a9afc852856963138c01b96e4ec5deb248df",
+        "disk_sha256": "918c937ab4ca0aebd7042cc46ed581634d315b78fb9602dfde7c6d1d43b9f3c5"
+      },
+      "tests/specific_datetime_guard.py": {
+        "git_blob": "adc5d47ed48537cc2ccb81f86858d99e38e92b03",
+        "disk_sha256": "ab55140855f90f4c04e436aaa8174ba49a279e25841078550ae8b56fe0fd7c1a"
+      },
+      "tests/test_harness.py": {
+        "git_blob": "a2fc1dad934ad77699977e8d35b90d40ee49128b",
+        "disk_sha256": "4e3e0b3f663e36ecc849a7403c93a6104db24829608b9de46275673638b99b05"
+      },
+      "tests/tier_a.py": {
+        "git_blob": "db178d959d82ff870678dde69511835a0370b323",
+        "disk_sha256": "a2d0624efd6eadbf5a7b35c3fb0f4c837a252ea784d779e00fb41b832e812e75"
+      },
+      "tests/tier_b.py": {
+        "git_blob": "42878da5d4a59ff318e3146e3872208a45a3e1ba",
+        "disk_sha256": "7d80bf6fc3ab4592277cf75284b16a52d171709d39250a2b4011dd294440a8a0"
+      },
+      "tests/tier_c.py": {
+        "git_blob": "d5c030962e0ad2901787f98474d2a17d56911348",
+        "disk_sha256": "c0d1aabffe6d9f2c5c6fd68196902fa70f0bd8a50a5ca0e1698a05d93edc7ec5"
+      },
+      "time_adjustment_logic.py": {
+        "git_blob": "7b6fee30d544cbe63f602d52c096d9aa5a86fbaf",
+        "disk_sha256": "78669bab535ae415f2a6bce3d11fbf75a279df12e43c2d67c1a90da387baea4d"
+      },
+      "utils.py": {
+        "git_blob": "66c839c18fe50e16e8696f9ad35c2da446f2c2cb",
+        "disk_sha256": "cde48344b1e3a5fac8a84bee4183dd562b3c49e25617ec4e19eae08a9d15bce6"
+      },
+      "yearly_flow_logic.py": {
+        "git_blob": "289568edd2b756279ce9d5c596ac1788f0daceb6",
+        "disk_sha256": "9ba37a7b4b8d2fcf23565ab16b0902c393130d03f76dab7866d04184cf1bdd0c"
+      },
+      "yearly_overall_logic.py": {
+        "git_blob": "e32f64b64ee1b5a2c500901f01c7129bea839642",
+        "disk_sha256": "265fa3d7c5cfd8ae86153e62e23b25c4955de92358843b29e9e66844f7892e85"
+      }
+    }
+  },
+  "exports": [
+    {
+      "file": "ui-main-auth_ui/mobile_saved.pdf",
+      "facts": [
+        "Pages:           2",
+        "Page size:       595.2 x 841.44 pts (A4)"
+      ],
+      "sha256": "88cd9003b99f89e94c8e1303ea852c655b81b70f0cfe9e88a3800a8bdced7c72"
+    },
+    {
+      "file": "ui-main-auth_ui/mobile_unsaved.pdf",
+      "facts": [
+        "Pages:           2",
+        "Page size:       595.2 x 841.44 pts (A4)"
+      ],
+      "sha256": "465f5253f23f49947a585928ffcb5e6e85687c3c93ec175a10f8b44785f2c908"
+    },
+    {
+      "file": "ui-main-auth_ui/PC_saved.pdf",
+      "facts": [
+        "Pages:           2",
+        "Page size:       595.2 x 841.44 pts (A4)"
+      ],
+      "sha256": "a3022f77ef1db774f6ecb14110e48ad0eef65d0143bd19193e5b53b9b36011a5"
+    },
+    {
+      "file": "ui-main-auth_ui/PC_unsaved.pdf",
+      "facts": [
+        "Pages:           2",
+        "Page size:       595.2 x 841.44 pts (A4)"
+      ],
+      "sha256": "9ec7ccdc842a401f6feff648bf60528d439ce2537976bf63d581ec475f74df6d"
+    }
+  ],
+  "limitations": [
+    "Initial main Windows PDF timeout; direct conversion and identical full UI retry passed. Initial cause unproven.",
+    "Production backups require sudo; no password entered. Linux staging and production deployment pending approval."
+  ]
+}
