@@ -10,7 +10,7 @@ mainはe8b53082775744a74f66502e8fb8f3cef72974c1。GitHub両branchも一致。
 独立branch **security-b2b-next-node-20261022**、起点 **5854eed16b71671fc6c6f1d33ae30b238e8552d9**、
 更新コードcommit **343edd3f40299ce8bb8c6434e14128a983d367ac**。この記録は後続commitに保存する。
 作業先は開発元内.security-validation-20261022/b2bの独立clone。
-既存branch切替、main merge、force pushなし。最終記録HEADとpush結果は完了報告で照合。
+既存branch切替、main merge、force pushなし。両security branchのGitHub新規push成功を確認済み。最終記録HEADは完了報告で照合。
 Python/templates/adapters計96ファイルは改行正規化込みのGit blob照合で不変。
 B2B二列レイアウトと鑑定文を保持。
 
@@ -29,7 +29,7 @@ B2B二列レイアウトと鑑定文を保持。
 | Python unittest | 24 suite、491回実行、全suite終了0 |
 | 公開版認証/履歴/再鑑定/Excel/PDF実画面 | 34項目PASS |
 | B2B会員/先生/運営実画面 | 156項目PASS、1280/390/320幅 |
-| B2B履歴/境界/再鑑定 | 既存スイートPASS、履歴10/境界1 |
+| B2B履歴/境界/再鑑定 | 既存スイートPASS、履歴28/境界1 |
 | B2B実ダウンロードと異常時復帰 | 12項目PASS |
 | 出力物 | 両系統8 PDFすべてA4縦2頁、B2B二列セル保持、B2B代表PDFの両ページ画像確認 |
 | 正式回帰前後の本体hash | 差分0 |
@@ -110,7 +110,7 @@ Tier Cの既知課題を解決済みとは扱わない。
 | React / React DOM | 19.2.7 / latest | 19.3.1 / 19.3.1固定 |
 | sharp（間接依存） | 0.34.5 | 0.35.5 |
 | PostCSS | 8.4.31 | 8.5.23 |
-| baseline-browser-mapping | 2.9.19 | 2.11.0 override固定 |
+| baseline-browser-mapping | 2.10.40 | 2.11.0 override固定 |
 | source-map-js | 1.2.1 | 1.2.2 override固定 |
 | lucide-react | 1.22.0 / latest | 1.22.0固定 |
 | TypeScript | 6.0.3 / latest | 6.0.3固定 |
