@@ -94,6 +94,21 @@ class Styles:
 
 
 
+def special_items(report):
+    """Read the ordered official projection without changing or recomputing it."""
+    return [(str(report.cells["C"+str(n)]), str(report.cells["E"+str(n)]))
+            for n in range(19,25) if report.cells["C"+str(n)] or report.cells["E"+str(n)]]
+
+
+def special_position(index):
+    return ("C" if index % 2 == 0 else "I"), 19 + 2 * (index // 2)
+
+
+def wrapped_lines(value, capacity=50):
+    return sum(max(1,math.ceil(sum(2 if unicodedata.east_asian_width(c) in "WF" else 1
+                                  for c in line)/capacity)) for line in value.split("\n"))
+
+
 def presentation_cells(report):
     """Rearrange supplied report fields only; preserve the official report projection."""
     values = dict(report.cells)
@@ -107,6 +122,12 @@ def presentation_cells(report):
         if star and address in values:
             values[address] += "：" + star
         values[col+str(footer)] = "キーワード：" + keywords if separator else ""
+    for n in range(19,25):
+        for col in "CDEFGHIJKLMN":values[col+str(n)] = ""
+    for i,(label,description) in enumerate(special_items(report)):
+        col,row = special_position(i)
+        values[col+str(row)] = label
+        values[col+str(row+1)] = description
     return values
 
 
@@ -166,27 +187,56 @@ def acceptance_layout(sheet, styles, report):
     style("G61",wrap=False)
 
     deltas={}
+    original_heights={n:float(row.getAttribute("ht") or 15) for n,row in rows.items()}
     def height(number,value,hidden=False):
-        old=float(rows[number].getAttribute("ht") or 15)
+        old=original_heights[number]
         rows[number].setAttribute("ht",f"{value:g}");rows[number].setAttribute("customHeight","1")
         rows[number].setAttribute("hidden","1" if hidden else "0")
         deltas[number]=(0 if hidden else value)-old
 
-    height(18,20)
-    needs={}
-    for n in range(19,25):
-        left,right=(str(report.cells[col+str(n)]) for col in ("C","E"))
-        if left or right:
-            def lines(value,capacity):
-                return sum(max(1,math.ceil(sum(2 if unicodedata.east_asian_width(c) in "WF" else 1
-                                              for c in line)/capacity)) for line in value.split("\n"))
-            needs[n]=max(20,16*max(lines(left,16),lines(right,86))+4)
-        style("C"+str(n),wrap=True);style("E"+str(n),wrap=True)
-    # Keep each populated row at its required height. Hide unused rows rather
-    # than printing hairline blank bands; zero results retain one ordinary blank row.
-    for n in range(19,25):
-        hide=n not in needs and not (n==19 and not needs)
-        height(n,needs.get(n,20),hidden=hide)
+    items = special_items(report)
+    height(18,20,hidden=not items)
+    # Replace only the special table's merges; C:H and I:N have near-equal widths.
+    for merge in list(children(merges)):
+        if re.fullmatch(r"[C-N](?:19|2[0-4]):[C-N](?:19|2[0-4])",merge.getAttribute("ref")):
+            merges.removeChild(merge)
+    sources = {True:int(cells["C19"].getAttribute("s")), False:int(cells["E19"].getAttribute("s"))}
+    card_styles = {}
+    def card_style(heading, left, right):
+        key = heading,left,right
+        if key in card_styles:return card_styles[key]
+        xf = children(styles.xfs)[sources[heading]].cloneNode(True)
+        border = children(styles.borders)[int(xf.getAttribute("borderId"))].cloneNode(True)
+        for edge in children(border):
+            for attr in list(edge.attributes.keys()):edge.removeAttribute(attr)
+            for child in list(edge.childNodes):edge.removeChild(child)
+            if edge.localName in ("top","bottom") or (edge.localName=="left" and left) or (edge.localName=="right" and right):
+                edge.setAttribute("style","thin");new(edge,S,"color",{"indexed":"64"})
+        styles.borders.appendChild(border)
+        xf.setAttribute("borderId",str(len(children(styles.borders))-1));xf.setAttribute("applyBorder","1")
+        alignment = first(xf,"alignment")
+        if alignment is None:alignment=new(xf,S,"alignment")
+        for k,v in {"horizontal":"left","vertical":"center","wrapText":"1","shrinkToFit":"0","indent":"1"}.items():alignment.setAttribute(k,v)
+        xf.setAttribute("applyAlignment","1")
+        styles.xfs.appendChild(xf)
+        card_styles[key]=len(children(styles.xfs))-1
+        return card_styles[key]
+    for row in range(19,25):
+        for col in "CDEFGHIJKLMN":cells[col+str(row)].setAttribute("s","0")
+        height(row,16,hidden=True)
+    for pair in range(math.ceil(len(items)/2)):
+        row = 19 + 2*pair
+        pair_items=items[2*pair:2*pair+2]
+        # Both sides share row heights; explicit newlines and wrapping are never truncated.
+        height(row,14*max(wrapped_lines(label) for label,_ in pair_items)+2)
+        height(row+1,14*max(wrapped_lines(desc) for _,desc in pair_items)+2)
+        for side in range(len(pair_items)):
+            columns = "CDEFGH" if side==0 else "IJKLMN"
+            for number,heading in ((row,True),(row+1,False)):
+                new(merges,S,"mergeCell",{"ref":f"{columns[0]}{number}:{columns[-1]}{number}"})
+                for i,col in enumerate(columns):
+                    cells[col+str(number)].setAttribute("s",str(card_style(heading,i==0,i==5)))
+    merges.setAttribute("count",str(len(children(merges))))
     for n in (37,40):height(n,19)
     for n in (39,42):height(n,18)
     for n in (43,55):height(n,POLISH_HEADING_HEIGHT_PT)
@@ -196,6 +246,37 @@ def acceptance_layout(sheet, styles, report):
     for collection in (styles.fonts,styles.borders,styles.xfs):
         collection.setAttribute("count",str(len(children(collection))))
     return deltas
+
+def paginate_special_layout(sheet):
+    """Keep the usual two pages; bound scaling and break overflowing reports by blocks."""
+    rows={int(r.getAttribute("r")):r for r in sheet.getElementsByTagNameNS(S,"row")}
+    heights={n:0 if r.getAttribute("hidden")=="1" else float(r.getAttribute("ht") or 15) for n,r in rows.items()}
+    setup=first(sheet.documentElement,"pageSetup")
+    margins=first(sheet.documentElement,"pageMargins")
+    printable=841.89-72*sum(float(margins.getAttribute(side)) for side in ("top","bottom"))
+    first_page=sum(heights[n] for n in range(1,36))
+    if first_page*REPORT_PRINT_SCALE/100<=printable:return
+    # At most a two-point (2.4%) reduction, never shrink in proportion to long text.
+    # Native Excel rounding is verified separately by the PDF integration check.
+    if first_page*80/100<=printable:
+        setup.setAttribute("scale","80")
+        return
+    # Long reports keep 82% and move whole headings/bodies together. Removing the
+    # fixed row-35 break avoids an almost-empty page between two manual breaks.
+    blocks=((1,17),(18,20),(21,22),(23,24),(25,28),(29,31),(32,33),(34,35),
+            (36,39),(40,42),(43,54),(55,59),(60,66),(67,69))
+    breaks=first(sheet.documentElement,"rowBreaks")
+    for node in list(children(breaks)):breaks.removeChild(node)
+    used=0
+    for start,end in blocks:
+        height=sum(heights.get(n,0) for n in range(start,end+1))
+        if used and used+height>printable/(REPORT_PRINT_SCALE/100)-8:
+            new(breaks,S,"brk",{"id":start-1,"max":"14","man":"1"})
+            used=0
+        used+=height
+    count=len(children(breaks))
+    breaks.setAttribute("count",str(count));breaks.setAttribute("manualBreakCount",str(count))
+
 
 def write_sheet(doc, values, styles, report, shared):
     data = first(doc.documentElement,"sheetData")
@@ -308,6 +389,7 @@ def apply_report_layout(sheet, drawing, styles, report):
     styles.xfs.setAttribute("count", str(len(children(styles.xfs))))
     first(sheet.documentElement, "pageSetup").setAttribute("scale", str(REPORT_PRINT_SCALE))
     layout_deltas = acceptance_layout(sheet, styles, report)
+    paginate_special_layout(sheet)
     # Excel uses the row anchors; synchronize cached physical transforms too.
     for anchor in children(drawing.documentElement, "twoCellAnchor"):
         start = int(content(first(first(anchor, "from"), "row"))) + 1
