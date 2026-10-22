@@ -5,7 +5,7 @@ const nextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://127.0.0.1:8765/api/:path*",
+        destination: `${process.env.FORTUNE_API_ORIGIN || "http://127.0.0.1:8765"}/api/:path*`,
       },
     ];
   },
