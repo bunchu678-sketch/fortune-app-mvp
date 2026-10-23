@@ -360,7 +360,35 @@ class ReportCases(unittest.TestCase):
 
     def test_nikkan_description_and_keywords(self):
         self.assertEqual(self.report.texts['Phase5_Nikkan'],self.result['personality']['nikkan']['description'])
-        self.assertIn(self.result['personality']['nikkan']['keywords'],self.cells['B25'])
+        self.assertEqual(self.cells['B25'],'● 干支から読み取れるもの')
+        drawing=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
+        shape=next(a for a in drawing if a.find('.//x:cNvPr',NS).get('name')=='Phase5_Nikkan')
+        paragraphs=[''.join(p.itertext()) for p in shape.findall('x:sp/x:txBody/a:p',NS)]
+        self.assertEqual(paragraphs,[self.result['personality']['nikkan']['description'],
+                                    'キーワード：'+self.result['personality']['nikkan']['keywords']])
+
+    def test_nikkan_official_comments_and_missing_keywords(self):
+        from comments import NIKKAN_COMMENTS
+        for name,comment in (*NIKKAN_COMMENTS.items(),('empty-keywords',{'description':'説明一行目\n説明二行目','keywords':''})):
+            with self.subTest(name=name):
+                result=deepcopy(self.result);result['personality']['nikkan']=comment
+                report=build_reading_report(FORM,result);before=deepcopy(report)
+                parts=unpack(render_xlsx(report));self.assertEqual(report,before)
+                self.assertEqual(sheet_cells(parts)['B25'],'● 干支から読み取れるもの')
+                drawing=ET.fromstring(parts['xl/drawings/drawing2.xml'])
+                shape=next(a for a in drawing if a.find('.//x:cNvPr',NS).get('name')=='Phase5_Nikkan')
+                paragraphs=[''.join(p.itertext()) for p in shape.findall('x:sp/x:txBody/a:p',NS)]
+                expected=comment['description'].split('\n')
+                if comment['keywords']:expected.append('キーワード：'+comment['keywords'])
+                self.assertEqual(paragraphs,expected)
+                self.assertTrue(all(r.get('sz')=='1100' for r in shape.findall('.//a:rPr',NS)))
+                if name=='辛':
+                    self.assertGreater(int(shape.find('.//a:xfrm/a:ext',NS).get('cy')),45*12700)
+                for anchor in drawing:
+                    props=anchor.find('.//x:cNvPr',NS)
+                    if props.get('name')=='Phase5_Nikkan' or not props.get('name').startswith('Phase5_'):continue
+                    base=next(a for a in ET.fromstring(self.parts['xl/drawings/drawing2.xml']) if a.find('.//x:cNvPr',NS).get('name')==props.get('name'))
+                    self.assertEqual(anchor.find('.//a:xfrm/a:ext',NS).attrib,base.find('.//a:xfrm/a:ext',NS).attrib)
 
     def test_life_stage_public_only_and_current(self):
         for i,row in enumerate(self.result['personality']['life_stage_tsuhensei']):
@@ -475,7 +503,7 @@ class ReportCases(unittest.TestCase):
                     area={(c,r) for c in range(ord(start[0]),ord(end[0])+1)}
                     self.assertFalse(occupied & area);occupied.update(area)
                 self.assertEqual(sheet.find('s:pageSetup',NS).get('scale'),'80' if count in (7,8) else str(REPORT_PRINT_SCALE))
-                self.assertEqual(values['B'+str(25+extra)],before.cells['B25'])
+                self.assertEqual(values['B'+str(25+extra)],'● 干支から読み取れるもの')
                 self.assertEqual(values['C'+str(58+extra)],str(before.cells['C58']))
                 self.assertEqual(values['X'+str(103+extra)],str(before.chart_cells['X103']))
                 workbook=ET.fromstring(parts['xl/workbook.xml'])

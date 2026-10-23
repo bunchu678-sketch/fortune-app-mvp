@@ -111,11 +111,22 @@ def wrapped_lines(value, capacity=50):
                                   for c in line)/capacity)) for line in value.split("\n"))
 
 
+def presentation_texts(report):
+    """Move the supplied Nikkan keywords below its unchanged description."""
+    texts = dict(report.texts)
+    _, separator, keywords = str(report.cells["B25"]).partition("　キーワード：")
+    if separator and keywords:
+        texts["Phase5_Nikkan"] = "\n".join(value for value in (
+            texts["Phase5_Nikkan"], "キーワード：" + keywords) if value)
+    return texts
+
+
 def presentation_cells(report):
     """Rearrange supplied report fields only; preserve the official report projection."""
     values = dict(report.cells)
     values.update({"B60": "●年運", "I60": "太罫線：接木運の境界",
-                   "L60": "", "M60": "", "N60": "", "H4": ""})
+                   "L60": "", "M60": "", "N60": "", "H4": "",
+                   "B25": "● 干支から読み取れるもの"})
     for col in "LMN":
         values[col+"61"] = report.cells[col+"60"]
     for col, heading, footer in (("C",37,39),("I",37,39),("C",40,42),("I",40,42)):
@@ -194,6 +205,14 @@ def acceptance_layout(sheet, styles, report):
 
     items = special_items(report)
     height(18,20,hidden=not items)
+    # The Nikkan text box spans rows 26:28, with 13pt line spacing and 4pt
+    # vertical insets. Keep its original 45pt whenever the two paragraphs fit.
+    body_height = sum(float(rows[n].getAttribute("ht")) for n in (26,27,28))
+    needed = 13 * wrapped_lines(presentation_texts(report)["Phase5_Nikkan"],106) + 4
+    if needed > body_height:
+        # Native Excel can clip the final paragraph at the estimated boundary.
+        # Reserve one more line only when expanding, keeping normal reports intact.
+        height(28,float(rows[28].getAttribute("ht")) + needed - body_height + 13)
     for n in (37,40):height(n,19)
     for n in (39,42):height(n,18)
     for n in (43,55):height(n,POLISH_HEADING_HEIGHT_PT)
@@ -665,7 +684,7 @@ def render_xlsx(report: ReadingReport, template_path=TEMPLATE_PATH):
     write_sheet(sheet,{**presentation_cells(report),**report.chart_cells},styles,report,strings)
     hide_gogyo_cell_text(sheet, styles)
     drawing=minidom.parseString(files["xl/drawings/drawing2.xml"])
-    write_shapes(drawing,report.texts)
+    write_shapes(drawing,presentation_texts(report))
     apply_report_layout(sheet, drawing, styles, report)
     workbook=minidom.parseString(files["xl/workbook.xml"])
     protect_advice_bottom_border(sheet, drawing, workbook)
