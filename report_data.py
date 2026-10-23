@@ -19,6 +19,8 @@ class ReadingReport:
     chart_cells: dict
     setsuboku_boundaries: set
     kubou_months: set
+    # Sanitized display entries, independent of the template's six legacy slots.
+    special_entries: tuple | None = None
 
 
 def text(value):
@@ -70,8 +72,6 @@ def build_reading_report(form, result):
     if a.get("status") != "available":
         raise ReportError("元命式の五行結果がないため出力できません。")
     specials = result.get("special_meishiki", {}).get("rows", [])
-    if len(specials) > 6:
-        raise ReportError("特殊な命式がテンプレートの6行を超えています。省略せず確認が必要です。")
     daiun = result.get("daiun", {}).get("rows", [])
     if len(daiun) > 10:
         raise ReportError("大運がテンプレートの10列を超えています。")
@@ -190,4 +190,5 @@ def build_reading_report(form, result):
             chart_cells[label_col+str(start+i)] = label
             chart_cells[value_col+str(start+i)] = value if group == "work_type" else value/total if total else 0
     safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f\x7f]', "", name).strip(" .")[:80] or "無記名"
-    return ReadingReport(f"鑑定書_{safe_name}_{reading.isoformat()}.xlsx", cells, texts, chart_cells, borders, kubou_months)
+    return ReadingReport(f"鑑定書_{safe_name}_{reading.isoformat()}.xlsx", cells, texts, chart_cells, borders, kubou_months,
+                         tuple((text(row.get("判定")), text(row.get("結果"))) for row in specials))

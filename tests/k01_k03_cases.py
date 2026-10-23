@@ -148,7 +148,10 @@ class InterpretationCases(unittest.TestCase):
 
     def test_2026_report_entirely_unchanged(self):
         result = calculate_fortune(FORM)
-        self.assertEqual(digest(asdict(build_reading_report(FORM, result))), BASELINE["report2026"])
+        report = asdict(build_reading_report(FORM, result))
+        self.assertEqual(report.pop("special_entries"), tuple((row["判定"], row["結果"])
+                         for row in result["special_meishiki"]["rows"]))
+        self.assertEqual(digest(report), BASELINE["report2026"])
 
     def test_missing_year_excel_pdf_completed_workbook(self):
         form = {**FORM, "readingDate": "2027-09-30"}; result = calculate_fortune(form)

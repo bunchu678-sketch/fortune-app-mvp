@@ -96,12 +96,14 @@ class Styles:
 
 def special_items(report):
     """Read the ordered official projection without changing or recomputing it."""
+    if report.special_entries is not None:
+        return list(report.special_entries)
     return [(str(report.cells["C"+str(n)]), str(report.cells["E"+str(n)]))
             for n in range(19,25) if report.cells["C"+str(n)] or report.cells["E"+str(n)]]
 
 
 def special_position(index):
-    return ("C" if index % 2 == 0 else "I"), 19 + 2 * (index // 2)
+    return ("C" if index % 2 == 0 else "I"), 19 + index // 2
 
 
 def wrapped_lines(value, capacity=50):
@@ -124,10 +126,6 @@ def presentation_cells(report):
         values[col+str(footer)] = "キーワード：" + keywords if separator else ""
     for n in range(19,25):
         for col in "CDEFGHIJKLMN":values[col+str(n)] = ""
-    for i,(label,description) in enumerate(special_items(report)):
-        col,row = special_position(i)
-        values[col+str(row)] = label
-        values[col+str(row+1)] = description
     return values
 
 
@@ -196,47 +194,6 @@ def acceptance_layout(sheet, styles, report):
 
     items = special_items(report)
     height(18,20,hidden=not items)
-    # Replace only the special table's merges; C:H and I:N have near-equal widths.
-    for merge in list(children(merges)):
-        if re.fullmatch(r"[C-N](?:19|2[0-4]):[C-N](?:19|2[0-4])",merge.getAttribute("ref")):
-            merges.removeChild(merge)
-    sources = {True:int(cells["C19"].getAttribute("s")), False:int(cells["E19"].getAttribute("s"))}
-    card_styles = {}
-    def card_style(heading, left, right):
-        key = heading,left,right
-        if key in card_styles:return card_styles[key]
-        xf = children(styles.xfs)[sources[heading]].cloneNode(True)
-        border = children(styles.borders)[int(xf.getAttribute("borderId"))].cloneNode(True)
-        for edge in children(border):
-            for attr in list(edge.attributes.keys()):edge.removeAttribute(attr)
-            for child in list(edge.childNodes):edge.removeChild(child)
-            if edge.localName in ("top","bottom") or (edge.localName=="left" and left) or (edge.localName=="right" and right):
-                edge.setAttribute("style","thin");new(edge,S,"color",{"indexed":"64"})
-        styles.borders.appendChild(border)
-        xf.setAttribute("borderId",str(len(children(styles.borders))-1));xf.setAttribute("applyBorder","1")
-        alignment = first(xf,"alignment")
-        if alignment is None:alignment=new(xf,S,"alignment")
-        for k,v in {"horizontal":"left","vertical":"center","wrapText":"1","shrinkToFit":"0","indent":"1"}.items():alignment.setAttribute(k,v)
-        xf.setAttribute("applyAlignment","1")
-        styles.xfs.appendChild(xf)
-        card_styles[key]=len(children(styles.xfs))-1
-        return card_styles[key]
-    for row in range(19,25):
-        for col in "CDEFGHIJKLMN":cells[col+str(row)].setAttribute("s","0")
-        height(row,16,hidden=True)
-    for pair in range(math.ceil(len(items)/2)):
-        row = 19 + 2*pair
-        pair_items=items[2*pair:2*pair+2]
-        # Both sides share row heights; explicit newlines and wrapping are never truncated.
-        height(row,14*max(wrapped_lines(label) for label,_ in pair_items)+2)
-        height(row+1,14*max(wrapped_lines(desc) for _,desc in pair_items)+2)
-        for side in range(len(pair_items)):
-            columns = "CDEFGH" if side==0 else "IJKLMN"
-            for number,heading in ((row,True),(row+1,False)):
-                new(merges,S,"mergeCell",{"ref":f"{columns[0]}{number}:{columns[-1]}{number}"})
-                for i,col in enumerate(columns):
-                    cells[col+str(number)].setAttribute("s",str(card_style(heading,i==0,i==5)))
-    merges.setAttribute("count",str(len(children(merges))))
     for n in (37,40):height(n,19)
     for n in (39,42):height(n,18)
     for n in (43,55):height(n,POLISH_HEADING_HEIGHT_PT)
@@ -247,14 +204,131 @@ def acceptance_layout(sheet, styles, report):
         collection.setAttribute("count",str(len(children(collection))))
     return deltas
 
-def paginate_special_layout(sheet):
+def layout_special_table(sheet, drawing, workbook, charts, styles, report):
+    """Two entries per row, each with a narrow name and a wide description.
+
+    Reuse the template's six rows, hiding unused rows. Grow the output only when
+    needed, moving subsequent cells, merges, drawings, chart sources and print
+    area together. Never edit the approved template or the supplied report.
+    """
+    items = special_items(report)
+    count = math.ceil(len(items) / 2)
+    extra = max(0, count - 6)
+    data = first(sheet.documentElement, "sheetData")
+    rows = {int(r.getAttribute("r")): r for r in children(data, "row")}
+    old_height = sum(float(rows[n].getAttribute("ht") or 15) for n in range(19,25))
+    blank_row = rows[24].cloneNode(True)
+    merges = first(sheet.documentElement, "mergeCells")
+    for merge in list(children(merges)):
+        if re.fullmatch(r"[C-N](?:19|2[0-4]):[C-N](?:19|2[0-4])", merge.getAttribute("ref")):
+            merges.removeChild(merge)
+
+    def move_ref(value):
+        return re.sub(r"(\$?[A-Z]{1,3}\$?)(\d+)",
+                      lambda m: m[1] + str(int(m[2]) + (extra if int(m[2]) >= 25 else 0)), value)
+
+    if extra:
+        for node in sheet.getElementsByTagName("*"):
+            if node.localName == "row":
+                number = int(node.getAttribute("r"))
+                if number >= 25: node.setAttribute("r", str(number + extra))
+            else:
+                for attr in ("r", "ref", "sqref"):
+                    if node.hasAttribute(attr): node.setAttribute(attr, move_ref(node.getAttribute(attr)))
+        for node in workbook.getElementsByTagNameNS(S, "definedName"):
+            if node.getAttribute("localSheetId") == "1" or "原本!" in content(node):
+                replace_text(node, move_ref(content(node)))
+        for _, chart in charts:
+            # Cell-sourced labels also use c15:f, outside the base chart namespace.
+            for node in (n for n in chart.getElementsByTagName("*") if n.localName == "f"):
+                if re.match(r"'?原本'?!", content(node)): replace_text(node, move_ref(content(node)))
+        for node in sheet.getElementsByTagNameNS(S, "brk"):
+            number = int(node.getAttribute("id"))
+            if number >= 25: node.setAttribute("id", str(number + extra))
+        following = rows[25]
+        for number in range(25,25+extra):
+            row = blank_row.cloneNode(True)
+            row.setAttribute("r", str(number))
+            for cell in children(row, "c"):
+                cell.setAttribute("r", re.sub(r"\d+$", str(number), cell.getAttribute("r")))
+            data.insertBefore(row, following)
+            rows[number] = row
+
+    cells = {c.getAttribute("r"): c for row in children(data, "row") for c in children(row, "c")}
+    sources = {True: int(cells["C19"].getAttribute("s")), False: int(cells["E19"].getAttribute("s"))}
+    cache = {}
+
+    def table_style(heading, left, right):
+        key = heading, left, right
+        if key in cache: return cache[key]
+        xf = children(styles.xfs)[sources[heading]].cloneNode(True)
+        border = children(styles.borders)[int(xf.getAttribute("borderId"))].cloneNode(True)
+        for edge in children(border):
+            for attr in list(edge.attributes.keys()): edge.removeAttribute(attr)
+            for child in list(edge.childNodes): edge.removeChild(child)
+            if edge.localName in ("top", "bottom") or (edge.localName == "left" and left) or (edge.localName == "right" and right):
+                edge.setAttribute("style", "thin"); new(edge, S, "color", {"indexed": "64"})
+        styles.borders.appendChild(border)
+        xf.setAttribute("borderId", str(len(children(styles.borders))-1)); xf.setAttribute("applyBorder", "1")
+        alignment = first(xf, "alignment")
+        if alignment is None: alignment = new(xf, S, "alignment")
+        for k,v in {"horizontal":"left", "vertical":"center", "wrapText":"1", "shrinkToFit":"0", "indent":"1"}.items():
+            alignment.setAttribute(k,v)
+        styles.xfs.appendChild(xf)
+        cache[key] = len(children(styles.xfs))-1
+        return cache[key]
+
+    total_height = 0
+    for index in range(max(6,count)):
+        number = 19+index
+        row = rows[number]
+        pair = items[2*index:2*index+2]
+        height = max(22, 14*max((max(wrapped_lines(label,14),wrapped_lines(desc,30))
+                                  for label,desc in pair), default=1)+4)
+        row.setAttribute("ht", str(height)); row.setAttribute("customHeight", "1")
+        row.setAttribute("hidden", "0" if pair else "1")
+        if pair: total_height += height
+        for col in "CDEFGHIJKLMN":
+            cell = cells[col+str(number)]
+            for node in list(children(cell)): cell.removeChild(node)
+            if cell.hasAttribute("t"): cell.removeAttribute("t")
+            cell.setAttribute("s", "0")
+        if not pair: continue
+        for side, groups in enumerate((("CD","EFGH"),("IJ","KLMN"))):
+            label,desc = pair[side] if side < len(pair) else ("", "")
+            for columns,value,heading in ((groups[0],label,True),(groups[1],desc,False)):
+                new(merges,S,"mergeCell",{"ref":f"{columns[0]}{number}:{columns[-1]}{number}"})
+                for i,col in enumerate(columns):
+                    cells[col+str(number)].setAttribute("s",str(table_style(heading and side<len(pair),i==0,i==len(columns)-1)))
+                cell = cells[columns[0]+str(number)]
+                cell.setAttribute("t","inlineStr")
+                new(new(cell,S,"is"),S,"t",{"xml:space":"preserve"},value)
+    merges.setAttribute("count", str(len(children(merges))))
+    for collection in (styles.borders,styles.xfs):
+        collection.setAttribute("count", str(len(children(collection))))
+    delta = round((total_height-old_height)*12700)
+    for anchor in children(drawing.documentElement,"twoCellAnchor"):
+        offsets = []
+        for endpoint in ("from","to"):
+            node = first(first(anchor,endpoint),"row")
+            old = int(content(node))
+            offsets.append(delta if old >= 24 else 0)
+            if extra and old >= 24: replace_text(node, old+extra)
+        for transform in anchor.getElementsByTagNameNS(A,"xfrm"):
+            off,ext = first(transform,"off"),first(transform,"ext")
+            off.setAttribute("y", str(int(off.getAttribute("y"))+offsets[0]))
+            ext.setAttribute("cy", str(int(ext.getAttribute("cy"))+offsets[1]-offsets[0]))
+    return extra
+
+
+def paginate_special_layout(sheet, extra_rows=0):
     """Keep the usual two pages; bound scaling and break overflowing reports by blocks."""
     rows={int(r.getAttribute("r")):r for r in sheet.getElementsByTagNameNS(S,"row")}
     heights={n:0 if r.getAttribute("hidden")=="1" else float(r.getAttribute("ht") or 15) for n,r in rows.items()}
     setup=first(sheet.documentElement,"pageSetup")
     margins=first(sheet.documentElement,"pageMargins")
     printable=841.89-72*sum(float(margins.getAttribute(side)) for side in ("top","bottom"))
-    first_page=sum(heights[n] for n in range(1,36))
+    first_page=sum(heights[n] for n in range(1,36+extra_rows))
     if first_page*REPORT_PRINT_SCALE/100<=printable:return
     # At most a two-point (2.4%) reduction, never shrink in proportion to long text.
     # Native Excel rounding is verified separately by the PDF integration check.
@@ -263,8 +337,9 @@ def paginate_special_layout(sheet):
         return
     # Long reports keep 82% and move whole headings/bodies together. Removing the
     # fixed row-35 break avoids an almost-empty page between two manual breaks.
-    blocks=((1,17),(18,20),(21,22),(23,24),(25,28),(29,31),(32,33),(34,35),
-            (36,39),(40,42),(43,54),(55,59),(60,66),(67,69))
+    blocks=((1,17),(18,19),*((n,n) for n in range(20,25+extra_rows)),
+            *((a+extra_rows,b+extra_rows) for a,b in ((25,28),(29,31),(32,33),(34,35),
+            (36,39),(40,42),(43,54),(55,59),(60,66),(67,69))))
     breaks=first(sheet.documentElement,"rowBreaks")
     for node in list(children(breaks)):breaks.removeChild(node)
     used=0
@@ -389,7 +464,6 @@ def apply_report_layout(sheet, drawing, styles, report):
     styles.xfs.setAttribute("count", str(len(children(styles.xfs))))
     first(sheet.documentElement, "pageSetup").setAttribute("scale", str(REPORT_PRINT_SCALE))
     layout_deltas = acceptance_layout(sheet, styles, report)
-    paginate_special_layout(sheet)
     # Excel uses the row anchors; synchronize cached physical transforms too.
     for anchor in children(drawing.documentElement, "twoCellAnchor"):
         start = int(content(first(first(anchor, "from"), "row"))) + 1
@@ -595,14 +669,18 @@ def render_xlsx(report: ReadingReport, template_path=TEMPLATE_PATH):
     apply_report_layout(sheet, drawing, styles, report)
     workbook=minidom.parseString(files["xl/workbook.xml"])
     protect_advice_bottom_border(sheet, drawing, workbook)
+    polish_gogyo_layout(drawing, report)
+    charts=[]
+    for index in range(1,6):
+        name=f"xl/charts/chart{index}.xml";chart=minidom.parseString(files[name])
+        write_charts(chart,report.chart_cells);charts.append((name,chart))
+    extra_rows = layout_special_table(sheet, drawing, workbook, charts, styles, report)
+    paginate_special_layout(sheet, extra_rows)
     files["xl/workbook.xml"]=serialize(workbook)
     files["xl/worksheets/sheet2.xml"]=serialize(sheet)
     files["xl/styles.xml"]=serialize(style_doc)
-    polish_gogyo_layout(drawing, report)
     files["xl/drawings/drawing2.xml"]=serialize(drawing)
-    for index in range(1,6):
-        name=f"xl/charts/chart{index}.xml";chart=minidom.parseString(files[name])
-        write_charts(chart,report.chart_cells);files[name]=serialize(chart)
+    for name,chart in charts:files[name]=serialize(chart)
     # Preserve the hidden sheet and hidden Yojin layout, but ship no old computation or tables.
     calc=minidom.parseString(files["xl/worksheets/sheet1.xml"])
     for cell in calc.getElementsByTagNameNS(S,"c"):

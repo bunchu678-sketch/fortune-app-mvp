@@ -348,15 +348,15 @@ class ReportCases(unittest.TestCase):
             self.assertEqual(self.report.cells[f'C{19+i}'],row.get('判定',''))
             self.assertEqual(self.report.cells[f'E{19+i}'],row.get('結果',''))
         for i,row in enumerate(self.result['special_meishiki']['rows']):
-            col='C' if i%2==0 else 'I';number=19+2*(i//2)
+            col='C' if i%2==0 else 'I';number=19+i//2
             self.assertEqual(self.cells[col+str(number)],row['判定'])
-            self.assertEqual(self.cells[col+str(number+1)],row['結果'])
+            self.assertEqual(self.cells[('E' if i%2==0 else 'K')+str(number)],row['結果'])
 
     def test_no_special_and_overflow_not_truncated(self):
         r=deepcopy(self.result);r['special_meishiki']['rows']=[]
         self.assertTrue(all(build_reading_report(FORM,r).cells[f'C{19+i}']=='' for i in range(6)))
         r['special_meishiki']['rows']=[{'判定':'テスト','結果':'テスト'}]*7
-        with self.assertRaises(ReportError):build_reading_report(FORM,r)
+        self.assertEqual(len(build_reading_report(FORM,r).special_entries),7)
 
     def test_nikkan_description_and_keywords(self):
         self.assertEqual(self.report.texts['Phase5_Nikkan'],self.result['personality']['nikkan']['description'])
@@ -408,9 +408,9 @@ class ReportCases(unittest.TestCase):
         result['special_meishiki']['rows']=[{'判定':'複数行確認','結果':'一行目の正式説明\n二行目の正式説明'}]
         report=build_reading_report(FORM,result)
         parts=unpack(render_xlsx(report));sheet=ET.fromstring(parts['xl/worksheets/sheet2.xml'])
-        row=sheet.find("s:sheetData/s:row[@r='20']",NS)
-        self.assertGreaterEqual(float(row.get('ht')),30)
-        self.assertEqual(sheet_cells(parts)['C20'],'一行目の正式説明\n二行目の正式説明')
+        row=sheet.find("s:sheetData/s:row[@r='19']",NS)
+        self.assertGreaterEqual(float(row.get('ht')),32)
+        self.assertEqual(sheet_cells(parts)['E19'],'一行目の正式説明\n二行目の正式説明')
         self.assertEqual(sheet.find('s:pageSetup',NS).get('scale'),str(REPORT_PRINT_SCALE))
 
     def test_polish_transparent_nodes_and_removed_caption(self):
@@ -438,44 +438,78 @@ class ReportCases(unittest.TestCase):
         for n in (43,55):
             self.assertGreaterEqual(float(sheet.find("s:sheetData/s:row[@r='%s']"%n,NS).get('ht')),24)
 
-    def test_two_column_counts_order_styles_and_merges(self):
-        for count in range(7):
+    def test_special_table_counts_order_styles_and_merges(self):
+        for count in (*range(9),13,16,25):
             with self.subTest(count=count):
                 entries=[{'判定':'判定'+str(i+1),'結果':'正式説明'+str(i+1)} for i in range(count)]
                 result=deepcopy(self.result);result['special_meishiki']['rows']=entries
                 report=build_reading_report(FORM,result);before=deepcopy(report)
                 parts=unpack(render_xlsx(report));sheet=ET.fromstring(parts['xl/worksheets/sheet2.xml']);values=sheet_cells(parts)
                 self.assertEqual(report,before)
+                occupied_rows=math.ceil(count/2);extra=max(0,occupied_rows-6)
                 rows={int(r.get('r')):r for r in sheet.findall('s:sheetData/s:row',NS)}
-                self.assertEqual([n for n in range(19,25) if rows[n].get('hidden')!='1'],list(range(19,19+2*math.ceil(count/2))))
+                self.assertEqual([n for n in range(19,25+extra) if rows[n].get('hidden')!='1'],list(range(19,19+occupied_rows)))
                 self.assertEqual(rows[18].get('hidden'),'0' if count else '1')
-                self.assertTrue(all(float(rows[n].get('ht'))>=16 for n in range(19,25)))
+                self.assertTrue(all(float(rows[n].get('ht'))>=22 for n in range(19,25+extra)))
                 styles=ET.fromstring(parts['xl/styles.xml']);xfs=list(styles.find('s:cellXfs',NS));fonts=list(styles.find('s:fonts',NS))
                 merges={m.get('ref') for m in sheet.find('s:mergeCells',NS)}
                 positions=set()
                 for i,entry in enumerate(entries):
-                    col,end=('C','H') if i%2==0 else ('I','N');row=19+2*(i//2)
-                    for n,key,bold in ((row,'判定',True),(row+1,'結果',False)):
-                        address=col+str(n);positions.add(address)
+                    groups=('CD','EFGH') if i%2==0 else ('IJ','KLMN');row=19+i//2
+                    for columns,key,bold in ((groups[0],'判定',True),(groups[1],'結果',False)):
+                        address=columns[0]+str(row);positions.add(address)
                         self.assertEqual(values[address],entry[key])
-                        self.assertIn(f'{col}{n}:{end}{n}',merges)
+                        self.assertIn(f'{columns[0]}{row}:{columns[-1]}{row}',merges)
                         cell=sheet.find("s:sheetData/s:row/s:c[@r='%s']"%address,NS)
                         xf=xfs[int(cell.get('s'))];align=xf.find('s:alignment',NS);font=fonts[int(xf.get('fontId'))]
                         self.assertEqual(align.get('wrapText'),'1');self.assertEqual(align.get('shrinkToFit'),'0')
                         self.assertEqual(font.find('s:sz',NS).get('val'),'11')
                         self.assertEqual(font.find('s:b',NS) is not None,bold)
-                for n in range(19,25):
+                for n in range(19,25+extra):
                     for col in 'CDEFGHIJKLMN':
                         if col+str(n) not in positions:self.assertEqual(values.get(col+str(n),''),'')
-                # No overlapping merged areas, including blank right-hand cards.
                 occupied=set()
                 for ref in merges:
-                    if not any(ref.startswith(col+str(n)+':') for n in range(19,25) for col in 'CI'):continue
-                    start,end=ref.split(':');number=int(start[1:])
-                    area={(c,number) for c in range(ord(start[0]),ord(end[0])+1)}
+                    start,end=ref.split(':');r=int(''.join(filter(str.isdigit,start)))
+                    if not 19<=r<25+extra:continue
+                    area={(c,r) for c in range(ord(start[0]),ord(end[0])+1)}
                     self.assertFalse(occupied & area);occupied.update(area)
-                self.assertEqual(sheet.find('s:pageSetup',NS).get('scale'),'80' if count>=5 else str(REPORT_PRINT_SCALE))
-                self.assertEqual(sheet.find('s:rowBreaks/s:brk',NS).get('id'),'35')
+                self.assertEqual(sheet.find('s:pageSetup',NS).get('scale'),'80' if count in (7,8) else str(REPORT_PRINT_SCALE))
+                self.assertEqual(values['B'+str(25+extra)],before.cells['B25'])
+                self.assertEqual(values['C'+str(58+extra)],str(before.cells['C58']))
+                self.assertEqual(values['X'+str(103+extra)],str(before.chart_cells['X103']))
+                workbook=ET.fromstring(parts['xl/workbook.xml'])
+                area=next(n.text for n in workbook.findall('s:definedNames/s:definedName',NS) if n.get('name')=='_xlnm.Print_Area' and n.get('localSheetId')=='1')
+                self.assertEqual(area,'原本!$A$1:$O$'+str(69+extra))
+                for address,value in self.cells.items():
+                    import re
+                    column,number=re.fullmatch(r'([A-Z]+)(\d+)',address).groups();number=int(number)
+                    if 19<=number<=24:continue
+                    self.assertEqual(values[column+str(number+(extra if number>=25 else 0))],value)
+                drawing=ET.fromstring(parts['xl/drawings/drawing2.xml'])
+                base_drawing=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
+                base_sheet=ET.fromstring(self.parts['xl/worksheets/sheet2.xml'])
+                base_heights={int(r.get('r')):0 if r.get('hidden')=='1' else float(r.get('ht',15)) for r in base_sheet.findall('s:sheetData/s:row',NS)}
+                actual_heights={n:0 if r.get('hidden')=='1' else float(r.get('ht',15)) for n,r in rows.items()}
+                for base,actual in zip(base_drawing,drawing):
+                    if base.find('x:from',NS) is None:continue
+                    shifts=[]
+                    for endpoint in ('from','to'):
+                        old=int(base.findtext('x:'+endpoint+'/x:row','',NS))
+                        new=old+(extra if old>=24 else 0)
+                        self.assertEqual(int(actual.findtext('x:'+endpoint+'/x:row','',NS)),new)
+                        shifts.append(round((sum(actual_heights[n] for n in range(1,new+1))-sum(base_heights[n] for n in range(1,old+1)))*12700))
+                    for a,b in zip(base.findall('.//a:xfrm',NS),actual.findall('.//a:xfrm',NS)):
+                        self.assertAlmostEqual(int(b.find('a:off',NS).get('y'))-int(a.find('a:off',NS).get('y')),shifts[0],delta=1)
+                        self.assertAlmostEqual(int(b.find('a:ext',NS).get('cy'))-int(a.find('a:ext',NS).get('cy')),shifts[1]-shifts[0],delta=1)
+                for index in range(1,6):
+                    chart=ET.fromstring(parts[f'xl/charts/chart{index}.xml'])
+                    base=ET.fromstring(self.parts[f'xl/charts/chart{index}.xml'])
+                    import re
+                    for old,actual in zip([n for n in base.iter() if n.tag.endswith('}f')],
+                                          [n for n in chart.iter() if n.tag.endswith('}f')]):
+                        expected=re.sub(r'(\$?[A-Z]{1,3}\$?)(\d+)',lambda m:m[1]+str(int(m[2])+(extra if int(m[2])>=25 else 0)),old.text)
+                        self.assertEqual(actual.text,expected)
 
     def test_two_column_long_text_newlines_and_pair_height(self):
         for entries in ([{'判定':'短い判定','結果':'短文'},{'判定':'右の判定','結果':'正式な長文の説明を省略しない。'*9}],
@@ -485,8 +519,8 @@ class ReportCases(unittest.TestCase):
             values=sheet_cells(parts)
             for i,entry in enumerate(entries):
                 col='C' if i==0 else 'I'
-                self.assertEqual(values[col+'19'],entry['判定']);self.assertEqual(values[col+'20'],entry['結果'])
-            self.assertGreater(float(sheet.find("s:sheetData/s:row[@r='20']",NS).get('ht')),16)
+                self.assertEqual(values[col+'19'],entry['判定']);self.assertEqual(values[('E' if i==0 else 'K')+'19'],entry['結果'])
+            self.assertGreater(float(sheet.find("s:sheetData/s:row[@r='19']",NS).get('ht')),22)
             if len(entries)==1:self.assertGreater(float(sheet.find("s:sheetData/s:row[@r='19']",NS).get('ht')),16)
 
     def test_two_column_long_overflow_breaks_keep_blocks_together(self):
@@ -497,11 +531,11 @@ class ReportCases(unittest.TestCase):
         self.assertEqual(sheet.find('s:pageSetup',NS).get('scale'),'82')
         breaks=[int(n.get('id')) for n in sheet.find('s:rowBreaks',NS)]
         self.assertTrue(breaks)
-        self.assertTrue(set(breaks)<={17,20,22,24,28,31,33,35,39,42,54,59,66})
+        self.assertTrue(set(breaks)<={17,19,20,21,22,23,24,28,31,33,35,39,42,54,59,66})
         values=sheet_cells(parts)
         for i,entry in enumerate(result['special_meishiki']['rows']):
-            col='C' if i%2==0 else 'I';row=19+2*(i//2)
-            self.assertEqual(values[col+str(row+1)],entry['結果'])
+            col='E' if i%2==0 else 'K';row=19+i//2
+            self.assertEqual(values[col+str(row)],entry['結果'])
         self.assertEqual(report.texts,build_reading_report(FORM,self.result).texts)
 
     def test_polish_drawing_transforms_follow_effective_row_heights(self):
