@@ -19,7 +19,7 @@ A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 X = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
 C = "http://schemas.openxmlformats.org/drawingml/2006/chart"
 GOGYO_CELLS = ("K6", "M8", "L12", "J12", "I8")
-GOGYO_DRAWING_IDS = set(range(4, 24))
+GOGYO_DRAWING_IDS = {2} | set(range(4, 24))
 SECTION_GAP_PT = 7.5
 SECTION_HEADING_ROWS = (25, 29, 34, 36, 43, 55, 60, 62, 67)
 REPORT_PRINT_SCALE = 82
@@ -525,8 +525,13 @@ def polish_gogyo_layout(doc, report):
     off, ext = first(frame, "off"), first(frame, "ext")
     left, top = int(off.getAttribute("x")), int(off.getAttribute("y"))
     width, height = int(ext.getAttribute("cx")), int(ext.getAttribute("cy"))
-    center = (left + width / 2, top + height * .55)
-    orbit, radius = height * .36, height * .103
+    label_height, label_width, label_gap = 16*12700, 60*12700, 6*12700
+    orbit, radius = height * .35, height * .103
+    # Center the complete silhouette, including the top label and bottom circles.
+    # A regular pentagon's orbital center is below its visible bounding-box center.
+    min_y = -orbit - radius - label_gap - label_height
+    max_y = orbit * math.sin(math.radians(54)) + radius
+    center = (left + width / 2, top + height / 2 - (min_y + max_y) / 2)
     points = [(center[0] + orbit * math.cos(math.radians(-90 + i * 72)),
                center[1] + orbit * math.sin(math.radians(-90 + i * 72))) for i in range(5)]
 
@@ -550,6 +555,9 @@ def polish_gogyo_layout(doc, report):
         first(transform, "ext").setAttribute("cy", str(round(h)))
         return shape
 
+    # The legacy two-cell frame can render at a different horizontal position
+    # from its cached transform. Use the same absolute coordinates as its contents.
+    place(2,left,top,width,height)
     for i, ident in enumerate((20, 21, 22, 23, 19)):
         x, y = points[i]
         shape = place(ident, x-radius, y-radius, radius*2, radius*2)
@@ -632,14 +640,29 @@ def polish_gogyo_layout(doc, report):
             if style is not None: replacement.appendChild(style)
             shape.parentNode.replaceChild(replacement, shape)
 
-    # Keep role labels outside node/arrow paths and inside the unchanged chart frame.
-    label_height, label_width = 16*12700, 68*12700
-    positions = {4:(points[0][0]-45*12700, points[0][1]-radius-18*12700, 90*12700),
-                 5:(points[1][0]+radius+3*12700, points[1][1]-radius-12*12700, label_width),
-                 6:(points[4][0]-radius-3*12700-label_width, points[4][1]-radius-12*12700, label_width),
-                 7:(points[2][0]+radius+8*12700, points[2][1]-label_height/2, label_width),
-                 8:(points[3][0]-radius-8*12700-label_width, points[3][1]-label_height/2, label_width)}
-    for ident, (x, y, w) in positions.items(): place(ident, x, y, w, label_height)
+    # Mirror the text edge nearest each circle, rather than left-aligning both
+    # sides inside equal boxes. Different text widths then keep the same gap.
+    positions = {4:(points[0][0]-45*12700, points[0][1]-radius-label_gap-label_height, 90*12700, "ctr")}
+    for ident,index,direction in ((5,1,1),(6,4,-1),(7,2,1),(8,3,-1)):
+        x,y = points[index]
+        positions[ident] = (x+radius+label_gap if direction==1 else x-radius-label_gap-label_width,
+                            y-label_height/2, label_width, "l" if direction==1 else "r")
+    for ident, (x,y,w,alignment) in positions.items():
+        shape = place(ident,x,y,w,label_height)
+        body = first(shape,"txBody")
+        props = first(body,"bodyPr")
+        for key,value in {"anchor":"ctr","wrap":"none","lIns":"0","rIns":"0","tIns":"0","bIns":"0"}.items():
+            props.setAttribute(key,value)
+        for node in list(children(props)):
+            if node.localName in ("spAutoFit","normAutofit"): props.removeChild(node)
+        if first(props,"noAutofit") is None: new(props,A,"a:noAutofit")
+        for paragraph in children(body,"p"):
+            ppr = first(paragraph,"pPr")
+            if ppr is None:
+                ppr = new(paragraph,A,"a:pPr")
+                paragraph.insertBefore(ppr,paragraph.firstChild)
+            for key,value in {"algn":alignment,"marL":"0","marR":"0","indent":"0"}.items():
+                ppr.setAttribute(key,value)
 
 
 def formula_values(formula, cells):

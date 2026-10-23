@@ -163,6 +163,60 @@ class ReportCases(unittest.TestCase):
             self.assertEqual(formats[xfs[int(cell.get('s'))].get('numFmtId')],';;;')
             self.assertTrue(self.cells[address])
 
+    def test_gogyo_mirrored_labels_equal_gaps_and_centered_silhouette(self):
+        drawing=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
+        anchors={int(a.find('.//x:cNvPr',NS).get('id')):a for a in drawing}
+        frame=anchors[2].find('.//a:xfrm',NS)
+        def bounds(ident):
+            anchor=anchors[ident];pos=anchor.find('x:pos',NS);ext=anchor.find('x:ext',NS)
+            x,y=int(pos.get('x')),int(pos.get('y'))
+            return x,y,x+int(ext.get('cx')),y+int(ext.get('cy'))
+        off,ext=frame.find('a:off',NS),frame.find('a:ext',NS)
+        cx=int(off.get('x'))+int(ext.get('cx'))/2
+        cy=int(off.get('y'))+int(ext.get('cy'))/2
+        self.assertEqual(anchors[2].tag,'{'+NS['x']+'}absoluteAnchor')
+        boxes=[bounds(i) for i in GOGYO_DRAWING_IDS if i!=2]
+        self.assertAlmostEqual((min(b[0] for b in boxes)+max(b[2] for b in boxes))/2,cx,delta=1)
+        self.assertAlmostEqual((min(b[1] for b in boxes)+max(b[3] for b in boxes))/2,cy,delta=1)
+        gaps=[]
+        for label_left,label_right,circle_left,circle_right in ((6,5,19,21),(8,7,23,22)):
+            ll,lr,cl,cr=(bounds(i) for i in (label_left,label_right,circle_left,circle_right))
+            self.assertAlmostEqual(ll[0]+lr[2],2*cx,delta=1)
+            self.assertAlmostEqual(ll[2]+lr[0],2*cx,delta=1)
+            self.assertEqual(ll[1::2],lr[1::2])
+            self.assertAlmostEqual(cl[0]+cr[2],2*cx,delta=1)
+            self.assertEqual(cl[1::2],cr[1::2])
+            self.assertAlmostEqual((ll[1]+ll[3])/2,(cl[1]+cl[3])/2,delta=1)
+            self.assertAlmostEqual((lr[1]+lr[3])/2,(cr[1]+cr[3])/2,delta=1)
+            gaps.extend((cl[0]-ll[2],lr[0]-cr[2]))
+            for ident,align in ((label_left,'r'),(label_right,'l')):
+                shape=anchors[ident].find('x:sp',NS)
+                body=shape.find('x:txBody/a:bodyPr',NS)
+                self.assertEqual(body.get('anchor'),'ctr');self.assertEqual(body.get('wrap'),'none')
+                self.assertTrue(all(body.get(key)=='0' for key in ('lIns','rIns','tIns','bIns')))
+                self.assertEqual(shape.find('x:txBody/a:p/a:pPr',NS).get('algn'),align)
+        top_label,top_circle=bounds(4),bounds(20)
+        self.assertAlmostEqual((top_label[0]+top_label[2])/2,cx,delta=1)
+        gaps.append(top_circle[1]-top_label[3])
+        self.assertLessEqual(max(gaps)-min(gaps),1)
+        self.assertGreater(min(gaps),4*12700)
+
+    def test_gogyo_geometry_independent_of_element_rotation_and_scores(self):
+        baseline=ET.fromstring(self.parts['xl/drawings/drawing2.xml'])
+        base={a.find('.//x:cNvPr',NS).get('id'):a for a in baseline}
+        for shift in range(5):
+            with self.subTest(shift=shift):
+                report=deepcopy(self.report)
+                for i,address in enumerate(GOGYO_CELLS):report.cells[address]='木火土金水'[(i+shift)%5]+' '+str((i+shift)*2)
+                before=deepcopy(report)
+                drawing=ET.fromstring(unpack(render_xlsx(report))['xl/drawings/drawing2.xml'])
+                self.assertEqual(report,before)
+                for anchor in drawing:
+                    ident=anchor.find('.//x:cNvPr',NS).get('id')
+                    if int(ident) not in GOGYO_DRAWING_IDS:continue
+                    for name in ('pos','ext'):
+                        self.assertEqual(anchor.find('x:'+name,NS).attrib,base[ident].find('x:'+name,NS).attrib)
+
     def test_non_gogyo_shapes_and_other_parts_unchanged(self):
         with patch('report_xlsx.polish_gogyo_layout'),patch('report_xlsx.hide_gogyo_cell_text'):
             before=unpack(render_xlsx(self.report))
