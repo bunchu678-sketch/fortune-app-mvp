@@ -1,10 +1,11 @@
 """SQLite adapter. All persisted objects and queries are scoped by owner."""
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
 from uuid import uuid4
+from reading_snapshot import public_result_snapshot
 
 
 class HistoryError(Exception):
@@ -81,6 +82,10 @@ class SQLiteHistoryRepository:
                          (owner, person_id)).fetchone()
         if not row:
             raise HistoryError("鑑定対象者が見つかりません。", 404)
+        from service_contract_repository import content_visible
+        readings=db.execute('SELECT id FROM readings WHERE owner_user_id=? AND person_id=?',(owner,person_id)).fetchall()
+        if readings and not any(content_visible(db,owner,r[0]) for r in readings):
+            raise HistoryError('鑑定対象者が見つかりません。',404)
         return dict(row)
 
     @staticmethod
@@ -89,9 +94,13 @@ class SQLiteHistoryRepository:
                          (owner, reading_id)).fetchone()
         if not row:
             raise HistoryError("鑑定履歴が見つかりません。", 404)
+        from service_contract_repository import content_visible
+        if not content_visible(db,owner,reading_id):
+            raise HistoryError('鑑定履歴が見つかりません。',404)
         data = dict(row)
         for key in ("input_snapshot", "result_snapshot"):
             data[key] = json.loads(data[key])
+        data["result_snapshot"] = public_result_snapshot(data["result_snapshot"])
         return data
 
     def candidates(self, owner, form):
@@ -104,12 +113,15 @@ class SQLiteHistoryRepository:
                 AND EXISTS(SELECT 1 FROM readings r WHERE r.owner_user_id=persons.owner_user_id
                     AND r.person_id=persons.id AND r.deleted_at IS NULL)
                 ORDER BY created_at DESC""", (owner, surname, given, form.get("birthDate"))).fetchall()
+            from service_contract_repository import content_visible
             candidates = []
             for row in rows:
                 person = dict(row)
                 history = db.execute("""SELECT id,group_id,reading_date,saved_at FROM readings
                     WHERE owner_user_id=? AND person_id=? AND deleted_at IS NULL
                     ORDER BY saved_at DESC""", (owner, row["id"])).fetchall()
+                history=[h for h in history if content_visible(db,owner,h['id'])]
+                if not history: continue
                 candidates.append({
                     "id": row["id"], "surname": row["surname"], "givenName": row["given_name"],
                     "birthDate": row["birth_date"], "birthPlace": json.loads(person["current_input"]).get("form", {}).get("birthPlace", ""),
@@ -117,11 +129,20 @@ class SQLiteHistoryRepository:
                 })
             return candidates
 
-    def create(self, owner, payload, versions):
-        snapshot, result = payload["input_snapshot"], payload["result_snapshot"]
+    def create(self, owner, payload, versions, organization_id=None):
+        snapshot, result = payload["input_snapshot"], public_result_snapshot(payload["result_snapshot"])
         form, link = snapshot["form"], payload.get("link") or {"mode": "new_person"}
         now, reading_id = timestamp(), str(uuid4())
         with self.connection() as db:
+            if organization_id:
+                from operations_repository import OperationsRepository
+                db.execute("BEGIN IMMEDIATE")
+                OperationsRepository.member_access(db,organization_id,owner)
+                source_id=link.get("source_reading_id")
+                if source_id:
+                    source_scope=db.execute("SELECT organization_id FROM reading_organization_scopes WHERE reading_id=? AND owner_user_id=?",(source_id,owner)).fetchone()
+                    if source_scope and source_scope[0]!=organization_id:
+                        raise HistoryError("別Organizationの再鑑定元を使用できません。",404)
             person_id = link.get("person_id")
             source = None
             if link.get("source_reading_id"):
@@ -160,7 +181,16 @@ class SQLiteHistoryRepository:
                 reading_id, owner, person_id, group_id, link.get("source_reading_id"),
                 form["readingDate"], now, now, None, payload.get("memo", ""),
                 encode(snapshot), encode(result), *versions))
+            if organization_id:
+                db.execute("INSERT INTO reading_organization_scopes VALUES (?,?,?)",(reading_id,organization_id,owner))
             return self.reading(db, owner, reading_id)
+
+    def organization_scope(self, owner, reading_id):
+        with self.connection() as db:
+            if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='reading_organization_scopes'").fetchone():
+                return None
+            row=db.execute("SELECT organization_id FROM reading_organization_scopes WHERE reading_id=? AND owner_user_id=?",(reading_id,owner)).fetchone()
+            return row[0] if row else None
 
     def detail(self, owner, reading_id):
         with self.connection() as db:
@@ -171,9 +201,10 @@ class SQLiteHistoryRepository:
             if not db.execute("SELECT id FROM reading_groups WHERE owner_user_id=? AND id=?",
                               (owner, group_id)).fetchone():
                 raise HistoryError("鑑定グループが見つかりません。", 404)
+            from service_contract_repository import content_visible
             return [dict(r) for r in db.execute("""SELECT id,reading_date,memo FROM readings
                 WHERE owner_user_id=? AND group_id=? AND deleted_at IS NULL AND id<>?
-                AND memo<>'' ORDER BY reading_date ASC,saved_at ASC""", (owner, group_id, exclude or ""))]
+                AND memo<>'' ORDER BY reading_date ASC,saved_at ASC""", (owner, group_id, exclude or "")) if content_visible(db,owner,r["id"])]
 
     def list(self, owner, keyword="", start="", end=""):
         with self.connection() as db:
@@ -182,7 +213,9 @@ class SQLiteHistoryRepository:
                 ORDER BY saved_at DESC,id DESC""", (owner, start, start, end, end)).fetchall()
             found = []
             needle = normalize(keyword).casefold()
+            from service_contract_repository import content_visible
             for row in rows:
+                if not content_visible(db,owner,row["id"]): continue
                 # List/search use contemporaneous input, not mutable current person data.
                 form = json.loads(row["input_snapshot"])["form"]
                 names = [form.get(k, "") for k in ("surname", "givenName", "surnameKana", "givenNameKana")]
@@ -225,3 +258,54 @@ class SQLiteHistoryRepository:
     def current_person(self, owner, person_id):
         with self.connection() as db:
             return json.loads(self.person(db, owner, person_id)["current_input"])
+
+    @staticmethod
+    def recovery_window(deleted_at, now):
+        try:
+            deleted=datetime.fromisoformat(deleted_at)
+            if deleted.tzinfo is None or now.tzinfo is None: raise ValueError()
+        except (ValueError, TypeError):
+            raise HistoryError("履歴の削除日時を確認できません。",503) from None
+        deadline=deleted+timedelta(days=30)
+        return deleted<=now<deadline,deadline
+
+    def deleted_list(self, owner, now=None):
+        now=now or datetime.now(timezone.utc)
+        with self.connection() as db:
+            rows=db.execute("SELECT * FROM readings WHERE owner_user_id=? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC,id DESC",(owner,)).fetchall()
+            result=[]
+            from service_contract_repository import content_visible
+            for row in rows:
+                if not content_visible(db,owner,row["id"],now): continue
+                recoverable,deadline=self.recovery_window(row["deleted_at"],now)
+                if not recoverable: continue
+                form=json.loads(row["input_snapshot"])["form"]
+                result.append({"id":row["id"],"name":(form.get("surname","")+form.get("givenName","")).strip() or "無記名",
+                    "birth_date":form["birthDate"],"reading_date":row["reading_date"],"saved_at":row["saved_at"],
+                    "deleted_at":row["deleted_at"],"restore_until":deadline.astimezone(timezone.utc).isoformat(timespec="microseconds")})
+            return result
+
+    def restore(self, owner, reading_id, now=None):
+        now=now or datetime.now(timezone.utc)
+        with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row=db.execute("SELECT deleted_at FROM readings WHERE owner_user_id=? AND id=? AND deleted_at IS NOT NULL",(owner,reading_id)).fetchone()
+            from service_contract_repository import content_visible
+            if not content_visible(db,owner,reading_id,now): raise HistoryError("復旧可能な鑑定履歴が見つかりません。",404)
+            if not row or not self.recovery_window(row["deleted_at"],now)[0]:
+                raise HistoryError("復旧可能な鑑定履歴が見つかりません。",404)
+            db.execute("UPDATE readings SET deleted_at=NULL,updated_at=? WHERE owner_user_id=? AND id=?",
+                       (now.astimezone(timezone.utc).isoformat(timespec="microseconds"),owner,reading_id))
+            return {"restored":True}
+
+    def deletion_candidates(self, owner, now=None):
+        """Read-only candidates. Physical deletion requires a separate source-FK policy."""
+        now=now or datetime.now(timezone.utc)
+        with self.connection() as db:
+            result=[]
+            for row in db.execute("SELECT id,deleted_at FROM readings WHERE owner_user_id=? AND deleted_at IS NOT NULL",(owner,)):
+                _,deadline=self.recovery_window(row["deleted_at"],now)
+                if deadline<=now:
+                    dependent=db.execute("SELECT 1 FROM readings WHERE owner_user_id=? AND source_reading_id=? LIMIT 1",(owner,row["id"])).fetchone()
+                    result.append({"id":row["id"],"has_dependents":bool(dependent)})
+            return result

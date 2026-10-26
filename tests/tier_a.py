@@ -116,3 +116,6 @@ def cases():
 
     from sekki_confirmation_cases import cases as boundary_confirmation_cases
     yield from boundary_confirmation_cases()
+
+    from k01_k03_cases import formal_cases as interpretation_cases
+    yield from interpretation_cases()

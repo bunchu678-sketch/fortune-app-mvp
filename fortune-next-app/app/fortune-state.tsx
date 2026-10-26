@@ -4,6 +4,7 @@ import { createContext, ReactNode, useContext, useState } from "react";
 import type { HistoryLink, HistoryRecord, PastMemo, RerunDraft } from "./history-client";
 
 export type FortuneSaved = {
+  organizationId?: string;
   result: Record<string, any>;
   form: Record<string, any>;
   manualChoices: Record<string, "before" | "after">;

@@ -120,11 +120,11 @@ function record(device,flow) { results.push({device,flow,passed:true}); console.
     await page.getByLabel('メールアドレス',{exact:true}).fill(users[who].email);
     await page.getByLabel('パスワード',{exact:true}).fill(password);
     await page.getByRole('button',{name:'ログイン',exact:true}).click();
-    await page.waitForURL(base+'/'); await page.getByText(users[who].email+' でログイン中',{exact:true}).waitFor();
+    await page.waitForURL(base+'/mypage'); await page.getByText(users[who].email+' でログイン中',{exact:true}).waitFor();
    };
    const logout = async()=>{
     await page.getByRole('button',{name:'ログアウト',exact:true}).click();
-    await page.waitForURL(base+'/'); await page.getByRole('link',{name:'ログイン',exact:true}).waitFor();
+    await page.waitForURL(base+'/login'); await page.getByRole('link',{name:'ログイン',exact:true}).waitFor();
    };
    const anonymous = await calculate();
    assert.equal(anonymous.excel_export_token,undefined);
@@ -212,7 +212,7 @@ function record(device,flow) { results.push({device,flow,passed:true}); console.
    await intercepted;
    await logout(); assert.equal((await request.get(base+'/api/auth/me')).status(),401); record(device,'logout and session revocation');
    await delayedRoute.fulfill(production?delayedResponse:{response:delayedResponse}); await page.unroute('**/api/fortune');
-   await sleep(500); assert.equal(page.url(),base+'/'); record(device,'late A response discarded after logout');
+   await sleep(500); assert.equal(page.url(),base+'/login'); record(device,'late A response discarded after logout');
    await login(index+1); record(device,'B login');
    await page.goto(base+'/history',{waitUntil:'networkidle'}); await page.getByText('該当する鑑定履歴はありません。',{exact:true}).waitFor();
    assert.equal(await page.getByText('認証試験'+device+'太郎',{exact:true}).count(),0);

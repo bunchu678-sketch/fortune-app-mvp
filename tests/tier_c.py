@@ -50,7 +50,8 @@ def probe_all():
     results=[]
     for case_id,title,description in ISSUES:
         try:
-            state=classify(probe(case_id))
+            present = probe(case_id)
+            state = ("REGRESSION / RECHECK" if present else "RESOLVED; protected by blocking K01/K03 tests") if case_id in ("K01", "K03") else classify(present)
         except Exception as exc:
             state=f"UNVERIFIED ({type(exc).__name__}: {exc})"
         print(f"Tier C {case_id}: {state}; {title}: {description}")

@@ -41,7 +41,16 @@ async def listing(request: Request, keyword: str = "", start: str = "", end: str
 
 @router.post("")
 async def create(request: Request):
-    return await handle(request, lambda s, o, p: s.create(o, p), True)
+    def action(s,o,p):
+        org=p.get("organization_id") if isinstance(p,dict) else None
+        if org is not None:
+            from product_api import identity,repositories
+            identity(request)
+            if not isinstance(org,str) or not org: raise HistoryError("Organizationを確認してください。",422)
+            operations,_=repositories()
+            operations.context(org,o)
+        return s.create(o,p,organization_id=org)
+    return await handle(request,action,True)
 
 
 @router.post("/candidates")
@@ -61,6 +70,16 @@ async def update_person(person_id: str, request: Request):
         service.repository.update_person(owner, person_id, payload)
         return {"updated": True}
     return await handle(request, action, True)
+
+
+@router.get("/deleted")
+async def deleted(request: Request):
+    return await handle(request, lambda s,o,p: s.repository.deleted_list(o))
+
+
+@router.post("/{reading_id}/restore")
+async def restore(reading_id: str, request: Request):
+    return await handle(request, lambda s,o,p: s.repository.restore(o,reading_id))
 
 
 @router.get("/{reading_id}")

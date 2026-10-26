@@ -3,13 +3,12 @@ import Link from "next/link";
 import { useAuth, LoginRequired } from "../auth";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { historyRequest, savedTime } from "../history-client";
-import { useFortuneState } from "../fortune-state";
+import HistoryNewReading from "../history-new-reading";
 import "./history.css";
 
 type Entry = { id: string; name: string; birth_date: string; reading_date: string; saved_at: string };
 export default function HistoryPage() {
   const { user, loading: authLoading } = useAuth();
-  const { setDraft, setSaved } = useFortuneState();
   const [items, setItems] = useState<Entry[]>([]);
   const [keyword, setKeyword] = useState("");
   const [start, setStart] = useState("");
@@ -51,10 +50,10 @@ export default function HistoryPage() {
       onClick={() => setMenu(menu === item.id ? null : item.id)}>⋮</button>
     {menu === item.id ? <button type="button" onClick={() => { setDeleting(item); setMenu(null); }}>削除</button> : null}
   </div>;
-  if (authLoading || !user) return <main className="appShell historyPage"><h1>鑑定履歴</h1><LoginRequired next="/history" /><Link href="/">通常鑑定へ戻る</Link></main>;
+  if (authLoading || !user) return <main className="appShell historyPage"><h1>鑑定履歴</h1><LoginRequired next="/history" />{!authLoading ? <Link href="/">通常鑑定へ戻る</Link> : null}</main>;
   return <main className="appShell historyPage">
     <header className="historyHeader"><h1>鑑定履歴</h1>
-      <Link href="/" onClick={() => { setDraft(null); setSaved(null); }}>新しく鑑定する</Link>
+      <HistoryNewReading />
     </header>
     <form className="historySearch" onSubmit={load}>
       <label>キーワード<input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="氏名・ふりがな・生年月日" /></label>
@@ -62,6 +61,7 @@ export default function HistoryPage() {
       <label>鑑定日（終了）<input type="date" value={end} onChange={e => setEnd(e.target.value)} /></label>
       <button type="submit" disabled={loading}>検索</button>
     </form>
+    <p><Link href="/history/deleted">削除した履歴を復旧する</Link></p>
     <p>保存日時の新しい順</p>
     {error ? <p role="alert">{error}</p> : null}
     {loading ? <p role="status">履歴を読み込み中…</p> : null}
@@ -78,6 +78,7 @@ export default function HistoryPage() {
     </article>)}</div>
     {deleting ? <div className="historyModal"><section role="dialog" aria-modal="true" aria-labelledby="delete-heading" className="historyCard">
       <h2 id="delete-heading">この鑑定履歴を削除しますか？</h2>
+      <p>削除後30日以内は、削除した履歴の一覧から復旧できます。</p>
       <p>{deleting.name}／{deleting.birth_date}／鑑定日 {deleting.reading_date}</p>
       <div className="historyActions"><button type="button" autoFocus disabled={busy} onClick={() => setDeleting(null)}>キャンセル</button>
         <button type="button" disabled={busy} onClick={remove}>削除する</button></div>

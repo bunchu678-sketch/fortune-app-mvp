@@ -24,7 +24,7 @@ class AuthBoundary:
         if scope["type"] == "http":
             request = Request(scope)
             path = request.url.path
-            owned = path == "/api/history" or path.startswith(("/api/history/", "/api/export/"))
+            owned = path == "/api/history" or path.startswith(("/api/history/", "/api/export/", "/api/account/", "/api/b2b/", "/api/operations/"))
             private_response = owned or path.startswith("/api/auth/") or path == "/api/fortune"
             try:
                 if owned:

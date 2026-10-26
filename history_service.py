@@ -60,7 +60,7 @@ class HistoryService:
     def __init__(self, repository):
         self.repository = repository
 
-    def create(self, owner, payload):
+    def create(self, owner, payload, organization_id=None):
         if not owner or not isinstance(payload, dict):
             raise HistoryError("履歴の指定が不正です。")
         form = validate_input(payload.get("input_snapshot"))
@@ -77,7 +77,7 @@ class HistoryService:
         # A race with another save requires confirmation; no automatic merge.
         if "link" not in payload and self.repository.candidates(owner, form):
             raise HistoryError("過去に鑑定履歴がありますが、同一人物ですか？", 409)
-        return self.repository.create(owner, payload, VERSIONS)
+        return self.repository.create(owner, payload, VERSIONS, organization_id=organization_id)
 
     def prepare(self, owner, reading_id, mode):
         if mode not in ("existing_group", "new_group"):
@@ -91,7 +91,9 @@ class HistoryService:
         # Only the resolved birth decision belongs to this person.
         birth_selection = snapshot.get("boundarySelections", {}).get("birth")
         choices = snapshot.get("manualChoices", {})
+        organization_id=self.repository.organization_scope(owner,reading_id)
         return {
+            **({"organizationId":organization_id} if organization_id else {}),
             "form": form, "manualChoices": {"birth": choices["birth"]} if "birth" in choices else {},
             "boundarySelections": {"birth": birth_selection} if birth_selection else {},
             "link": {"mode": mode, "person_id": reading["person_id"], "source_reading_id": reading_id,
@@ -101,4 +103,5 @@ class HistoryService:
 
     def detail(self, owner, reading_id):
         reading = self.repository.detail(owner, reading_id)
-        return {**reading, "past_memos": self.repository.memos(owner, reading["group_id"], reading_id)}
+        organization_id=self.repository.organization_scope(owner,reading_id)
+        return {**({"organization_id":organization_id} if organization_id else {}), **reading, "past_memos": self.repository.memos(owner, reading["group_id"], reading_id)}

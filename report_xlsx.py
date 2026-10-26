@@ -7,6 +7,7 @@ import math
 from io import BytesIO
 from pathlib import Path
 import re
+import unicodedata
 from xml.dom import minidom
 from zipfile import ZipFile, ZIP_DEFLATED
 from report_data import ReadingReport, ReportError
@@ -18,11 +19,13 @@ A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 X = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
 C = "http://schemas.openxmlformats.org/drawingml/2006/chart"
 GOGYO_CELLS = ("K6", "M8", "L12", "J12", "I8")
-GOGYO_DRAWING_IDS = set(range(4, 24))
+GOGYO_DRAWING_IDS = {2} | set(range(4, 24))
 SECTION_GAP_PT = 7.5
 SECTION_HEADING_ROWS = (25, 29, 34, 36, 43, 55, 60, 62, 67)
 REPORT_PRINT_SCALE = 82
 ADVICE_BOTTOM_INSET_PT = 6
+POLISH_HEADING_HEIGHT_PT = 24
+POLISH_ADVICE_SPACE_PT = 18.7
 
 
 def children(node, local=None):
@@ -88,6 +91,285 @@ class Styles:
         value = len(children(self.xfs))-1
         self.cache[key] = value
         return value
+
+
+
+def special_items(report):
+    """Read the ordered official projection without changing or recomputing it."""
+    if report.special_entries is not None:
+        return list(report.special_entries)
+    return [(str(report.cells["C"+str(n)]), str(report.cells["E"+str(n)]))
+            for n in range(19,25) if report.cells["C"+str(n)] or report.cells["E"+str(n)]]
+
+
+def special_position(index):
+    return ("C" if index % 2 == 0 else "I"), 19 + index // 2
+
+
+def wrapped_lines(value, capacity=50):
+    return sum(max(1,math.ceil(sum(2 if unicodedata.east_asian_width(c) in "WF" else 1
+                                  for c in line)/capacity)) for line in value.split("\n"))
+
+
+def presentation_texts(report):
+    """Move the supplied Nikkan keywords below its unchanged description."""
+    texts = dict(report.texts)
+    _, separator, keywords = str(report.cells["B25"]).partition("　キーワード：")
+    if separator and keywords:
+        texts["Phase5_Nikkan"] = "\n".join(value for value in (
+            texts["Phase5_Nikkan"], "キーワード：" + keywords) if value)
+    return texts
+
+
+def presentation_cells(report):
+    """Rearrange supplied report fields only; preserve the official report projection."""
+    values = dict(report.cells)
+    values.update({"B60": "●年運", "I60": "太罫線：接木運の境界",
+                   "L60": "", "M60": "", "N60": "", "H4": "",
+                   "B25": "● 干支から読み取れるもの"})
+    for col in "LMN":
+        values[col+"61"] = report.cells[col+"60"]
+    for col, heading, footer in (("C",37,39),("I",37,39),("C",40,42),("I",40,42)):
+        star, separator, keywords = str(report.cells[col+str(footer)]).partition("　キーワード：")
+        address = col+str(heading)
+        if star and address in values:
+            values[address] += "：" + star
+        values[col+str(footer)] = "キーワード：" + keywords if separator else ""
+    for n in range(19,25):
+        for col in "CDEFGHIJKLMN":values[col+str(n)] = ""
+    return values
+
+
+def acceptance_layout(sheet, styles, report):
+    """Format headings and populated rows without squeezing unused table rows."""
+    rows = {int(r.getAttribute("r")):r for r in sheet.getElementsByTagNameNS(S,"row")}
+    cells = {c.getAttribute("r"):c for r in rows.values() for c in children(r,"c")}
+    merges = first(sheet.documentElement,"mergeCells")
+    for merge in list(children(merges)):
+        if merge.getAttribute("ref") in ("B60:K60","G61:N61"):
+            merges.removeChild(merge)
+    for ref in ("B60:H60","I60:N60","G61:K61"):
+        new(merges,S,"mergeCell",{"ref":ref})
+    merges.setAttribute("count",str(len(children(merges))))
+
+    def style(address, size=None, bold=None, wrap=False, plain=False, diagonal=False, source=None, horizontal="left"):
+        cell = cells[address]
+        xf = children(styles.xfs)[int(cells[source or address].getAttribute("s") or 0)].cloneNode(True)
+        font = children(styles.fonts)[int(xf.getAttribute("fontId") or 0)].cloneNode(True)
+        if size is not None:
+            first(font,"sz").setAttribute("val",str(size))
+        if bold is not None:
+            for item in list(children(font,"b")):font.removeChild(item)
+            if bold:new(font,S,"b")
+        styles.fonts.appendChild(font)
+        xf.setAttribute("fontId",str(len(children(styles.fonts))-1));xf.setAttribute("applyFont","1")
+        alignment = first(xf,"alignment")
+        if alignment is None:alignment=new(xf,S,"alignment")
+        for key,value in {"vertical":"center","horizontal":horizontal,"wrapText":"1" if wrap else "0",
+                          "shrinkToFit":"0" if wrap else "1"}.items():
+            alignment.setAttribute(key,value)
+        xf.setAttribute("applyAlignment","1")
+        if plain:
+            xf.setAttribute("borderId","0");xf.setAttribute("fillId","0")
+            xf.setAttribute("applyBorder","1");xf.setAttribute("applyFill","1")
+        if diagonal:
+            border=children(styles.borders)[int(xf.getAttribute("borderId") or 0)].cloneNode(True)
+            for key in ("diagonalUp","diagonalDown"):
+                if border.hasAttribute(key):border.removeAttribute(key)
+            edge=first(border,"diagonal")
+            if edge is not None:border.removeChild(edge)
+            styles.borders.appendChild(border)
+            xf.setAttribute("borderId",str(len(children(styles.borders))-1));xf.setAttribute("applyBorder","1")
+        styles.xfs.appendChild(xf);cell.setAttribute("s",str(len(children(styles.xfs))-1))
+
+    for address in ("C2","D2"):style(address,size=11)
+    style("E10",diagonal=True,horizontal="center")  # Keep the official dash and its outer borders.
+    style("B18",size=11,bold=True)
+    for address in ("B43","B55"):style(address,size=11,bold=True)
+    for address in ("C37","I37","C40","I40"):style(address,size=11,bold=True)
+    for address in ("C39","I39","C42","I42"):style(address,size=10)
+    style("B60",size=11,bold=True,plain=True)
+    style("I60",size=10,bold=False,plain=True)
+    for col in "LMN":
+        style(col+"61",source=col+"60")
+        style(col+"60",plain=True)
+    style("G61",wrap=False)
+
+    deltas={}
+    original_heights={n:float(row.getAttribute("ht") or 15) for n,row in rows.items()}
+    def height(number,value,hidden=False):
+        old=original_heights[number]
+        rows[number].setAttribute("ht",f"{value:g}");rows[number].setAttribute("customHeight","1")
+        rows[number].setAttribute("hidden","1" if hidden else "0")
+        deltas[number]=(0 if hidden else value)-old
+
+    items = special_items(report)
+    height(18,20,hidden=not items)
+    # The Nikkan text box spans rows 26:28, with 13pt line spacing and 4pt
+    # vertical insets. Keep its original 45pt whenever the two paragraphs fit.
+    body_height = sum(float(rows[n].getAttribute("ht")) for n in (26,27,28))
+    needed = 13 * wrapped_lines(presentation_texts(report)["Phase5_Nikkan"],106) + 4
+    if needed > body_height:
+        # Native Excel can clip the final paragraph at the estimated boundary.
+        # Reserve one more line only when expanding, keeping normal reports intact.
+        height(28,float(rows[28].getAttribute("ht")) + needed - body_height + 13)
+    for n in (37,40):height(n,19)
+    for n in (39,42):height(n,18)
+    for n in (43,55):height(n,POLISH_HEADING_HEIGHT_PT)
+    # Transfer unused space at the end of the advice box to the section headings.
+    # This preserves page-two height and chart sizes at the approved 82% scale.
+    height(68,float(rows[68].getAttribute("ht"))-POLISH_ADVICE_SPACE_PT)
+    for collection in (styles.fonts,styles.borders,styles.xfs):
+        collection.setAttribute("count",str(len(children(collection))))
+    return deltas
+
+def layout_special_table(sheet, drawing, workbook, charts, styles, report):
+    """Two entries per row, each with a narrow name and a wide description.
+
+    Reuse the template's six rows, hiding unused rows. Grow the output only when
+    needed, moving subsequent cells, merges, drawings, chart sources and print
+    area together. Never edit the approved template or the supplied report.
+    """
+    items = special_items(report)
+    count = math.ceil(len(items) / 2)
+    extra = max(0, count - 6)
+    data = first(sheet.documentElement, "sheetData")
+    rows = {int(r.getAttribute("r")): r for r in children(data, "row")}
+    old_height = sum(float(rows[n].getAttribute("ht") or 15) for n in range(19,25))
+    blank_row = rows[24].cloneNode(True)
+    merges = first(sheet.documentElement, "mergeCells")
+    for merge in list(children(merges)):
+        if re.fullmatch(r"[C-N](?:19|2[0-4]):[C-N](?:19|2[0-4])", merge.getAttribute("ref")):
+            merges.removeChild(merge)
+
+    def move_ref(value):
+        return re.sub(r"(\$?[A-Z]{1,3}\$?)(\d+)",
+                      lambda m: m[1] + str(int(m[2]) + (extra if int(m[2]) >= 25 else 0)), value)
+
+    if extra:
+        for node in sheet.getElementsByTagName("*"):
+            if node.localName == "row":
+                number = int(node.getAttribute("r"))
+                if number >= 25: node.setAttribute("r", str(number + extra))
+            else:
+                for attr in ("r", "ref", "sqref"):
+                    if node.hasAttribute(attr): node.setAttribute(attr, move_ref(node.getAttribute(attr)))
+        for node in workbook.getElementsByTagNameNS(S, "definedName"):
+            if node.getAttribute("localSheetId") == "1" or "原本!" in content(node):
+                replace_text(node, move_ref(content(node)))
+        for _, chart in charts:
+            # Cell-sourced labels also use c15:f, outside the base chart namespace.
+            for node in (n for n in chart.getElementsByTagName("*") if n.localName == "f"):
+                if re.match(r"'?原本'?!", content(node)): replace_text(node, move_ref(content(node)))
+        for node in sheet.getElementsByTagNameNS(S, "brk"):
+            number = int(node.getAttribute("id"))
+            if number >= 25: node.setAttribute("id", str(number + extra))
+        following = rows[25]
+        for number in range(25,25+extra):
+            row = blank_row.cloneNode(True)
+            row.setAttribute("r", str(number))
+            for cell in children(row, "c"):
+                cell.setAttribute("r", re.sub(r"\d+$", str(number), cell.getAttribute("r")))
+            data.insertBefore(row, following)
+            rows[number] = row
+
+    cells = {c.getAttribute("r"): c for row in children(data, "row") for c in children(row, "c")}
+    sources = {True: int(cells["C19"].getAttribute("s")), False: int(cells["E19"].getAttribute("s"))}
+    cache = {}
+
+    def table_style(heading, left, right):
+        key = heading, left, right
+        if key in cache: return cache[key]
+        xf = children(styles.xfs)[sources[heading]].cloneNode(True)
+        border = children(styles.borders)[int(xf.getAttribute("borderId"))].cloneNode(True)
+        for edge in children(border):
+            for attr in list(edge.attributes.keys()): edge.removeAttribute(attr)
+            for child in list(edge.childNodes): edge.removeChild(child)
+            if edge.localName in ("top", "bottom") or (edge.localName == "left" and left) or (edge.localName == "right" and right):
+                edge.setAttribute("style", "thin"); new(edge, S, "color", {"indexed": "64"})
+        styles.borders.appendChild(border)
+        xf.setAttribute("borderId", str(len(children(styles.borders))-1)); xf.setAttribute("applyBorder", "1")
+        alignment = first(xf, "alignment")
+        if alignment is None: alignment = new(xf, S, "alignment")
+        for k,v in {"horizontal":"left", "vertical":"center", "wrapText":"1", "shrinkToFit":"0", "indent":"1"}.items():
+            alignment.setAttribute(k,v)
+        styles.xfs.appendChild(xf)
+        cache[key] = len(children(styles.xfs))-1
+        return cache[key]
+
+    total_height = 0
+    for index in range(max(6,count)):
+        number = 19+index
+        row = rows[number]
+        pair = items[2*index:2*index+2]
+        height = max(22, 14*max((max(wrapped_lines(label,14),wrapped_lines(desc,30))
+                                  for label,desc in pair), default=1)+4)
+        row.setAttribute("ht", str(height)); row.setAttribute("customHeight", "1")
+        row.setAttribute("hidden", "0" if pair else "1")
+        if pair: total_height += height
+        for col in "CDEFGHIJKLMN":
+            cell = cells[col+str(number)]
+            for node in list(children(cell)): cell.removeChild(node)
+            if cell.hasAttribute("t"): cell.removeAttribute("t")
+            cell.setAttribute("s", "0")
+        if not pair: continue
+        for side, groups in enumerate((("CD","EFGH"),("IJ","KLMN"))):
+            label,desc = pair[side] if side < len(pair) else ("", "")
+            for columns,value,heading in ((groups[0],label,True),(groups[1],desc,False)):
+                new(merges,S,"mergeCell",{"ref":f"{columns[0]}{number}:{columns[-1]}{number}"})
+                for i,col in enumerate(columns):
+                    cells[col+str(number)].setAttribute("s",str(table_style(heading and side<len(pair),i==0,i==len(columns)-1)))
+                cell = cells[columns[0]+str(number)]
+                cell.setAttribute("t","inlineStr")
+                new(new(cell,S,"is"),S,"t",{"xml:space":"preserve"},value)
+    merges.setAttribute("count", str(len(children(merges))))
+    for collection in (styles.borders,styles.xfs):
+        collection.setAttribute("count", str(len(children(collection))))
+    delta = round((total_height-old_height)*12700)
+    for anchor in children(drawing.documentElement,"twoCellAnchor"):
+        offsets = []
+        for endpoint in ("from","to"):
+            node = first(first(anchor,endpoint),"row")
+            old = int(content(node))
+            offsets.append(delta if old >= 24 else 0)
+            if extra and old >= 24: replace_text(node, old+extra)
+        for transform in anchor.getElementsByTagNameNS(A,"xfrm"):
+            off,ext = first(transform,"off"),first(transform,"ext")
+            off.setAttribute("y", str(int(off.getAttribute("y"))+offsets[0]))
+            ext.setAttribute("cy", str(int(ext.getAttribute("cy"))+offsets[1]-offsets[0]))
+    return extra
+
+
+def paginate_special_layout(sheet, extra_rows=0):
+    """Keep the usual two pages; bound scaling and break overflowing reports by blocks."""
+    rows={int(r.getAttribute("r")):r for r in sheet.getElementsByTagNameNS(S,"row")}
+    heights={n:0 if r.getAttribute("hidden")=="1" else float(r.getAttribute("ht") or 15) for n,r in rows.items()}
+    setup=first(sheet.documentElement,"pageSetup")
+    margins=first(sheet.documentElement,"pageMargins")
+    printable=841.89-72*sum(float(margins.getAttribute(side)) for side in ("top","bottom"))
+    first_page=sum(heights[n] for n in range(1,36+extra_rows))
+    if first_page*REPORT_PRINT_SCALE/100<=printable:return
+    # At most a two-point (2.4%) reduction, never shrink in proportion to long text.
+    # Native Excel rounding is verified separately by the PDF integration check.
+    if first_page*80/100<=printable:
+        setup.setAttribute("scale","80")
+        return
+    # Long reports keep 82% and move whole headings/bodies together. Removing the
+    # fixed row-35 break avoids an almost-empty page between two manual breaks.
+    blocks=((1,17),(18,19),*((n,n) for n in range(20,25+extra_rows)),
+            *((a+extra_rows,b+extra_rows) for a,b in ((25,28),(29,31),(32,33),(34,35),
+            (36,39),(40,42),(43,54),(55,59),(60,66),(67,69))))
+    breaks=first(sheet.documentElement,"rowBreaks")
+    for node in list(children(breaks)):breaks.removeChild(node)
+    used=0
+    for start,end in blocks:
+        height=sum(heights.get(n,0) for n in range(start,end+1))
+        if used and used+height>printable/(REPORT_PRINT_SCALE/100)-8:
+            new(breaks,S,"brk",{"id":start-1,"max":"14","man":"1"})
+            used=0
+        used+=height
+    count=len(children(breaks))
+    breaks.setAttribute("count",str(count));breaks.setAttribute("manualBreakCount",str(count))
 
 
 def write_sheet(doc, values, styles, report, shared):
@@ -175,8 +457,8 @@ def hide_gogyo_cell_text(sheet, styles):
     styles.xfs.setAttribute("count", str(len(children(styles.xfs))))
 
 
-def apply_report_layout(sheet, drawing, styles):
-    """Add half a line above headings without changing prose/font/body-box sizes."""
+def apply_report_layout(sheet, drawing, styles, report):
+    """Preserve the page structure while applying the requested print formatting."""
     merges = first(sheet.documentElement, "mergeCells")
     if not any(n.getAttribute("ref") == "D2:F2" for n in children(merges)):
         new(merges, S, "mergeCell", {"ref": "D2:F2"})
@@ -200,12 +482,15 @@ def apply_report_layout(sheet, drawing, styles):
             cell.setAttribute("s", str(len(children(styles.xfs)) - 1))
     styles.xfs.setAttribute("count", str(len(children(styles.xfs))))
     first(sheet.documentElement, "pageSetup").setAttribute("scale", str(REPORT_PRINT_SCALE))
+    layout_deltas = acceptance_layout(sheet, styles, report)
     # Excel uses the row anchors; synchronize cached physical transforms too.
     for anchor in children(drawing.documentElement, "twoCellAnchor"):
         start = int(content(first(first(anchor, "from"), "row"))) + 1
         end = int(content(first(first(anchor, "to"), "row"))) + 1
-        before = sum(SECTION_GAP_PT for row in SECTION_HEADING_ROWS if row < start) * 12700
-        after = sum(SECTION_GAP_PT for row in SECTION_HEADING_ROWS if row < end) * 12700
+        before = (sum(SECTION_GAP_PT for row in SECTION_HEADING_ROWS if row < start) +
+                  sum(delta for row,delta in layout_deltas.items() if row < start)) * 12700
+        after = (sum(SECTION_GAP_PT for row in SECTION_HEADING_ROWS if row < end) +
+                 sum(delta for row,delta in layout_deltas.items() if row < end)) * 12700
         for transform in anchor.getElementsByTagNameNS(A, "xfrm"):
             off, ext = first(transform, "off"), first(transform, "ext")
             off.setAttribute("y", str(int(off.getAttribute("y")) + round(before)))
@@ -240,8 +525,13 @@ def polish_gogyo_layout(doc, report):
     off, ext = first(frame, "off"), first(frame, "ext")
     left, top = int(off.getAttribute("x")), int(off.getAttribute("y"))
     width, height = int(ext.getAttribute("cx")), int(ext.getAttribute("cy"))
-    center = (left + width / 2, top + height * .55)
-    orbit, radius = height * .36, height * .103
+    label_height, label_width, label_gap = 16*12700, 60*12700, 6*12700
+    orbit, radius = height * .35, height * .103
+    # Center the complete silhouette, including the top label and bottom circles.
+    # A regular pentagon's orbital center is below its visible bounding-box center.
+    min_y = -orbit - radius - label_gap - label_height
+    max_y = orbit * math.sin(math.radians(54)) + radius
+    center = (left + width / 2, top + height / 2 - (min_y + max_y) / 2)
     points = [(center[0] + orbit * math.cos(math.radians(-90 + i * 72)),
                center[1] + orbit * math.sin(math.radians(-90 + i * 72))) for i in range(5)]
 
@@ -265,15 +555,21 @@ def polish_gogyo_layout(doc, report):
         first(transform, "ext").setAttribute("cy", str(round(h)))
         return shape
 
+    # The legacy two-cell frame can render at a different horizontal position
+    # from its cached transform. Use the same absolute coordinates as its contents.
+    place(2,left,top,width,height)
     for i, ident in enumerate((20, 21, 22, 23, 19)):
         x, y = points[i]
         shape = place(ident, x-radius, y-radius, radius*2, radius*2)
         shape.getElementsByTagNameNS(X, "cNvPr")[0].setAttribute("name", f"Gogyo_Node_{i}")
         props = first(shape, "spPr")
-        no_fill = first(props, "noFill")
-        fill = doc.createElementNS(A, "a:solidFill")
-        new(fill, A, "a:srgbClr", {"val": "FFFFFF"})
-        props.replaceChild(fill, no_fill)
+        # Preserve the template's actual noFill (transparent), not a white fill.
+        assert first(props,"noFill") is not None
+        outline = first(props,"ln")
+        for color in list(children(outline,"solidFill")):outline.removeChild(color)
+        outline_fill = new(outline,A,"a:solidFill")
+        new(outline_fill,A,"a:srgbClr",{"val":"5B655F"})
+        if outline.firstChild is not outline_fill:outline.insertBefore(outline_fill,outline.firstChild)
         body = first(shape, "txBody")
         for child in list(body.childNodes): body.removeChild(child)
         body_props = new(body, A, "a:bodyPr", {"anchor": "ctr", "anchorCtr": "1", "wrap": "none",
@@ -284,12 +580,12 @@ def polish_gogyo_layout(doc, report):
         new(paragraph, A, "a:pPr", {"algn": "ctr", "marL": "0", "marR": "0", "indent": "0"})
         run = new(paragraph, A, "a:r")
         run_props = new(run, A, "a:rPr", {"lang": "ja-JP", "sz": "1600", "b": "1"})
-        new(new(run_props, A, "a:solidFill"), A, "a:srgbClr", {"val": "000000"})
+        new(new(run_props, A, "a:solidFill"), A, "a:srgbClr", {"val": "232825"})
         for font in ("latin", "ea"): new(run_props, A, "a:"+font, {"typeface": "游ゴシック"})
         new(run, A, "a:t", value=report.cells[GOGYO_CELLS[i]])
 
     # Five complete edges follow the official chart_order (a rotation of 木火土金水).
-    # Both sets of arrows stop outside the node outlines; native line colours are preserved.
+    # Both sets of arrows stop outside the node outlines and use the Web palette.
     for ident, source, target in [(9+i, i, (i+1)%5) for i in range(5)] + [
             (14,3,0), (15,0,2), (16,2,4), (17,1,3), (18,4,1)]:
         start, end = points[source], points[target]
@@ -298,31 +594,75 @@ def polish_gogyo_layout(doc, report):
         clearance = radius + 7 * 12700
         sx, sy = start[0]+dx/distance*clearance, start[1]+dy/distance*clearance
         ex, ey = end[0]-dx/distance*clearance, end[1]-dy/distance*clearance
-        shape = place(ident, min(sx,ex), min(sy,ey), abs(ex-sx), abs(ey-sy), ex<sx, ey<sy)
+        if ident < 14:
+            # Match the Web SVG's short clockwise arc (radius = chord * 1.55).
+            chord=math.hypot(ex-sx,ey-sy);arc_radius=chord*1.55
+            sag=arc_radius-math.sqrt(arc_radius**2-(chord/2)**2)
+            nx,ny=-(ey-sy)/chord,(ex-sx)/chord
+            control=4*sag/3
+            curve=[(sx,sy),(sx+(ex-sx)/3-nx*control,sy+(ey-sy)/3-ny*control),
+                   (ex-(ex-sx)/3-nx*control,ey-(ey-sy)/3-ny*control),(ex,ey)]
+            x,y=min(p[0] for p in curve),min(p[1] for p in curve)
+            w,h=max(p[0] for p in curve)-x,max(p[1] for p in curve)-y
+            shape=place(ident,x,y,w,h)
+        else:
+            shape = place(ident, min(sx,ex), min(sy,ey), abs(ex-sx), abs(ey-sy), ex<sx, ey<sy)
         shape.getElementsByTagNameNS(X, "cNvPr")[0].setAttribute(
             "name", f"Gogyo_{'Sheng' if ident<14 else 'Ke'}_{source}_{target}")
         geom = first(first(shape, "spPr"), "prstGeom")
         geom.setAttribute("prst", "straightConnector1")
         for adjustment in list(children(first(geom, "avLst"))): first(geom, "avLst").removeChild(adjustment)
-        # Arc shapes become native connectors, so Excel renders a full line with its end arrow.
+        line=first(first(shape,"spPr"),"ln")
+        line.setAttribute("w",str(round((2.8 if ident<14 else 2.3)*12700)))
+        for fill in list(children(line,"solidFill")):line.removeChild(fill)
+        line_fill=new(line,A,"a:solidFill")
+        new(line_fill,A,"a:srgbClr",{"val":"9EB9A8" if ident<14 else "D7A96B"})
+        if line.firstChild is not line_fill:line.insertBefore(line_fill,line.firstChild)
+        # Native custom curves retain Excel/PDF arrowheads without raster images.
         if ident < 14:
-            replacement = doc.createElementNS(X, "xdr:cxnSp")
-            nv = new(replacement, X, "xdr:nvCxnSpPr")
+            props=first(shape,"spPr")
+            custom=doc.createElementNS(A,"a:custGeom")
+            for name in ("avLst","gdLst","ahLst","cxnLst"):new(custom,A,"a:"+name)
+            new(custom,A,"a:rect",{"l":"0","t":"0","r":"r","b":"b"})
+            path_node=new(new(custom,A,"a:pathLst"),A,"a:path",
+                          {"w":round(w),"h":round(h),"fill":"none","stroke":"1"})
+            move=new(path_node,A,"a:moveTo")
+            new(move,A,"a:pt",{"x":round(curve[0][0]-x),"y":round(curve[0][1]-y)})
+            bezier=new(path_node,A,"a:cubicBezTo")
+            for px,py in curve[1:]:new(bezier,A,"a:pt",{"x":round(px-x),"y":round(py-y)})
+            props.replaceChild(custom,geom)
+            replacement = doc.createElementNS(X, "xdr:sp")
+            nv = new(replacement, X, "xdr:nvSpPr")
             nv.appendChild(shape.getElementsByTagNameNS(X, "cNvPr")[0])
-            new(nv, X, "xdr:cNvCxnSpPr")
+            new(nv, X, "xdr:cNvSpPr")
             replacement.appendChild(first(shape, "spPr"))
             style = first(shape, "style")
             if style is not None: replacement.appendChild(style)
             shape.parentNode.replaceChild(replacement, shape)
 
-    # Keep role labels outside node/arrow paths and inside the unchanged chart frame.
-    label_height, label_width = 16*12700, 68*12700
-    positions = {4:(points[0][0]-45*12700, points[0][1]-radius-18*12700, 90*12700),
-                 5:(points[1][0]+radius+3*12700, points[1][1]-radius-12*12700, label_width),
-                 6:(points[4][0]-radius-3*12700-label_width, points[4][1]-radius-12*12700, label_width),
-                 7:(points[2][0]+radius+8*12700, points[2][1]-label_height/2, label_width),
-                 8:(points[3][0]-radius-8*12700-label_width, points[3][1]-label_height/2, label_width)}
-    for ident, (x, y, w) in positions.items(): place(ident, x, y, w, label_height)
+    # Mirror the text edge nearest each circle, rather than left-aligning both
+    # sides inside equal boxes. Different text widths then keep the same gap.
+    positions = {4:(points[0][0]-45*12700, points[0][1]-radius-label_gap-label_height, 90*12700, "ctr")}
+    for ident,index,direction in ((5,1,1),(6,4,-1),(7,2,1),(8,3,-1)):
+        x,y = points[index]
+        positions[ident] = (x+radius+label_gap if direction==1 else x-radius-label_gap-label_width,
+                            y-label_height/2, label_width, "l" if direction==1 else "r")
+    for ident, (x,y,w,alignment) in positions.items():
+        shape = place(ident,x,y,w,label_height)
+        body = first(shape,"txBody")
+        props = first(body,"bodyPr")
+        for key,value in {"anchor":"ctr","wrap":"none","lIns":"0","rIns":"0","tIns":"0","bIns":"0"}.items():
+            props.setAttribute(key,value)
+        for node in list(children(props)):
+            if node.localName in ("spAutoFit","normAutofit"): props.removeChild(node)
+        if first(props,"noAutofit") is None: new(props,A,"a:noAutofit")
+        for paragraph in children(body,"p"):
+            ppr = first(paragraph,"pPr")
+            if ppr is None:
+                ppr = new(paragraph,A,"a:pPr")
+                paragraph.insertBefore(ppr,paragraph.firstChild)
+            for key,value in {"algn":alignment,"marL":"0","marR":"0","indent":"0"}.items():
+                ppr.setAttribute(key,value)
 
 
 def formula_values(formula, cells):
@@ -364,21 +704,25 @@ def render_xlsx(report: ReadingReport, template_path=TEMPLATE_PATH):
         strings.append("".join(content(n) if n.localName=="t" else "".join(content(t) for t in children(n,"t")) for n in children(si) if n.localName in ("t","r")))
     style_doc=minidom.parseString(files["xl/styles.xml"]);styles=Styles(style_doc)
     sheet=minidom.parseString(files["xl/worksheets/sheet2.xml"])
-    write_sheet(sheet,{**report.cells,**report.chart_cells},styles,report,strings)
+    write_sheet(sheet,{**presentation_cells(report),**report.chart_cells},styles,report,strings)
     hide_gogyo_cell_text(sheet, styles)
     drawing=minidom.parseString(files["xl/drawings/drawing2.xml"])
-    write_shapes(drawing,report.texts)
-    apply_report_layout(sheet, drawing, styles)
+    write_shapes(drawing,presentation_texts(report))
+    apply_report_layout(sheet, drawing, styles, report)
     workbook=minidom.parseString(files["xl/workbook.xml"])
     protect_advice_bottom_border(sheet, drawing, workbook)
+    polish_gogyo_layout(drawing, report)
+    charts=[]
+    for index in range(1,6):
+        name=f"xl/charts/chart{index}.xml";chart=minidom.parseString(files[name])
+        write_charts(chart,report.chart_cells);charts.append((name,chart))
+    extra_rows = layout_special_table(sheet, drawing, workbook, charts, styles, report)
+    paginate_special_layout(sheet, extra_rows)
     files["xl/workbook.xml"]=serialize(workbook)
     files["xl/worksheets/sheet2.xml"]=serialize(sheet)
     files["xl/styles.xml"]=serialize(style_doc)
-    polish_gogyo_layout(drawing, report)
     files["xl/drawings/drawing2.xml"]=serialize(drawing)
-    for index in range(1,6):
-        name=f"xl/charts/chart{index}.xml";chart=minidom.parseString(files[name])
-        write_charts(chart,report.chart_cells);files[name]=serialize(chart)
+    for name,chart in charts:files[name]=serialize(chart)
     # Preserve the hidden sheet and hidden Yojin layout, but ship no old computation or tables.
     calc=minidom.parseString(files["xl/worksheets/sheet1.xml"])
     for cell in calc.getElementsByTagNameNS(S,"c"):

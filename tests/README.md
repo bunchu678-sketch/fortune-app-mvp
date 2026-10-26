@@ -432,3 +432,36 @@ Playwrightが標準の検索パスにない場合は、プロセスのPLAYWRIGHT
 - 出生時刻既知では出生地補正後日時と節入り時刻の差が±5分以内、出生時刻不明では出生日が節入り日なら確認を要求する。選択は年柱・月柱へ一貫して反映し、日柱・時柱は元の出生日時を維持する。
 - Tier Aに30件を追加。以前の11件の参照確認済み四柱は期待干支を変えず、サービス経路で境界確認が返った場合に正式境界に対する前後選択を送る。
 - Tier Bの旧 `B-analysis-year`（2026-01-01 → 丙午）は西暦年直接算出という不具合の観測だった。正式な立春前の値である乙巳へ更新し、旧値と変更理由をfixtureに残した。他のTier B観測は変更しない。
+
+
+## K01・K03確定仕様の回帰（2026-10-09）
+
+根拠: ユーザー添付8da35e8d-d388-470b-b586-5e99e9b3251a。実装/制限/全検証は `docs/phase10-k01-k03-fix-20261009.md`。
+
+- K01は先生の年別正式文章のみ。2026原文10種類を開始HEADから固定したfixtureと照合。未登録年/星は計算成功を維持し本文空と案内を返す。年計算を変更しない。
+- K03はprivate122文章と通常13結果項目を除去。public全値と計算の不変を基準HEADのdigestで検証。保存/旧JSON取得/メモ/再鑑定/権限/Excel/PDFも検査。
+- `k01_k03_cases.py` の42件中32件を通常Tier Aへ追加。残り10件は隔離DB/API/移行試験。Tier A556、独立 *cases.py 全460（32件の重複に注意）。
+- S比較は削除したprivate入力225件だけ外し、14関数1100入力の計算/public/invalid比較を維持。S/Dを変更しない。
+- `k01_k03_ui.cjs` はlocalhost mockのみ、PC/スマホ48項目。Edge/Playwright既存環境を使用する。
+- 年別登録確認は `python -B yearly_overall_comments.py`。正式原稿だけ追加し年・版・全10星の登録状況を確認する。
+- DB移行は自動実行しない。`research/run_migrate_test_history.py` は明示対象・テスト確認・外部退避・dry run/transaction/検証rollbackを必要とする。
+- `gogyou_ui_smoke.cjs` はPhase 10で正式A/B/Cへ更新。実計算から生成した合成応答をSVGへ接続し、通常/大運不能/立春待ち/立春前後をPC1280・スマホ390/320で81項目検査。所有するlocalhost frontendのみ起動しDB不要。数値の正解はTier Aの独立期待で保護する。
+- `history_ui_smoke.cjs` は元の10月1日と再鑑定の今日の両方を含む検索範囲へ修正。保存/再鑑定/検索/削除の既存判定を維持し、OS・API時計は変更しない。
+
+
+## Phase 10 総合・本人確認（2026-10-09）
+
+- `python -X utf8 -B -m unittest discover -s tests -p '*cases.py' -q`：既存460＋追加A〜F連携6件。`phase10_integration_cases.py` は既存fixtureを再利用し、初回設定用MemoryMailTransportを試験後に復元する。ASGI連携のPDFは記録adapterで同じ完成Excelを確認し、実Windows変換は別のUI E2Eで検査する。
+- `node tests/phase10_local_ui.cjs`：OS一時領域に新規DB・合成User/Orgを作り、所有するAPI8765/Next3000で履歴28シナリオ・境界1suite・出力12項目を実行。既存port占有時は停止し、既存サービスを終了しない。Playwrightは既存 `PLAYWRIGHT_MODULE`、Pythonは既存venv、PDFはWindows Excelを利用する。インストール不要。
+- `node tests/phase10_local_ui.cjs --review`：同じ隔離条件で本人確認環境を準備し、2026/2027の完成Excel/PDF・URL・合成login情報をOS一時領域へ保存。実アプリのserver-side認証を利用し、認可を迂回するrouteは追加しない。確認用情報・生成ファイルはGit対象外。終了はこのrunnerと所有serverだけを止める。
+- 実SMTP・実課金・file DBの物理purge・VPS・本番backup・Notion書込みは行わない。Linux PDF、外部backup、本番設定、本人/実スマホ確認は自動PASSへ含めない。
+- 全13領域の証拠・重複件数・保留・不合格の切り分けは `docs/phase10-regression-results-20261009.md`。
+
+
+## Phase 10 会員画面の遷移（2026-10-09）
+
+- `node --test tests/member_navigation.test.mjs`：既存Nodeと同じTypeScript実行環境。役割・複数所属・情報不足・許可/拒否nextの38件。
+- `node tests/member_navigation_ui.cjs`：build済みWと既存Playwright/Edge/venvを使用。新規OS一時DB・合成User/Org、所有API8765/Next3000だけを起動し、終了時に所有プロセスだけ停止。port占有時は中断する。PC1280/390/320各52条件、実認証/認可、ログアウト失敗/Back/遅延応答/休止/初期入金未確認を検査。PDFはこの試験ではdisabled。実出力は既存auth_ui/phase10_local_uiで別検査する。
+- 合成スナップショットも通常画面保存と同じ`manualChoices`/`boundarySelections`を含める。旧本人確認用4履歴は自動補完せず、既存DBを変更しない。
+- `auth_ui.cjs`の通常ログイン期待は`/mypage`、ログアウト期待は`/login`。既存のsession失効・所有者隔離・出力の期待を維持。
+- 詳細/件数/本人残確認は `docs/phase10-member-navigation-20261009.md`。実SMTP/課金/本番/既存DB/Notion書込みなし。

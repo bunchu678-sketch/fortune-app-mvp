@@ -19,6 +19,8 @@ class ReadingReport:
     chart_cells: dict
     setsuboku_boundaries: set
     kubou_months: set
+    # Sanitized display entries, independent of the template's six legacy slots.
+    special_entries: tuple | None = None
 
 
 def text(value):
@@ -70,8 +72,6 @@ def build_reading_report(form, result):
     if a.get("status") != "available":
         raise ReportError("元命式の五行結果がないため出力できません。")
     specials = result.get("special_meishiki", {}).get("rows", [])
-    if len(specials) > 6:
-        raise ReportError("特殊な命式がテンプレートの6行を超えています。省略せず確認が必要です。")
     daiun = result.get("daiun", {}).get("rows", [])
     if len(daiun) > 10:
         raise ReportError("大運がテンプレートの10列を超えています。")
@@ -130,7 +130,7 @@ def build_reading_report(form, result):
     nikkan = personality.get("nikkan", {})
     keywords = text(nikkan.get("keywords"))
     cells["B25"] = "●干支から読み取れるもの" + ("　キーワード："+keywords if keywords else "")
-    texts = {"Phase5_Nikkan": text(nikkan.get("description")), "3": text(result.get("yearly_overall", {}).get("comment"))}
+    texts = {"Phase5_Nikkan": text(nikkan.get("description")), "3": text(result.get("yearly_overall", {}).get("comment") or result.get("yearly_overall", {}).get("interpretation_message") or result.get("yearly_overall", {}).get("error"))}
     stages = ("幼年期", "青年期", "成熟期", "老年期")
     life = personality.get("life_stage_tsuhensei", [])
     if len(life) != 4:
@@ -164,7 +164,7 @@ def build_reading_report(form, result):
             borders.add(i)
     year = result.get("yearly_overall", {})
     cells.update({"L60": year.get("year", ""), "M60": text(year.get("tenkan")), "N60": text(year.get("chishi")),
-                  "E61": text(year.get("tsuhensei")), "G61": "年運テーマ："+text(year.get("theme"))})
+                  "E61": text(year.get("tsuhensei")), "G61": "年運テーマ："+text(year.get("theme")) if year.get("theme") else ""})
     months = result.get("yearly_flow", {}).get("rows", [])
     if len(months) != 12 or [x.get("月番号") for x in months] != list(range(2,13))+[1]:
         raise ReportError("正式な月運12か月の結果が不足しています。")
@@ -190,4 +190,5 @@ def build_reading_report(form, result):
             chart_cells[label_col+str(start+i)] = label
             chart_cells[value_col+str(start+i)] = value if group == "work_type" else value/total if total else 0
     safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f\x7f]', "", name).strip(" .")[:80] or "無記名"
-    return ReadingReport(f"鑑定書_{safe_name}_{reading.isoformat()}.xlsx", cells, texts, chart_cells, borders, kubou_months)
+    return ReadingReport(f"鑑定書_{safe_name}_{reading.isoformat()}.xlsx", cells, texts, chart_cells, borders, kubou_months,
+                         tuple((text(row.get("判定")), text(row.get("結果"))) for row in specials))

@@ -50,7 +50,7 @@ def vectors():
     branches=list("子丑寅卯辰巳午未申酉戌亥")+["",None,"invalid"]
     stars=["比肩","劫財","食神","傷官","偏財","正財","偏官","正官","偏印","印綬"]+["","－",None,"invalid"]
     unsei=["長生","沐浴","冠帯","建禄","帝旺","衰","病","死","墓","絶","胎","養"]+["",None,"invalid"]
-    types=["public","private","invalid"]
+    types=["public","invalid"]  # K03: private prose removed from W by confirmed specification.
     yield "get_tsuhensei",itertools.product(stems,stems)
     yield "get_kubou",itertools.product(stems,branches)
     yield "get_juuni_unsei",itertools.product(stems,branches)

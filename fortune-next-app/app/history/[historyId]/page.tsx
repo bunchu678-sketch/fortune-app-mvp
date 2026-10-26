@@ -17,7 +17,7 @@ export default function HistoryDetail({ params }: { params: Promise<{ historyId:
     setSaved(null); setError("");
     historyRequest<HistoryRecord>("/" + historyId).then(record => {
       if (!active) return;
-      setSaved({ result: record.result_snapshot, form: record.input_snapshot.form,
+      setSaved({ organizationId: record.organization_id, result: record.result_snapshot, form: record.input_snapshot.form,
         manualChoices: record.input_snapshot.manualChoices,
         boundarySelections: record.input_snapshot.boundarySelections,
         memo: record.memo, pastMemos: record.past_memos ?? [], history: record });
