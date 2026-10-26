@@ -77,7 +77,8 @@ function stop(){for(const p of children)if(p.pid)spawnSync('taskkill',['/PID',St
     if(role==='multi'||role==='mixed'){await page.getByText('利用する所属先を選んでください。',{exact:true}).waitFor();assert.equal(await page.locator('a[href="/b2b/'+f.org+'"]').count(),1);assert.equal(await page.locator('a[href="/b2b/'+f.other+'"]').count(),1);}
     if(role==='admin'){assert.equal(await page.locator('a[href^="/b2b/"]').count(),0);assert.equal(await page.getByRole('link',{name:'自分の鑑定履歴',exact:true}).count(),0);assert(!((await page.locator('main').innerText()).includes('自分の利用状況')));}if(role!=='b2c')assert.equal(await page.getByRole('link',{name:'通常鑑定（博士の占い）で鑑定を始める',exact:true}).count(),0);
     if(role==='paused'||role==='unpaid'){assert.equal(await page.locator('a[href^="/b2b/"]').count(),0);assert.equal((await page.request.get(base+'/api/b2b/organizations/'+f.org+'/me')).status(),403);assert.equal((await page.request.post(base+'/api/b2b/organizations/'+f.org+'/fortune',{headers:{Origin:base},data:{}})).status(),403);}
-    await overflow();await page.screenshot({path:path.join(folder,width+'-'+role+'.png'),fullPage:true});
+    if(role==='teacher'){assert.equal(await page.getByRole('link',{name:'マイページへ',exact:true}).count(),0);await page.getByRole('link',{name:'自分の鑑定履歴',exact:true}).waitFor();await page.getByRole('link',{name:'自分の鑑定回数・アカウント',exact:true}).waitFor();}
+    await overflow();await page.screenshot({path:path.join(folder,width+'-'+role+'.png'),fullPage:true,mask:[page.locator('.authBar'),page.getByText(/@example\.test/)]});
    });
    if(['b2c','student','teacher','multi'].includes(role))await check(width+' '+role+' start button uses authorized existing screen',async()=>{
     const button=role==='b2c'?page.locator('.memberStartButton[href="/"]'):page.locator('.memberStartButton[href="/b2b/'+f.org+'"]');await button.focus();await page.keyboard.press('Enter');await page.waitForURL(base+(role==='b2c'?'/':'/b2b/'+f.org));await page.getByRole('button',{name:'鑑定結果を表示する',exact:true}).waitFor();assert.equal(await page.getByLabel('特定の日時について占う').count(),role==='b2c'?1:0);await overflow();
@@ -87,6 +88,17 @@ function stop(){for(const p of children)if(p.pid)spawnSync('taskkill',['/PID',St
    });
    if(role==='admin')await check(width+' operator account settings has no personal reading controls',async()=>{
     await page.getByRole('link',{name:'アカウント設定',exact:true}).click();await page.getByRole('heading',{name:'アカウント設定',exact:true}).first().waitFor();assert.equal(await page.locator('.memberStartButton').count(),0);assert.equal(await page.getByRole('link',{name:'自分の鑑定履歴',exact:true}).count(),0);assert.equal(await page.getByRole('heading',{name:'自分の利用状況',exact:true}).count(),0);await page.getByRole('link',{name:'マイページ',exact:true}).click();await page.waitForURL(base+'/operations');
+   });
+   await check(width+' '+role+' history new-reading uses authorized input or chooser',async()=>{
+    await page.goto(base+'/history',{waitUntil:'networkidle'});await page.getByRole('heading',{name:'鑑定履歴',exact:true}).waitFor();
+    const start=page.getByRole('link',{name:'新しく鑑定する',exact:true});
+    if(role==='admin'){assert.equal(await start.count(),0);return;}
+    const expected=role==='b2c'?'/':['student','teacher'].includes(role)?'/b2b/'+f.org:'/mypage';
+    await start.waitFor();assert.equal(await start.getAttribute('href'),expected);await start.click();await page.waitForURL(base+expected);
+    if(['b2c','student','teacher'].includes(role)){await page.getByRole('button',{name:'鑑定結果を表示する',exact:true}).waitFor();assert.equal(await page.getByLabel('姓',{exact:true}).inputValue(),'');}
+    if(role==='multi'||role==='mixed'){await page.getByText('利用する所属先を選んでください。',{exact:true}).waitFor();}
+    if(role==='paused'||role==='unpaid'){assert.equal(await page.locator('a[href="/"]').count(),0);assert.equal((await page.request.post(base+'/api/b2b/organizations/'+f.org+'/fortune',{headers:{Origin:base},data:{}})).status(),403);}
+    await overflow();
    });
    await check(width+' '+role+' logout to login and revoked session',async()=>{await logout();assert.equal((await page.request.get(base+'/api/auth/me')).status(),401);assert.equal((await page.request.get(base+'/api/history')).status(),401);});
   }
@@ -115,6 +127,12 @@ function stop(){for(const p of children)if(p.pid)spawnSync('taskkill',['/PID',St
   ])await check(width+' checked next '+role+' '+next.split('/')[1],async()=>{await login(role,expected,next);if(role==='student'){assert.equal((await page.request.get(base+'/api/b2b/organizations/'+f.other+'/me')).status(),404);assert.equal((await page.request.get(base+'/api/history/'+f.rows.b2c_2026)).status(),404);}await logout();});
   await check(width+' unavailable role metadata falls back to mypage',async()=>{
    await page.route('**/api/account/summary',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({ok:false,error:'合成情報取得失敗'})}));await login('teacher','/mypage');await page.getByRole('alert').filter({hasText:'合成情報取得失敗'}).waitFor();await page.unroute('**/api/account/summary');await logout();
+  });
+  await check(width+' history summary failure never displays a B2C start link',async()=>{
+   await login('student','/mypage');await page.route('**/api/account/summary',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({ok:false,error:'合成情報取得失敗'})}));await page.goto(base+'/history',{waitUntil:'networkidle'});assert.equal(await page.getByRole('link',{name:'新しく鑑定する',exact:true}).count(),0);await page.unroute('**/api/account/summary');await logout();
+  });
+  await check(width+' pending history summary hides link and late response cannot survive logout',async()=>{
+   await login('student','/mypage');let hold,signal;const pending=new Promise(r=>signal=r);await page.route('**/api/account/summary',async route=>{const response=await route.fetch();hold=()=>route.fulfill({response});signal();});await page.goto(base+'/history',{waitUntil:'domcontentloaded'});await pending;assert.equal(await page.getByRole('link',{name:'新しく鑑定する',exact:true}).count(),0);await logout();await hold();await page.unroute('**/api/account/summary');await sleep(200);assert.equal(page.url(),base+'/login');assert.equal(await page.getByRole('link',{name:'新しく鑑定する',exact:true}).count(),0);
   });
   await check(width+' delayed login destination cannot override logout',async()=>{
    await page.goto(base+'/login',{waitUntil:'networkidle'});let hold,signal;const pending=new Promise(r=>signal=r);

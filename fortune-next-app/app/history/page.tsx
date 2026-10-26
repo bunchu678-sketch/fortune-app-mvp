@@ -3,13 +3,12 @@ import Link from "next/link";
 import { useAuth, LoginRequired } from "../auth";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { historyRequest, savedTime } from "../history-client";
-import { useFortuneState } from "../fortune-state";
+import HistoryNewReading from "../history-new-reading";
 import "./history.css";
 
 type Entry = { id: string; name: string; birth_date: string; reading_date: string; saved_at: string };
 export default function HistoryPage() {
   const { user, loading: authLoading } = useAuth();
-  const { setDraft, setSaved } = useFortuneState();
   const [items, setItems] = useState<Entry[]>([]);
   const [keyword, setKeyword] = useState("");
   const [start, setStart] = useState("");
@@ -51,10 +50,10 @@ export default function HistoryPage() {
       onClick={() => setMenu(menu === item.id ? null : item.id)}>⋮</button>
     {menu === item.id ? <button type="button" onClick={() => { setDeleting(item); setMenu(null); }}>削除</button> : null}
   </div>;
-  if (authLoading || !user) return <main className="appShell historyPage"><h1>鑑定履歴</h1><LoginRequired next="/history" /><Link href="/">通常鑑定へ戻る</Link></main>;
+  if (authLoading || !user) return <main className="appShell historyPage"><h1>鑑定履歴</h1><LoginRequired next="/history" />{!authLoading ? <Link href="/">通常鑑定へ戻る</Link> : null}</main>;
   return <main className="appShell historyPage">
     <header className="historyHeader"><h1>鑑定履歴</h1>
-      <Link href="/" onClick={() => { setDraft(null); setSaved(null); }}>新しく鑑定する</Link>
+      <HistoryNewReading />
     </header>
     <form className="historySearch" onSubmit={load}>
       <label>キーワード<input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="氏名・ふりがな・生年月日" /></label>

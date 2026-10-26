@@ -108,6 +108,8 @@ const base = process.env.FORTUNE_UI_URL || "http://127.0.0.1:3000";
    const target=candidate.locator("article").filter({has:page.getByRole("button",{name:/グループ2/})});
    assert.equal(await target.count(),1);
    await target.getByRole("button",{name:/同一人物として、過去の鑑定履歴を引き継ぐ/}).first().click();
+   // Choosing a group awaits its rerun API; do not submit before that choice is applied.
+   await candidate.waitFor({state:"hidden"});
    await calculate();await openMemo();assert.ok((await page.getByLabel("過去の鑑定メモ",{exact:true}).textContent()).includes("メモ"));
    await page.goto(base+"/history",{waitUntil:"domcontentloaded"});
    await page.waitForFunction(()=>!document.querySelector(".historySearch button")?.disabled);

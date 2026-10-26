@@ -4,6 +4,27 @@ type Summary = { is_operator: boolean; memberships: Membership[] };
 type Read = (path: string) => Promise<unknown>;
 const id = "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}";
 
+// A new reading opens the authorized input screen, independently of role-home navigation.
+export async function newReadingDestination(read: Read): Promise<string | null> {
+  let summary: Summary;
+  try { summary = await read("/api/account/summary") as Summary; }
+  catch { return null; }
+  if (summary?.is_operator === true) return null;
+  if (summary?.is_operator !== false || !Array.isArray(summary.memberships)) return null;
+  if (!summary.memberships.length) return "/";
+  if (summary.memberships.length > 1) return "/mypage";
+  const member = summary.memberships[0];
+  if (!member || !["student", "teacher"].includes(member.role) ||
+      !new RegExp("^" + id + "$").test(member.organization_id)) return "/mypage";
+  try {
+    const access = await read("/api/b2b/organizations/" + member.organization_id + "/me") as Membership;
+    if (access?.organization_id === member.organization_id && ["student", "teacher"].includes(access.role)) {
+      return "/b2b/" + member.organization_id;
+    }
+  } catch { /* Suspended, unpaid or missing permission: use the existing safe entrance. */ }
+  return "/mypage";
+}
+
 export async function memberDestination(next: string | null, read: Read): Promise<string> {
   if (next && ["/", "/mypage", "/history", "/history/deleted"].includes(next)) return next;
   let endpoint: string | null = null;

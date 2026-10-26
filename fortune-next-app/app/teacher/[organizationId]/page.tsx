@@ -21,6 +21,6 @@ export default function TeacherPage() {
           <li key={index}>{item.display_name}　{accountLabel(item.account_state)}</li>)}</ul>}</section>
         <nav><Link href="/history">自分の鑑定履歴</Link><Link href="/mypage">自分の鑑定回数・アカウント</Link></nav>
       </> : null}
-    </>}<nav><Link href="/mypage">マイページへ</Link></nav><p>Powered by 博士の占いらぼ</p>
+    </>}<p>Powered by 博士の占いらぼ</p>
   </main>;
 }
