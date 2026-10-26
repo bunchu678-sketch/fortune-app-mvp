@@ -16,8 +16,10 @@ export default function MemberStart({ account }: { account: Personal }) {
   return <section className="memberStart" aria-label="鑑定の入口"><h2>鑑定を始める</h2>
     {account.memberships.length > 1 ? <p>利用する所属先を選んでください。</p> : null}
     {account.memberships.length ? <ul>{account.memberships.map(member => <OrganizationStart key={member.organization_id} member={member} />)}</ul> : null}
-    <p><strong>通常鑑定（博士の占い）</strong></p>
-    <Link className="memberStartButton" href="/" aria-label="通常鑑定（博士の占い）で鑑定を始める">鑑定を始める</Link>
+    {!account.memberships.length && !account.is_operator ? <>
+      <p><strong>通常鑑定（博士の占い）</strong></p>
+      <Link className="memberStartButton" href="/" aria-label="通常鑑定（博士の占い）で鑑定を始める">鑑定を始める</Link>
+    </> : null}
     <nav><Link href="/history">自分の鑑定履歴</Link></nav>
   </section>;
 }

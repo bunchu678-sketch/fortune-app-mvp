@@ -59,6 +59,18 @@ class ProductAPICases(unittest.TestCase):
             ("POST",f"/api/operations/users/{owner}/suspend",{}),("POST",f"/api/operations/users/{owner}/resume",{}),
             ("POST",f"/api/operations/users/{owner}/membership",{"organization_id":self.org,"role":"teacher"})]:
             self.assertEqual(self.call(method,path,body,"teacher")[0],403,(method,path))
+
+    def test_cross_organization_errors_are_japanese_without_disclosure(self):
+        for owner in ('student','teacher'):
+            for path in (f'/api/b2b/organizations/{self.second}/me',
+                         f'/api/b2b/organizations/{self.second}/teacher'):
+                status,_,body=self.call('GET',path,who=owner)
+                self.assertEqual(status,404)
+                self.assertEqual(json.loads(body),{'ok':False,'error':'この情報にアクセスする権限がありません。'})
+                self.assertNotIn(self.second.encode(),body)
+        status,_,body=self.call('GET','/api/operations/organizations',who='student')
+        self.assertEqual(status,403)
+        self.assertEqual(json.loads(body)['error'],'運営権限がありません。')
     def test_teacher_response_exact_whitelist(self):
         self.fortune(who="teacher");self.fortune()
         data=self.data("GET",f"/api/b2b/organizations/{self.org}/teacher",who="teacher")

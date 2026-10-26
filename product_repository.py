@@ -75,7 +75,7 @@ class ProductRepository:
     @staticmethod
     def organization(db, organization_id):
         row = db.execute("SELECT * FROM organizations WHERE id=?",(organization_id,)).fetchone()
-        if not row: raise HistoryError("Organization not found",404)
+        if not row: raise HistoryError("この情報にアクセスする権限がありません。",404)
         return dict(row)
 
     @staticmethod
@@ -85,7 +85,7 @@ class ProductRepository:
             LEFT JOIN user_account_lifecycle l ON l.user_id=u.id
             WHERE m.organization_id=? AND m.user_id=? AND u.status='active'
             AND COALESCE(l.state,'active')='active'""",(organization_id,authenticated_user_id)).fetchone()
-        if not row: raise HistoryError("Organization membership not found",404)
+        if not row: raise HistoryError("この情報にアクセスする権限がありません。",404)
         return OrganizationContext(row["organization_id"],row["user_id"],row["role"],row["selected_theme_key"] or "default")
 
     def resolve_context(self, organization_id, authenticated_user_id):

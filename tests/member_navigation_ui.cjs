@@ -70,17 +70,23 @@ function stop(){for(const p of children)if(p.pid)spawnSync('taskkill',['/PID',St
   await check(width+' invalid login stays and displays error',async()=>{
    await page.goto(base+'/login',{waitUntil:'networkidle'});await page.getByLabel('メールアドレス',{exact:true}).fill('phase10.b2c@example.test');await page.getByLabel('パスワード',{exact:true}).fill(randomBytes(20).toString('hex'));await page.getByRole('button',{name:'ログイン',exact:true}).click();await page.getByRole('alert').filter({hasText:'メールアドレスまたはパスワードが正しくありません'}).waitFor();assert.equal(page.url(),base+'/login');assert.equal(await page.getByLabel('パスワード',{exact:true}).inputValue(),'');await overflow();
   });
-  for(const [role,destination,count] of [['b2c','/mypage',1],['student','/mypage',2],['teacher','/teacher/'+f.org,1],['multi','/mypage',3],['mixed','/mypage',3],['admin','/operations',1],['paused','/mypage',1],['unpaid','/mypage',1]]){
+  for(const [role,destination,count] of [['b2c','/mypage',1],['student','/mypage',1],['teacher','/teacher/'+f.org,1],['multi','/mypage',2],['mixed','/mypage',2],['admin','/operations',0],['paused','/mypage',0],['unpaid','/mypage',0]]){
    await check(width+' '+role+' role entrance and accessible start buttons',async()=>{
-    await login(role,destination);await page.waitForFunction(()=>document.querySelector('.memberStart') && !document.querySelector('.memberStart [role=status]'));assert.equal(await page.locator('.memberStartButton').count(),count);
+    await login(role,destination);if(role==='admin')await page.getByRole('heading',{name:'Organization一覧',exact:true}).waitFor();else await page.waitForFunction(()=>document.querySelector('.memberStart') && !document.querySelector('.memberStart [role=status]'));assert.equal(await page.locator('.memberStartButton').count(),count);
     for(const button of await page.locator('.memberStartButton').all()){const box=await button.boundingBox();assert(box.height>=44);await button.focus();assert(await button.evaluate(e=>e===document.activeElement));}
     if(role==='multi'||role==='mixed'){await page.getByText('利用する所属先を選んでください。',{exact:true}).waitFor();assert.equal(await page.locator('a[href="/b2b/'+f.org+'"]').count(),1);assert.equal(await page.locator('a[href="/b2b/'+f.other+'"]').count(),1);}
-    if(role==='admin')assert.equal(await page.locator('a[href^="/b2b/"]').count(),0);
+    if(role==='admin'){assert.equal(await page.locator('a[href^="/b2b/"]').count(),0);assert.equal(await page.getByRole('link',{name:'自分の鑑定履歴',exact:true}).count(),0);assert(!((await page.locator('main').innerText()).includes('自分の利用状況')));}if(role!=='b2c')assert.equal(await page.getByRole('link',{name:'通常鑑定（博士の占い）で鑑定を始める',exact:true}).count(),0);
     if(role==='paused'||role==='unpaid'){assert.equal(await page.locator('a[href^="/b2b/"]').count(),0);assert.equal((await page.request.get(base+'/api/b2b/organizations/'+f.org+'/me')).status(),403);assert.equal((await page.request.post(base+'/api/b2b/organizations/'+f.org+'/fortune',{headers:{Origin:base},data:{}})).status(),403);}
     await overflow();await page.screenshot({path:path.join(folder,width+'-'+role+'.png'),fullPage:true});
    });
    if(['b2c','student','teacher','multi'].includes(role))await check(width+' '+role+' start button uses authorized existing screen',async()=>{
     const button=role==='b2c'?page.locator('.memberStartButton[href="/"]'):page.locator('.memberStartButton[href="/b2b/'+f.org+'"]');await button.focus();await page.keyboard.press('Enter');await page.waitForURL(base+(role==='b2c'?'/':'/b2b/'+f.org));await page.getByRole('button',{name:'鑑定結果を表示する',exact:true}).waitFor();assert.equal(await page.getByLabel('特定の日時について占う').count(),role==='b2c'?1:0);await overflow();
+   });
+   await check(width+' '+role+' header My Page returns to initial role screen',async()=>{
+    await page.getByRole('link',{name:'マイページ',exact:true}).click();await page.waitForURL(base+destination);await page.waitForLoadState('networkidle');await overflow();
+   });
+   if(role==='admin')await check(width+' operator account settings has no personal reading controls',async()=>{
+    await page.getByRole('link',{name:'アカウント設定',exact:true}).click();await page.getByRole('heading',{name:'アカウント設定',exact:true}).first().waitFor();assert.equal(await page.locator('.memberStartButton').count(),0);assert.equal(await page.getByRole('link',{name:'自分の鑑定履歴',exact:true}).count(),0);assert.equal(await page.getByRole('heading',{name:'自分の利用状況',exact:true}).count(),0);await page.getByRole('link',{name:'マイページ',exact:true}).click();await page.waitForURL(base+'/operations');
    });
    await check(width+' '+role+' logout to login and revoked session',async()=>{await logout();assert.equal((await page.request.get(base+'/api/auth/me')).status(),401);assert.equal((await page.request.get(base+'/api/history')).status(),401);});
   }
@@ -114,6 +120,9 @@ function stop(){for(const p of children)if(p.pid)spawnSync('taskkill',['/PID',St
    await page.goto(base+'/login',{waitUntil:'networkidle'});let hold,signal;const pending=new Promise(r=>signal=r);
    await page.route('**/api/account/summary',async route=>{const response=await route.fetch();hold=()=>route.fulfill({response});signal();});
    await page.getByLabel('メールアドレス',{exact:true}).fill('phase10.teacher@example.test');await page.getByLabel('パスワード',{exact:true}).fill(password);await page.getByRole('button',{name:'ログイン',exact:true}).click();await pending;await logout();await hold();await page.unroute('**/api/account/summary');await sleep(200);assert.equal(page.url(),base+'/login');assert.equal((await page.request.get(base+'/api/auth/me')).status(),401);
+  });
+  await check(width+' late role-home response cannot redirect after logout',async()=>{
+   await login('teacher','/teacher/'+f.org);let hold,signal;const pending=new Promise(r=>signal=r);await page.route('**/api/account/summary',async route=>{const response=await route.fetch();hold=()=>route.fulfill({response});signal();});await page.goto(base+'/member');await pending;await logout();await hold();await page.unroute('**/api/account/summary');await sleep(200);assert.equal(page.url(),base+'/login');assert.equal((await page.request.get(base+'/api/auth/me')).status(),401);
   });
   await check(width+' late membership response cannot restore logged-out controls',async()=>{
    await login('student','/mypage');let hold,signal;const pending=new Promise(r=>signal=r);await page.route('**/api/b2b/organizations/'+f.org+'/me',async route=>{const response=await route.fetch();hold=()=>route.fulfill({response});signal();});await page.reload();await pending;await logout();await hold();await page.unroute('**/api/b2b/organizations/'+f.org+'/me');await sleep(200);assert.equal(page.url(),base+'/login');assert.equal(await page.locator('.memberStartButton').count(),0);
