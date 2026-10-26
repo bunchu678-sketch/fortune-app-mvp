@@ -43,6 +43,10 @@ const base = process.env.FORTUNE_UI_URL || "http://127.0.0.1:3000";
     return body.data;
    };
    const layout=async()=>assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth)<=width,"page overflow");
+   // The route can display its initial form before the rerun draft is committed.
+   // Wait for the actual inherited value, preserving the input assertions below.
+   const waitForRerun=async()=>page.waitForFunction(expected=>Array.from(document.querySelectorAll("label")).some(label=>
+    label.textContent==="姓" && label.querySelector("input")?.value===expected),surname);
    await fillNew();await calculate();
    assert.equal(await page.locator(".historyControls [role=status]").textContent(),"未保存");
    assert.equal(await page.locator(".gogyoVariant").nth(1).locator(".gogyoVariantContext").textContent(),"鑑定年：丙午");
@@ -73,6 +77,7 @@ const base = process.env.FORTUNE_UI_URL || "http://127.0.0.1:3000";
    await page.getByRole("button",{name:"この人を再鑑定",exact:true}).click();
    await page.getByRole("button",{name:"過去履歴を引き継いで再鑑定",exact:true}).click();
    await page.waitForURL(base+"/");
+   await waitForRerun();
    const today=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo"}).format(new Date());
    assert.equal(await page.getByLabel("鑑定日",{exact:true}).inputValue(),today);
    assert.equal(await page.getByLabel("姓",{exact:true}).inputValue(),surname);
@@ -87,7 +92,7 @@ const base = process.env.FORTUNE_UI_URL || "http://127.0.0.1:3000";
    assert.equal(second.memo,device+" 同グループの今回だけ");
    await page.getByRole("button",{name:"この人を再鑑定",exact:true}).click();
    await page.getByRole("button",{name:"過去履歴を引き継がず新規鑑定",exact:true}).click();
-   await page.waitForURL(base+"/");await calculate();await openMemo();
+   await page.waitForURL(base+"/");await waitForRerun();await calculate();await openMemo();
    assert.equal(await page.getByLabel("過去の鑑定メモ",{exact:true}).count(),0);
    await memo().fill(device+" 新グループメモ");
    const third=await save();
