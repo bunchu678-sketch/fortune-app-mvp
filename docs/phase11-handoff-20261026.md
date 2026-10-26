@@ -23,6 +23,8 @@ TS/build成功、Node69、Python既存495＋追加19=514、Tier A556/B38、実�
 3. `docs/phase11-predeployment-20261026.md`：配備/migration/backup/SMTP/Linux PDF/URL/運用/rollback準備。
 4. 開発元`docs/security-vps-retry-20261023.md`と`docs/security-main-integration-20261026.md`：本番記録とGitHub main統合。古いvps-deploymentの569d149だけで現在の稼働コードを決めない。
 
+Notion Sessionsの今回記録： https://app.notion.com/p/405f414e63af8100a351d9cca7c0a2a3 （旧履歴を上書きせず追加、正式Phase10は進行中）。
+
 ## 重要な未確定事項と停止条件
 
 Phase10正式完了、mainへのB2B統合、Phase11本番運用開始、本番配備/migration・実メール・実アカウント・請求・削除は未承認。今夜の実行許可は専用branchと合成隔離開発だけ。
