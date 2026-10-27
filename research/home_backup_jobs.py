@@ -10,7 +10,7 @@ import json
 import os
 from uuid import uuid4
 from research.home_backup_storage import (OwnedHomeLab, JobState, ProcessLock, LabFailure,
-    MAX_RAW, MAX_WIRE, instant, timestamp, slot, canonical, digest, JST)
+    MAX_RAW, MAX_WIRE, instant, timestamp, slot, canonical, digest, JST, BackupSchedule)
 
 
 def nothing(stage, identifier): pass
@@ -18,8 +18,9 @@ def nothing(stage, identifier): pass
 
 class SyntheticVPS:
     def __init__(self, lab, *, schedule, staging_days, staging_limit_bytes, point=nothing):
-        if not isinstance(lab,OwnedHomeLab) or not isinstance(schedule,wall_time) or schedule.tzinfo is not None:
+        if not isinstance(lab,OwnedHomeLab):
             raise LabFailure('explicit_synthetic_schedule_required')
+        schedule=BackupSchedule.coerce(schedule)
         if type(staging_days) is not int or not 1 <= staging_days <= 7 or staging_limit_bytes<=0:
             raise LabFailure('explicit_staging_policy_required')
         self.lab = lab; self.schedule = schedule; self.staging_days = staging_days
@@ -34,30 +35,35 @@ class SyntheticVPS:
         now = instant(now)
         with ProcessLock(self.lab,'vps-state'):
             self.state.clock(now)
-            if now.astimezone(JST).time().replace(tzinfo=None)<self.schedule: return None
+            anchor=self.schedule.anchor(now)
+            current_slot=slot(now,self.schedule)
             self.state.event(now,'generation_started')
             self.lab.clean_plain_snapshots()
             previous=self.state.rows('SELECT slot FROM backups ORDER BY slot DESC LIMIT 1')
-            if previous and (datetime.fromisoformat(slot(now))-datetime.fromisoformat(previous[0]['slot'])).days>1:
+            if previous and self.schedule.missing_between([previous[0]['slot'],current_slot]):
                 self.state.event(now,'generation_gap',alert=True)
-            rows = self.state.rows('SELECT * FROM backups WHERE slot=?',(slot(now),))
+            rows = self.state.rows('SELECT * FROM backups WHERE slot=?',(current_slot,))
             row = rows[0] if rows else None
             if row and row['state'] in ('ready','acked'):
                 path = self.lab.artifact('vps-stage',row['id'])
                 if not path.is_file() or digest(path.read_bytes()) != row['sha256']:
+                    self.state.event(now,'staged_backup_corrupt',row['id'],alert=True)
                     raise LabFailure('staged_backup_corrupt')
                 return row
+            if now-anchor>self.schedule.generation_window and not (row and self.lab.artifact('vps-stage',row['id']).exists()):
+                self.state.event(now,'generation_window_missed',alert=True)
+                return None
             identifier = row['id'] if row else uuid4().hex
             if row and row['state']=='deleted': raise LabFailure('generation_already_expired')
             with self.state.db() as db:
                 db.execute("INSERT INTO backups(id,slot,created_at,state) VALUES (?,?,?,'pending') ON CONFLICT(id) DO NOTHING",
-                           (identifier,slot(now),timestamp(now)))
+                           (identifier,current_slot,timestamp(now)))
             path = self.lab.artifact('vps-stage',identifier)
             try:
                 if path.exists():
                     body = path.read_bytes()
                     header,_ = self.lab.open_envelope(body,'vps-key')
-                    if header['id'] != identifier or header['slot'] != slot(now): raise LabFailure('staged_identity_mismatch')
+                    if header['id'] != identifier or header['slot'] != current_slot: raise LabFailure('staged_identity_mismatch')
                     with closing(self.lab.decode_backup(body,header,'vps-key')): pass
                 else:
                     item = self.lab.source_lab.snapshot()
@@ -65,7 +71,7 @@ class SyntheticVPS:
                         raw = item.path.read_bytes()
                         if len(raw)>MAX_RAW: raise LabFailure('synthetic_size_limit')
                         header = {'format':1,'kind':'backup','generation':self.lab.generation,'id':identifier,
-                                  'slot':slot(now),'created_at':timestamp(now),'raw_size':len(raw),
+                                  'slot':current_slot,'created_at':timestamp(now),'raw_size':len(raw),
                                   'raw_sha256':digest(raw),'schema':[item.schema_sha256,item.migrations,item.origin]}
                         body = self.lab.envelope(header,gzip.compress(raw,compresslevel=6,mtime=0))
                     finally:
@@ -113,7 +119,7 @@ class SyntheticVPS:
                 return
             for row in rows:
                 age = now-datetime.fromisoformat(row['created_at'])
-                if row['state']=='ready' and age>=timedelta(days=1):
+                if row['state']=='ready' and self.schedule.overdue(row['slot'],now):
                     self.state.event(now,'delivery_overdue',row['id'],alert=True)
                 if age<timedelta(days=self.staging_days): continue
                 if row['id']==newest:
@@ -134,8 +140,9 @@ class SyntheticHomeJob:
     def __init__(self, lab, server, *, schedule, point=nothing):
         if not isinstance(lab,OwnedHomeLab) or server.lab.root != lab.root:
             raise LabFailure('only_owned_mock_transport_allowed')
-        if not isinstance(schedule,wall_time) or schedule.tzinfo is not None:
-            raise LabFailure('explicit_synthetic_schedule_required')
+        schedule=BackupSchedule.coerce(schedule)
+        if schedule.times!=server.schedule.times or schedule.pull_delay!=server.schedule.pull_delay:
+            raise LabFailure('source_receiver_schedule_mismatch')
         self.lab = lab; self.server = server; self.schedule = schedule; self.point = point
         self.state = JobState(lab,'pc-state')
 
@@ -245,24 +252,31 @@ class SyntheticHomeJob:
         return warnings
 
     def run_daily(self, now, *, catch_up=False, attempts=3):
+        """Compatibility name; persistent completion is per generation time slot."""
+        return self.run_slot(now,catch_up=catch_up,attempts=attempts)
+
+    def run_slot(self, now, *, catch_up=False, attempts=3):
         now = instant(now)
         if type(attempts) is not int or not 1<=attempts<=3: raise LabFailure('retry_limit')
         with ProcessLock(self.lab,'pc-state'):
             self.state.clock(now)
-            current = self.state.rows('SELECT * FROM runs WHERE slot=?',(slot(now),))
-            if current and current[0]['state']=='completed': return {'status':'already_completed','received':0}
-            if not catch_up and now.astimezone(JST).time().replace(tzinfo=None)<self.schedule:
+            anchor=self.schedule.anchor(now)
+            before_pull=now<anchor+self.schedule.pull_delay
+            before_daily=(len(self.schedule.times)==1 and anchor.date()!=now.astimezone(JST).date())
+            if not catch_up and (before_pull or before_daily):
                 return {'status':'not_due','received':0}
+            current_slot=self.schedule.key(self.schedule.expected(now))
+            current = self.state.rows('SELECT * FROM runs WHERE slot=?',(current_slot,))
+            if current and current[0]['state']=='completed': return {'status':'already_completed','received':0}
             self.state.event(now,'job_started')
             with self.state.db() as db:
-                db.execute("INSERT INTO runs VALUES (?,'running',NULL,1) ON CONFLICT(slot) DO UPDATE SET state='running',attempts=attempts+1",(slot(now),))
+                db.execute("INSERT INTO runs VALUES (?,'running',NULL,1) ON CONFLICT(slot) DO UPDATE SET state='running',attempts=attempts+1",(current_slot,))
             try:
                 self.lab.disk()
                 catalog = self.server.catalog()
                 received = 0; warnings = []
                 dates=sorted({row['slot'] for row in catalog})
-                if any((datetime.fromisoformat(right)-datetime.fromisoformat(left)).days>1
-                       for left,right in zip(dates,dates[1:])):
+                if self.schedule.missing_between(dates):
                     warnings.append('generation_gap')
                 existing = {r['id']:r for r in self.state.rows('SELECT * FROM backups')}
                 for row in catalog:
@@ -279,19 +293,28 @@ class SyntheticHomeJob:
                             self.state.event(now,'receive_attempt_failed',row['id'])
                             if attempt+1==attempts: raise LabFailure('receive_failed') from None
                 candidates = [r for r in catalog if r['metadata'] and r['state']!='pending']
-                if not candidates or now-datetime.fromisoformat(max(candidates,key=lambda r:r['created_at'])['created_at'])>timedelta(days=1):
-                    warnings.append('generation_stale')
+                expected=self.schedule.expected(now)
+                if not candidates or max(r['slot'] for r in candidates)<self.schedule.key(expected):
+                    stale=(now>=expected+self.schedule.pull_delay+self.schedule.alert_grace
+                           or bool(candidates and self.schedule.overdue(max(r['slot'] for r in candidates),now)))
+                    warnings.append('generation_stale' if stale else 'generation_pending')
                 last = self._last_good(now)
-                if last is None or now-datetime.fromisoformat(last['created_at'])>timedelta(days=1):
+                if last is None or self.schedule.overdue(last['slot'],now):
                     warnings.append('offsite_backup_stale')
                 warnings.extend(self.prune(now))
                 for code in set(warnings): self.state.event(now,code,alert=True)
                 status = 'attention' if warnings else 'completed'
+                storage=self.lab.usage()
+                with self.state.db() as db:
+                    old=db.execute("SELECT value FROM metadata WHERE name='retained_bytes'").fetchone()
+                    storage['retained_delta_bytes']=storage['ciphertext_bytes']-(int(old[0]) if old else 0)
+                    db.execute("INSERT INTO metadata VALUES ('retained_bytes',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                               (str(storage['ciphertext_bytes']),))
                 self.state.event(now,'job_attention' if warnings else 'job_completed')
                 with self.state.db() as db:
-                    db.execute('UPDATE runs SET state=?,last_code=? WHERE slot=?',(status,','.join(sorted(set(warnings))),slot(now)))
-                return {'status':status,'received':received,'warnings':sorted(set(warnings))}
+                    db.execute('UPDATE runs SET state=?,last_code=? WHERE slot=?',(status,','.join(sorted(set(warnings))),current_slot))
+                return {'status':status,'received':received,'warnings':sorted(set(warnings)),'storage':storage}
             except Exception:
                 self.state.event(now,'job_failed',alert=True)
-                with self.state.db() as db: db.execute("UPDATE runs SET state='failed',last_code='job_failed' WHERE slot=?",(slot(now),))
+                with self.state.db() as db: db.execute("UPDATE runs SET state='failed',last_code='job_failed' WHERE slot=?",(current_slot,))
                 raise LabFailure('job_failed') from None

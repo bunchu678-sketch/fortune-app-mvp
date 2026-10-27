@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import unittest
 from unittest.mock import patch
-from research.home_backup_storage import (OwnedHomeLab, ProcessLock, LabFailure, canonical, digest)
+from research.home_backup_storage import (OwnedHomeLab, ProcessLock, LabFailure, canonical, digest, BackupSchedule, JST, slot)
 from research.home_backup_jobs import SyntheticVPS, SyntheticHomeJob
 from research.home_backup_ledger import DurableLedgerMock
 from operations_repository import OperationsRepository
@@ -443,6 +443,210 @@ with ProcessLock(lab,'pc-state'):
         ledger.point=changed
         with self.assertRaises(LabFailure): ledger.restore_memory(self.job,row['id'],self.ops,self.admin,NOW+timedelta(minutes=2))
         self.assertTrue(ledger.state.rows("SELECT * FROM outbox WHERE code='restore_denied'"))
+
+
+class FourSlotBackupCases(unittest.TestCase):
+    def setUp(self):
+        self.plan=BackupSchedule.parse('07:00,12:00,17:00,23:00',10)
+        HomeBackupCases.setUp(self)
+
+    def server_new(self, **changes):
+        return SyntheticVPS(self.lab,**({'schedule':self.plan,'staging_days':3,'staging_limit_bytes':256*1024*1024}|changes))
+
+    def job_new(self, **changes):
+        return SyntheticHomeJob(self.lab,self.server,**({'schedule':self.plan}|changes))
+
+    seed=HomeBackupCases.seed
+    reading=HomeBackupCases.reading
+    publish=HomeBackupCases.publish
+
+    def moment(self, day=0, index=0):
+        return datetime.combine(datetime(2026,10,27).date()+timedelta(days=day),self.plan.times[index],JST)
+
+    def take(self, day=0, index=0):
+        now=self.moment(day,index)
+        self.server.sweep(now)
+        row=self.server.generate(now)
+        result=self.job.run_slot(now+self.plan.pull_delay)
+        return row,result
+
+    def crash(self, phase, now, *, source=False):
+        child='''import os,sys
+from datetime import datetime
+from research.home_backup_storage import OwnedHomeLab,BackupSchedule
+from research.home_backup_jobs import SyntheticVPS,SyntheticHomeJob
+lab=OwnedHomeLab.attach_for_test(sys.argv[1],sys.argv[2])
+plan=BackupSchedule.parse(sys.argv[5],10)
+def fault(stage,identifier):
+ if stage==sys.argv[3]:os._exit(73)
+server=SyntheticVPS(lab,schedule=plan,staging_days=3,staging_limit_bytes=256*1024*1024,point=fault)
+now=datetime.fromisoformat(sys.argv[4])
+if sys.argv[6]=='source':server.generate(now)
+else:SyntheticHomeJob(lab,server,schedule=plan,point=fault).run_slot(now)
+'''
+        result=subprocess.run([sys.executable,'-B','-c',child,str(self.lab.root),self.lab.generation,
+                               phase,now.isoformat(),','.join(t.isoformat(timespec='minutes') for t in self.plan.times),
+                               'source' if source else 'home'],capture_output=True,timeout=45)
+        self.assertEqual(result.returncode,73,result.stderr.decode(errors='replace'))
+
+    def test_four_real_copies_received_with_distinct_slots_and_changed_content(self):
+        ids=[]; hashes=[]
+        for index in range(4):
+            self.ops.auth.create_user(f'synthetic-{index}@example.test',secrets.token_urlsafe(32))
+            row,result=self.take(index=index)
+            self.assertEqual(result['status'],'completed'); self.assertEqual(result['received'],1)
+            ids.append(row['id']); hashes.append(json.loads(row['metadata'])['raw_sha256'])
+            with closing(self.lab.decode_backup(self.job.verify_file(row),json.loads(row['metadata']))) as db:
+                self.assertEqual(db.execute('SELECT count(*) FROM users').fetchone()[0],index+1)
+        self.assertEqual(len(set(ids)),4); self.assertEqual(len(set(hashes)),4)
+        self.assertEqual(len(self.job.state.rows("SELECT * FROM runs WHERE state='completed'")),4)
+        self.assertEqual([r['slot'] for r in self.server.catalog()],
+                         [self.plan.key(self.moment(index=i)) for i in range(4)])
+
+    def test_same_slot_retry_and_new_slot_are_distinct(self):
+        first,_=self.take()
+        self.assertEqual(self.server_new().generate(self.moment()+timedelta(minutes=20))['id'],first['id'])
+        self.assertEqual(self.job_new().run_slot(self.moment()+timedelta(minutes=20))['status'],'already_completed')
+        self.assertEqual(self.server_new().generate(self.moment()+timedelta(minutes=50))['id'],first['id'])
+        second,_=self.take(index=1)
+        self.assertNotEqual(first['id'],second['id'])
+
+    def test_late_generation_is_skipped_and_never_backdated(self):
+        now=self.moment()+timedelta(hours=1)
+        self.assertIsNone(self.server.generate(now)); self.assertEqual(self.server.catalog(),[])
+        row=self.server.generate(self.moment(index=1)+timedelta(minutes=3))
+        self.assertEqual(datetime.fromisoformat(row['created_at']),self.moment(index=1)+timedelta(minutes=3))
+        self.assertEqual(len(self.server.catalog()),1)
+        self.assertTrue(self.server.state.rows("SELECT * FROM outbox WHERE code='generation_window_missed'"))
+
+    def test_cross_midnight_and_long_night_interval_do_not_raise_false_stale(self):
+        for index in range(4): self.take(index=index)
+        self.assertEqual(slot(self.moment(1)-timedelta(minutes=1),self.plan),self.plan.key(self.moment(index=3)))
+        result=self.job_new().run_slot(self.moment(1)-timedelta(minutes=1),catch_up=True)
+        self.assertEqual(result['status'],'already_completed')
+        row,result=self.take(1)
+        self.assertEqual(row['slot'],'2026-10-28T07:00+09:00'); self.assertEqual(result['warnings'],[])
+
+    def test_pull_delay_and_missing_latest_generation_detected_in_same_day(self):
+        self.take()
+        now=self.moment(index=1)
+        self.assertEqual(self.job.run_slot(now+timedelta(minutes=5))['status'],'not_due')
+        waiting=self.job.run_slot(now+timedelta(minutes=10))
+        self.assertIn('generation_pending',waiting['warnings'])
+        overdue=self.job.run_slot(now+timedelta(minutes=26))
+        self.assertIn('generation_stale',overdue['warnings']); self.assertIn('offsite_backup_stale',overdue['warnings'])
+        self.server.sweep(now+timedelta(minutes=26))
+        self.server.generate(now+timedelta(minutes=27))
+        self.assertEqual(self.job.run_slot(now+timedelta(minutes=28))['status'],'completed')
+
+    def test_skipped_midday_slot_is_detected_at_both_roles(self):
+        self.take(); _,result=self.take(index=2)
+        self.assertIn('generation_gap',result['warnings'])
+        self.assertTrue(self.server.state.rows("SELECT * FROM outbox WHERE code='generation_gap'"))
+
+    def test_pc_restart_recovers_eight_existing_points_without_fabrication(self):
+        for index in range(4): self.take(index=index)
+        for day in (1,2):
+            for index in range(4):
+                now=self.moment(day,index); self.server.sweep(now); self.server.generate(now)
+        result=self.job_new().run_slot(self.moment(2,3)+timedelta(minutes=10),catch_up=True)
+        self.assertEqual(result['received'],8); self.assertEqual(result['warnings'],[])
+        self.assertEqual(len(list(self.lab.path('mock-hdd').glob('*.enc'))),12)
+
+    def test_staging_window_loss_and_unacknowledged_points_are_reported(self):
+        self.take()
+        for day in range(1,5):
+            for index in range(4):
+                now=self.moment(day,index); self.server.sweep(now); self.server.generate(now)
+        result=self.job_new().run_slot(self.moment(4,3)+timedelta(minutes=10),catch_up=True)
+        self.assertIn('staging_gap',result['warnings'])
+        self.assertTrue(self.server.state.rows("SELECT * FROM outbox WHERE code='delivery_overdue'"))
+
+    def test_thirty_days_keep_120_by_timestamp_and_expire_within_day(self):
+        first=[]
+        for day in range(30):
+            for index in range(4):
+                row,result=self.take(day,index)
+                self.assertEqual(result['status'],'completed')
+                if day==0:first.append(row)
+        self.assertEqual(len(list(self.lab.path('mock-hdd').glob('*.enc'))),120)
+        _,result=self.take(30)
+        self.assertEqual(result['warnings'],[])
+        self.assertEqual(len(list(self.lab.path('mock-hdd').glob('*.enc'))),120)
+        self.assertFalse(self.lab.artifact('mock-hdd',first[0]['id']).exists())
+        self.assertTrue(self.lab.artifact('mock-hdd',first[1]['id']).exists())
+        _,result=self.take(30,1)
+        self.assertFalse(self.lab.artifact('mock-hdd',first[1]['id']).exists())
+        self.assertEqual(len(list(self.lab.path('mock-hdd').glob('*.enc'))),120)
+
+    def test_actual_source_and_receive_crashes_recover_same_slot(self):
+        now=self.moment()
+        self.crash('server_published',now,source=True)
+        pending=self.server.catalog()[0]
+        row=self.server.generate(now+timedelta(minutes=1))
+        self.assertEqual(row['id'],pending['id'])
+        self.crash('transfer_chunk',now+timedelta(minutes=10))
+        self.assertTrue(self.lab.artifact('mock-hdd',row['id'],'.part').exists())
+        self.assertEqual(self.job_new().run_slot(now+timedelta(minutes=11))['status'],'completed')
+        self.assertEqual(len(list(self.lab.path('mock-hdd').glob('*.enc'))),1)
+
+    def test_actual_deletion_crash_resumes_without_retransfer(self):
+        old,_=self.take(); self.server.generate(self.moment(31))
+        self.crash('deleted_before_record',self.moment(31)+timedelta(minutes=10))
+        self.assertFalse(self.lab.artifact('mock-hdd',old['id']).exists())
+        self.job_new().run_slot(self.moment(31)+timedelta(minutes=11))
+        self.assertEqual(self.job.state.rows('SELECT state FROM backups WHERE id=?',(old['id'],))[0]['state'],'deleted')
+
+    def test_partial_link_failure_capacity_and_corruption_fail_closed(self):
+        now=self.moment(); row=self.server.generate(now)
+        def disconnect(stage,identifier):
+            if stage=='transfer_chunk':self.lab.link_available=False
+        with self.assertRaises(LabFailure): self.job_new(point=disconnect).run_slot(now+timedelta(minutes=10))
+        self.lab.link_available=True
+        self.assertEqual(self.job_new().run_slot(now+timedelta(minutes=11))['status'],'completed')
+        self.lab.write(self.lab.artifact('vps-stage',row['id']),b'corrupt',replace=True)
+        with self.assertRaises(LabFailure): self.server.generate(now+timedelta(minutes=12))
+        self.assertFalse(self.job.state.rows("SELECT * FROM backups WHERE state='receiving'"))
+
+    def test_stage_capacity_failure_does_not_delete_last_good_copy(self):
+        old,_=self.take(); used=self.lab.usage()['stage_bytes']
+        limited=self.server_new(staging_limit_bytes=used)
+        with self.assertRaises(LabFailure): limited.generate(self.moment(index=1))
+        self.assertTrue(self.lab.artifact('mock-hdd',old['id']).exists())
+        self.assertTrue(self.lab.artifact('vps-stage',old['id']).exists())
+
+    def test_failed_new_capture_preserves_expired_last_good_as_warning(self):
+        old,_=self.take(); now=self.moment(40)
+        with patch.object(self.lab.source_lab,'snapshot',side_effect=OSError('synthetic failure')):
+            with self.assertRaises(LabFailure):self.server.generate(now)
+        result=self.job.run_slot(now+timedelta(minutes=10))
+        self.assertEqual(result['status'],'attention'); self.assertIn('retention_overdue',result['warnings'])
+        self.assertTrue(self.lab.artifact('mock-hdd',old['id']).exists())
+
+    def test_four_slot_restore_keeps_existing_ledger_gate_and_scope_protection(self):
+        self.seed(); deleted=self.reading(self.org); b2c=self.reading(None); other=self.reading(self.other)
+        row,_=self.take()
+        changed=self.moment(index=1)
+        with self.ops.auth.connection() as db:record_deletion(db,'scope',self.owner,self.org,[deleted],changed)
+        ledger=DurableLedgerMock(self.lab); self.publish(ledger,changed)
+        with self.assertRaises(LabFailure):ledger.restore_memory(self.job,row['id'],self.ops,self.admin,changed)
+        ledger.sync(changed)
+        with closing(ledger.restore_memory(self.job,row['id'],self.ops,self.admin,changed)) as db:
+            self.assertIsNone(db.execute('SELECT id FROM readings WHERE id=?',(deleted,)).fetchone())
+            for identifier in (b2c,other):self.assertIsNotNone(db.execute('SELECT id FROM readings WHERE id=?',(identifier,)).fetchone())
+            self.assertEqual(db.execute("SELECT count(*) FROM users WHERE status!='disabled'").fetchone()[0],0)
+        self.lab.truth_available=False
+        with self.assertRaises(LabFailure):ledger.restore_memory(self.job,row['id'],self.ops,self.admin,changed)
+
+    def test_schedule_validation_and_storage_metrics(self):
+        for text in ('07:00,07:00','12:00,07:00','24:00','7:00','07:00,08:00,09:00,10:00,11:00'):
+            with self.assertRaises(LabFailure):BackupSchedule.parse(text,10)
+        with self.assertRaises(LabFailure):BackupSchedule.parse('07:00,12:00,17:00,23:00',-1)
+        with self.assertRaises(LabFailure):self.job_new(schedule=BackupSchedule.parse('06:00,12:00,17:00,23:00',10))
+        _,first=self.take(); _,second=self.take(index=1)
+        self.assertGreater(first['storage']['mock_host_free_bytes'],0)
+        self.assertGreater(second['storage']['retained_delta_bytes'],0)
+        self.assertEqual(second['storage']['partial_bytes'],0)
 
 
 if __name__=='__main__': unittest.main(verbosity=2)

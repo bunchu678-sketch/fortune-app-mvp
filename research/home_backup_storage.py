@@ -17,6 +17,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import sqlite3
 from uuid import uuid4
 from research.backup_foundation_lab import (SyntheticNodeAEAD, LabFailure, instant, canonical, digest, JST)
@@ -30,8 +31,78 @@ def timestamp(now):
     return instant(now).isoformat()
 
 
-def slot(now):
-    return instant(now).astimezone(JST).date().isoformat()
+class BackupSchedule:
+    """Explicit JST generation slots; delayed pulls share the generation key.
+
+    A missed generation window is never backfilled. Its eventual copy would
+    contain current data, so representing it as a past recovery point is false.
+    """
+    def __init__(self, times, *, pull_delay=timedelta(0), generation_window=timedelta(minutes=30),
+                 alert_grace=timedelta(minutes=15)):
+        times=tuple(times)
+        if (not 1<=len(times)<=4 or any(not isinstance(t,wall_time) or t.tzinfo is not None
+                or t.second or t.microsecond for t in times)
+                or times!=tuple(sorted(set(times)))):
+            raise LabFailure('explicit_synthetic_schedule_required')
+        intervals=[(datetime.combine(datetime.min.date(),right)-datetime.combine(datetime.min.date(),left)).total_seconds()%86400
+                   for left,right in zip(times,times[1:]+times[:1])]
+        shortest=min(value or 86400 for value in intervals)
+        if any(not isinstance(value,timedelta) or value.total_seconds()<0
+               for value in (pull_delay,generation_window,alert_grace)):
+            raise LabFailure('schedule_interval_invalid')
+        if not 0<generation_window.total_seconds()<shortest or (pull_delay+alert_grace).total_seconds()>=shortest:
+            raise LabFailure('schedule_interval_invalid')
+        self.times=times; self.pull_delay=pull_delay
+        self.generation_window=generation_window; self.alert_grace=alert_grace
+
+    @classmethod
+    def coerce(cls, value):
+        if isinstance(value,cls): return value
+        if isinstance(value,wall_time): return cls((value,))  # Existing daily fixtures.
+        raise LabFailure('explicit_synthetic_schedule_required')
+
+    @classmethod
+    def parse(cls, text, delay_minutes):
+        if not re.fullmatch(r'\d{2}:\d{2}(,\d{2}:\d{2}){0,3}',text) or type(delay_minutes) is not int:
+            raise LabFailure('explicit_synthetic_schedule_required')
+        try: times=tuple(wall_time.fromisoformat(value) for value in text.split(','))
+        except ValueError: raise LabFailure('explicit_synthetic_schedule_required') from None
+        return cls(times,pull_delay=timedelta(minutes=delay_minutes))
+
+    def anchor(self, now):
+        local=instant(now).astimezone(JST)
+        candidates=[datetime.combine(local.date(),t,JST) for t in self.times]
+        return max((t for t in candidates if t<=local),default=datetime.combine(local.date()-timedelta(days=1),self.times[-1],JST))
+
+    def key(self, anchor):
+        local=instant(anchor).astimezone(JST)
+        if local.time().replace(tzinfo=None) not in self.times:
+            raise LabFailure('slot_not_in_schedule')
+        return local.isoformat(timespec='minutes')
+
+    def previous(self, anchor): return self.anchor(anchor-timedelta(microseconds=1))
+
+    def next(self, anchor):
+        index=self.times.index(anchor.astimezone(JST).time().replace(tzinfo=None))
+        day=anchor.astimezone(JST).date()
+        return datetime.combine(day if index+1<len(self.times) else day+timedelta(days=1),
+                                self.times[(index+1)%len(self.times)],JST)
+
+    def expected(self, now):
+        anchor=self.anchor(now)
+        return anchor if instant(now)>=anchor+self.pull_delay else self.previous(anchor)
+
+    def missing_between(self, keys):
+        anchors=sorted(datetime.fromisoformat(key) for key in set(keys))
+        return any(self.next(left)<right for left,right in zip(anchors,anchors[1:]))
+
+    def overdue(self, key, now):
+        anchor=datetime.fromisoformat(key)
+        return instant(now)>=self.next(anchor)+self.pull_delay+self.alert_grace
+
+
+def slot(now, schedule):
+    return BackupSchedule.coerce(schedule).key(BackupSchedule.coerce(schedule).anchor(now))
 
 
 class OwnedHomeLab:
@@ -115,9 +186,19 @@ class OwnedHomeLab:
         marker = self.path('mock-hdd','volume.json')
         if not marker.is_file() or json.loads(marker.read_bytes()) != {'synthetic_volume':self.generation}:
             raise LabFailure('hdd_identity_mismatch')
-        if self.disk_free_bytes is not None and self.disk_free_bytes < required:
+        available=self.disk_free_bytes if self.disk_free_bytes is not None else shutil.disk_usage(marker.parent).free
+        if available < required:
             raise LabFailure('hdd_capacity_insufficient')
         return self.path('mock-hdd')
+
+    def usage(self):
+        """Only this newly allocated mock volume; never enumerates real HDDs."""
+        volume=self.disk()
+        return {'ciphertext_bytes':sum(self.check(p).stat().st_size for p in volume.glob('*.enc')),
+                'partial_bytes':sum(self.check(p).stat().st_size for p in volume.glob('*.part')),
+                'stage_bytes':sum(self.check(p).stat().st_size for p in self.path('vps-stage').glob('*.enc')),
+                'mock_host_free_bytes':shutil.disk_usage(volume).free,
+                'injected_free_bytes':self.disk_free_bytes}
 
     def cipher(self, role):
         if role not in ('vps-key','pc-key'): raise LabFailure('key_role_refused')
