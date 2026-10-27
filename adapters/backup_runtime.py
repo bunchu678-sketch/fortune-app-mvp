@@ -95,14 +95,15 @@ def private_acl(path):
 $p=__PATH__
 $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $allowed=@($sid,'S-1-5-18','S-1-5-32-544')
-$acl=Get-Acl -LiteralPath $p
-$owner=([Security.Principal.NTAccount]$acl.Owner).Translate([Security.Principal.SecurityIdentifier]).Value
+$acl=if([IO.Directory]::Exists($p)){[IO.Directory]::GetAccessControl($p)}else{[IO.File]::GetAccessControl($p)}
+$owner=$acl.GetOwner([Security.Principal.SecurityIdentifier]).Value
 $ok=$allowed -contains $owner
-foreach($rule in $acl.Access){if($rule.AccessControlType -eq 'Allow' -and $allowed -notcontains $rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value){$ok=$false}}
+foreach($rule in $acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])){if($rule.AccessControlType -eq 'Allow' -and $allowed -notcontains $rule.IdentityReference.Value){$ok=$false}}
 if($ok){'true'}else{'false'}
 """.replace('__PATH__',"'"+str(path).replace("'","''")+"'")
     encoded=base64.b64encode(script.encode('utf-16-le')).decode()
-    result=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-EncodedCommand',encoded],capture_output=True,timeout=15)
+    powershell=Path(os.environ['SystemRoot'])/'System32'/'WindowsPowerShell'/'v1.0'/'powershell.exe'
+    result=subprocess.run([str(powershell),'-NoProfile','-NonInteractive','-EncodedCommand',encoded],capture_output=True,timeout=15)
     return result.returncode==0 and result.stdout.decode(errors='replace').strip()=='true'
 
 

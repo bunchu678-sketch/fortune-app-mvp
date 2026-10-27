@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from unittest.mock import patch,Mock
 from uuid import uuid4
-from adapters.backup_runtime import (GuardedWorkspace,ExecutionGrant,ConfiguredVPS,ConfiguredHome,dpapi,volume_identity)
+from adapters.backup_runtime import (GuardedWorkspace,ExecutionGrant,ConfiguredVPS,ConfiguredHome,dpapi,volume_identity,private_acl)
 from adapters.backup_ssh import ProcessRPC,PullTransport,TransferService,PinnedSSH
 from adapters.backup_notifications import BackupNotifications
 from research.home_backup_storage import LabFailure,canonical,digest,ProcessLock,OwnedHomeLab
@@ -68,6 +68,22 @@ class AdapterCases(unittest.TestCase):
     def capture(self,now=NOW):
         row=self.server.generate(now);result=self.job.run_slot(now+timedelta(minutes=10))
         return row,result
+
+    @unittest.skipUnless(os.name=='nt','Windows DACL check')
+    def test_real_private_acl_accepts_owner_and_rejects_other_readers(self):
+        target=self.base/'acl-owned';target.mkdir()
+        command=['powershell.exe','-NoProfile','-NonInteractive','-Command',
+                 '[Security.Principal.WindowsIdentity]::GetCurrent().User.Value']
+        sid=subprocess.check_output(command,text=True).strip()
+        subprocess.run(['icacls.exe',str(target),'/inheritance:r','/grant:r',
+                        '*'+sid+':(OI)(CI)F','*S-1-5-18:(OI)(CI)F','*S-1-5-32-544:(OI)(CI)F'],
+                       check=True,capture_output=True)
+        self.assertTrue(private_acl(target))
+        file=target/'key.fixture';file.write_bytes(b'synthetic ACL fixture')
+        self.assertTrue(private_acl(file))
+        subprocess.run(['icacls.exe',str(target),'/grant','*S-1-5-32-545:(OI)(CI)R'],check=True,capture_output=True)
+        self.assertFalse(private_acl(target))
+        self.assertFalse(private_acl(file))
 
     def transfer_workspace(self):
         return GuardedWorkspace(self.configs['vps'],self.approvals['vps'],'transfer')
