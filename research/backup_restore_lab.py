@@ -14,6 +14,7 @@ import hashlib
 import json
 import sqlite3
 import tempfile
+import time
 from uuid import uuid4
 
 
@@ -58,7 +59,13 @@ class SyntheticBackupLab:
         if path.is_symlink() or path.resolve().parent != self.root or self.root.is_symlink():
             raise ValueError('Only this newly allocated synthetic laboratory is allowed')
 
-    def snapshot(self):
+    def snapshot(self, timeout_seconds=5):
+        if not 0 < timeout_seconds <= 60:
+            raise ValueError('Synthetic backup timeout must be between 0 and 60 seconds')
+        deadline = time.monotonic() + timeout_seconds
+        def progress(status, remaining, total):
+            if time.monotonic() >= deadline:
+                raise TimeoutError('Synthetic snapshot deadline exceeded')
         self._guard(self.source)
         if not self.source.is_file():
             raise ValueError('Create the synthetic source first')
@@ -67,8 +74,12 @@ class SyntheticBackupLab:
         with target.open('xb'):
             pass
         with closing(sqlite3.connect(self.source.as_uri() + '?mode=ro', uri=True)) as src, closing(sqlite3.connect(target)) as dst:
-            src.backup(dst)
+            src.backup(dst, pages=256, progress=progress, sleep=0.02)
             dst.commit()
+            # The newly allocated snapshot must be a standalone image, including
+            # when the source uses WAL. Never change the source journal mode.
+            if dst.execute('PRAGMA journal_mode=DELETE').fetchone()[0] != 'delete':
+                raise ValueError('Synthetic snapshot is not a standalone database')
             schema, migrations, origin = inspect(dst)
         item = Snapshot(target, self._generation, hashlib.sha256(target.read_bytes()).hexdigest(), schema, migrations, origin)
         self._snapshots[target.name] = item
