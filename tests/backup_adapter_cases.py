@@ -19,6 +19,7 @@ from uuid import uuid4
 from adapters.backup_runtime import (GuardedWorkspace,ExecutionGrant,ConfiguredVPS,ConfiguredHome,dpapi,volume_identity,private_acl)
 from adapters.backup_ssh import ProcessRPC,PullTransport,TransferService,PinnedSSH
 from adapters.backup_notifications import BackupNotifications
+from adapters.backup_status import status as backup_status
 from research.home_backup_storage import LabFailure,canonical,digest,ProcessLock,OwnedHomeLab
 from research.home_backup_jobs import SyntheticVPS
 from research.home_backup_task_draft import configured_draft
@@ -84,6 +85,25 @@ class AdapterCases(unittest.TestCase):
         subprocess.run(['icacls.exe',str(target),'/grant','*S-1-5-32-545:(OI)(CI)R'],check=True,capture_output=True)
         self.assertFalse(private_acl(target))
         self.assertFalse(private_acl(file))
+
+    def test_status_uses_control_records_without_exposing_backup_data(self):
+        self.capture()
+        self.job.state.event(NOW,'receive_failed',alert=True)
+        value=backup_status(self.configs['home'],self.approvals['home'])
+        self.assertEqual(value['recorded_verified_backups'],1)
+        self.assertEqual(value['alerts'][0]['code'],'receive_failed')
+        self.assertEqual(value['status'],'attention')
+        self.assertFalse(value['integrity_rechecked'])
+        self.assertNotIn('synthetic fixture',json.dumps(value))
+        self.assertNotIn(str(self.base),json.dumps(value))
+
+    def test_status_keeps_control_evidence_when_hdd_unavailable(self):
+        self.capture()
+        with patch('adapters.backup_status.GuardedWorkspace.disk',side_effect=LabFailure('hdd_unavailable')):
+            value=backup_status(self.configs['home'],self.approvals['home'])
+        self.assertEqual(value['hdd'],'hdd_unavailable')
+        self.assertEqual(value['status'],'attention')
+        self.assertEqual(value['recorded_verified_backups'],1)
 
     def transfer_workspace(self):
         return GuardedWorkspace(self.configs['vps'],self.approvals['vps'],'transfer')
