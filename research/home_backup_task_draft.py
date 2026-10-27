@@ -58,6 +58,28 @@ def draft(python,node,start,*,schedule):
     return ET.tostring(root,encoding='unicode',xml_declaration=True)
 
 
+def configured_draft(python,node,start,*,schedule,config,approval,user_id,logon_type='InteractiveToken'):
+    """Real adapter action, disabled pending separate registration approval."""
+    for path in (config,approval):
+        if not Path(path).is_absolute() or any(c in str(path) for c in '\r\n"'):
+            raise ValueError('Explicit private configuration and approval paths required')
+    if not user_id or logon_type not in ('InteractiveToken','Password'):
+        raise ValueError('Explicit Windows identity and reviewed logon mode required')
+    ns={'t':'http://schemas.microsoft.com/windows/2004/02/mit/task'}
+    root=ET.fromstring(draft(python,node,start,schedule=schedule))
+    root.find('t:RegistrationInfo/t:Description',ns).text='DISABLED DRAFT: explicit-grant backup adapter; registration not performed'
+    root.find('t:Settings/t:Enabled',ns).text='false'
+    root.find('t:Principals/t:Principal/t:UserId',ns).text=user_id
+    root.find('t:Principals/t:Principal/t:LogonType',ns).text=logon_type
+    entry=Path(__file__).resolve().parents[1]/'adapters'/'backup_client.py'
+    root.find('t:Actions/t:Exec/t:Arguments',ns).text=f'-B "{entry}" --config "{config}" --approval "{approval}" --catch-up'
+    if logon_type=='InteractiveToken':
+        trigger=ET.SubElement(root.find('t:Triggers',ns),'{'+ns['t']+'}LogonTrigger')
+        ET.SubElement(trigger,'{'+ns['t']+'}Enabled').text='true'
+        ET.SubElement(trigger,'{'+ns['t']+'}UserId').text=user_id
+    return ET.tostring(root,encoding='unicode',xml_declaration=True)
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--python',required=True); parser.add_argument('--node',required=True)

@@ -1,4 +1,4 @@
-"""Durable synthetic VPS staging -> local mock HDD pull; no network adapter."""
+"""Shared durable backup jobs, with strict synthetic wrappers and transport IO."""
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, time as wall_time
 import gzip
 import json
 import os
+import re
 from uuid import uuid4
 from research.home_backup_storage import (OwnedHomeLab, JobState, ProcessLock, LabFailure,
     MAX_RAW, MAX_WIRE, instant, timestamp, slot, canonical, digest, JST, BackupSchedule)
@@ -16,10 +17,15 @@ from research.home_backup_storage import (OwnedHomeLab, JobState, ProcessLock, L
 def nothing(stage, identifier): pass
 
 
-class SyntheticVPS:
+def audit_failure(state,now,error,identifier=None):
+    # Adapter failure codes are fixed ASCII identifiers, never raw OS/SSH text.
+    code=str(error)
+    if isinstance(error,LabFailure) and re.fullmatch('[a-z_]{1,64}',code):
+        state.event(now,code,identifier,alert=True)
+
+
+class VPSBackupJob:
     def __init__(self, lab, *, schedule, staging_days, staging_limit_bytes, point=nothing):
-        if not isinstance(lab,OwnedHomeLab):
-            raise LabFailure('explicit_synthetic_schedule_required')
         schedule=BackupSchedule.coerce(schedule)
         if type(staging_days) is not int or not 1 <= staging_days <= 7 or staging_limit_bytes<=0:
             raise LabFailure('explicit_staging_policy_required')
@@ -30,6 +36,23 @@ class SyntheticVPS:
     def catalog(self):
         if not self.lab.link_available: raise LabFailure('transport_unavailable')
         return self.state.rows('SELECT * FROM backups ORDER BY created_at,id')
+
+    def prefix_digest(self, row, length):
+        if type(length) is not int or not 0<=length<=row['size']:
+            raise LabFailure('resume_offset_refused')
+        with self.lab.artifact('vps-stage',row['id']).open('rb') as stream:
+            return digest(stream.read(length))
+
+    def payload_chunks(self, row, offset):
+        if type(offset) is not int or not 0<=offset<=row['size']:
+            raise LabFailure('resume_offset_refused')
+        path=self.lab.artifact('vps-stage',row['id'])
+        if path.stat().st_size!=row['size']: raise LabFailure('staged_file_corrupt')
+        with path.open('rb') as stream:
+            stream.seek(offset)
+            while block:=stream.read(1024):
+                if not self.lab.link_available: raise LabFailure('transport_unavailable')
+                yield block
 
     def generate(self, now):
         now = instant(now)
@@ -86,7 +109,8 @@ class SyntheticVPS:
                                (header['created_at'],canonical(header).decode(),digest(body),len(body),identifier))
                 self.state.event(now,'generation_verified',identifier)
                 return self.state.rows('SELECT * FROM backups WHERE id=?',(identifier,))[0]
-            except Exception:
+            except Exception as error:
+                audit_failure(self.state,now,error,identifier)
                 self.state.event(now,'generation_failed',identifier,alert=True)
                 raise LabFailure('generation_failed') from None
             finally:
@@ -136,10 +160,8 @@ class SyntheticVPS:
                 with self.state.db() as db: db.execute("UPDATE backups SET state='deleted' WHERE id=?",(row['id'],))
 
 
-class SyntheticHomeJob:
+class HomeBackupJob:
     def __init__(self, lab, server, *, schedule, point=nothing):
-        if not isinstance(lab,OwnedHomeLab) or server.lab.root != lab.root:
-            raise LabFailure('only_owned_mock_transport_allowed')
         schedule=BackupSchedule.coerce(schedule)
         if schedule.times!=server.schedule.times or schedule.pull_delay!=server.schedule.pull_delay:
             raise LabFailure('source_receiver_schedule_mismatch')
@@ -182,21 +204,20 @@ class SyntheticHomeJob:
                        tuple(row[k] for k in ('id','slot','created_at','metadata','sha256','size')))
         if not target.exists():
             if not self.lab.link_available: raise LabFailure('transport_unavailable')
-            remote = self.lab.artifact('vps-stage',row['id']).read_bytes()
-            if len(remote)!=row['size'] or digest(remote)!=row['sha256']:
-                raise LabFailure('staged_file_corrupt')
             previous = part.read_bytes() if part.exists() else b''
-            if not remote.startswith(previous):
+            if len(previous)>row['size'] or (previous and self.server.prefix_digest(row,len(previous))!=digest(previous)):
                 self.lab.check(part).unlink(); previous = b''
                 self.state.event(now,'partial_restarted',row['id'])
-            self.lab.disk(len(remote)-len(previous))
-            with part.open('ab') as stream:
-                for offset in range(len(previous),len(remote),1024):
+            self.lab.disk(row['size']-len(previous))
+            with part.open('ab') as stream, closing(self.server.payload_chunks(row,len(previous))) as blocks:
+                for block in blocks:
                     if not self.lab.link_available: raise LabFailure('transport_unavailable')
-                    stream.write(remote[offset:offset+1024]); stream.flush(); os.fsync(stream.fileno())
+                    if not block or stream.tell()+len(block)>row['size']: raise LabFailure('wire_size_refused')
+                    stream.write(block); stream.flush(); os.fsync(stream.fileno())
                     with self.state.db() as db: db.execute('UPDATE backups SET offset=? WHERE id=?',(stream.tell(),row['id']))
                     self.point('transfer_chunk',row['id'])
             body = part.read_bytes()
+            if len(body)!=row['size'] or digest(body)!=row['sha256']: raise LabFailure('staged_file_corrupt')
             with closing(self.lab.decode_backup(body,header)): pass
             self.lab.disk(); self.lab.check(target); os.replace(part,target)
             self.point('received_renamed',row['id'])
@@ -223,7 +244,8 @@ class SyntheticHomeJob:
         now = instant(now); self.lab.disk()
         rows = self.state.rows('SELECT * FROM backups')
         known = {r['id']+extension for r in rows for extension in ('.enc','.part')}
-        unknown = [p.name for p in self.lab.path('mock-hdd').iterdir() if p.name!='volume.json' and p.name not in known]
+        markers=getattr(self.lab,'inventory_marker_names',{'volume.json'})
+        unknown = [p.name for p in self.lab.path('mock-hdd').iterdir() if p.name not in markers and p.name not in known]
         if unknown:
             self.state.event(now,'unknown_inventory',alert=True)
             return ['unknown_inventory']
@@ -287,11 +309,13 @@ class SyntheticHomeJob:
                     for attempt in range(attempts):
                         try:
                             done = self._pull_one(row,now)
-                            if done and row['id'] not in existing: received+=1
+                            if done and (row['id'] not in existing or existing[row['id']]['state']!='verified'): received+=1
                             break
-                        except Exception:
+                        except Exception as error:
                             self.state.event(now,'receive_attempt_failed',row['id'])
-                            if attempt+1==attempts: raise LabFailure('receive_failed') from None
+                            if attempt+1==attempts:
+                                audit_failure(self.state,now,error,row['id'])
+                                raise LabFailure('receive_failed') from None
                 candidates = [r for r in catalog if r['metadata'] and r['state']!='pending']
                 expected=self.schedule.expected(now)
                 if not candidates or max(r['slot'] for r in candidates)<self.schedule.key(expected):
@@ -314,7 +338,22 @@ class SyntheticHomeJob:
                 with self.state.db() as db:
                     db.execute('UPDATE runs SET state=?,last_code=? WHERE slot=?',(status,','.join(sorted(set(warnings))),current_slot))
                 return {'status':status,'received':received,'warnings':sorted(set(warnings)),'storage':storage}
-            except Exception:
+            except Exception as error:
+                audit_failure(self.state,now,error)
                 self.state.event(now,'job_failed',alert=True)
                 with self.state.db() as db: db.execute("UPDATE runs SET state='failed',last_code='job_failed' WHERE slot=?",(current_slot,))
                 raise LabFailure('job_failed') from None
+
+
+class SyntheticVPS(VPSBackupJob):
+    """Original synthetic boundary remains strict; real adapters use another class."""
+    def __init__(self, lab, **kwargs):
+        if not isinstance(lab,OwnedHomeLab): raise LabFailure('explicit_synthetic_schedule_required')
+        super().__init__(lab,**kwargs)
+
+
+class SyntheticHomeJob(HomeBackupJob):
+    def __init__(self, lab, server, **kwargs):
+        if not isinstance(lab,OwnedHomeLab) or not isinstance(server,SyntheticVPS) or server.lab.root!=lab.root:
+            raise LabFailure('only_owned_mock_transport_allowed')
+        super().__init__(lab,server,**kwargs)
