@@ -112,6 +112,9 @@ class InvitationRepository:
                 db.execute('BEGIN IMMEDIATE')
                 row=db.execute('SELECT v.*,u.email FROM initial_invitations v JOIN users u ON u.id=v.user_id WHERE v.id=?',(invitation,)).fetchone()
                 if not row or row['cancelled_at'] or row['attempt']!=attempt or row['delivery_state']!='queued':return
+                memberships=[tuple(r) for r in db.execute('SELECT organization_id,role FROM memberships WHERE user_id=?',(row['user_id'],))]
+                if memberships!=[(row['organization_id'],row['role'])]:raise ValueError()
+                if not db.execute('SELECT 1 FROM user_initial_setup WHERE user_id=? AND completed_at IS NULL',(row['user_id'],)).fetchone():return
                 issued=service.repository.issue(normalized_email(row['email']),now,connection=db)
                 if not issued:raise ValueError()
                 db.execute("UPDATE initial_invitations SET delivery_state='sending',token_digest=?,expires_at=?,updated_at=? WHERE id=?",(token_hash(issued[1]),now+RESET_TTL_SECONDS,stamp(now),invitation))
@@ -124,13 +127,17 @@ class InvitationRepository:
             state='failed'
             logging.getLogger(__name__).error('Invitation mail delivery unavailable')
         with self.auth.connection() as db:
-            db.execute("UPDATE initial_invitations SET delivery_state=?,updated_at=? WHERE id=? AND attempt=? AND cancelled_at IS NULL",(state,stamp(service.clock()),invitation,attempt))
+            # Delivery outcome remains factual even if cancellation raced with
+            # SMTP acceptance. This never clears cancelled_at or revives a token.
+            db.execute("UPDATE initial_invitations SET delivery_state=?,updated_at=? WHERE id=? AND attempt=?",(state,stamp(service.clock()),invitation,attempt))
 
     def cancel(self,actor,invitation):
         with self.operations.change(actor) as db:
             row=db.execute('SELECT * FROM initial_invitations WHERE id=?',(invitation,)).fetchone()
             if not row:raise HistoryError('招待が見つかりません。',404)
             if row['cancelled_at']:return
+            memberships=[tuple(r) for r in db.execute('SELECT organization_id,role FROM memberships WHERE user_id=?',(row['user_id'],))]
+            if memberships!=[(row['organization_id'],row['role'])]:raise HistoryError('所属・役割の変更を確認してください。',409)
             if db.execute('SELECT 1 FROM user_initial_setup WHERE user_id=? AND completed_at IS NOT NULL',(row['user_id'],)).fetchone():
                 raise HistoryError('設定済みUserは利用停止の操作を使ってください。',409)
             now=timestamp()

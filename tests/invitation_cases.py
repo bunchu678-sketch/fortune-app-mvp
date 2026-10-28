@@ -56,7 +56,7 @@ class InvitationCases(unittest.TestCase):
                 with self.auth.connection() as db:
                     for table in ('user_service_contracts','service_contract_terms','manual_dues','purchase_links'):
                         self.assertEqual(db.execute('SELECT count(*) FROM '+table+' WHERE user_id=?',(row['user_id'],)).fetchone()[0],0)
-            self.auth.logout(session)
+            self.assertEqual(self.call('POST','/api/auth/logout',{},'invited')[0],200)
             with self.assertRaises(AuthError):self.auth.authenticate(session)
             self.auth.login(row['email'],api.PASSWORD)
         self.assertTrue(all('token' not in row and 'password' not in row for row in self.rows()))
@@ -166,6 +166,42 @@ class InvitationCases(unittest.TestCase):
             rows=[tuple(row) for row in db.execute('SELECT * FROM initial_invitations')]
             self.assertNotIn(token,str(rows))
         self.assertNotIn(token,str(self.rows()))
+
+    def test_changed_membership_blocks_cancel_and_stale_delivery(self):
+        self.invite();row=self.rows()[0]
+        attempt=self.ops.invitations.queue(self.ids['admin'],row['id'],self.service,'synthetic')
+        self.ops.assign(self.ids['admin'],self.second,row['user_id'],'student',False,0)
+        with self.assertRaises(AuthError):
+            self.ops.invitations.cancel(self.ids['teacher'],row['id'])
+        from history_repository import HistoryError
+        with self.assertRaises(HistoryError):self.ops.invitations.cancel(self.ids['admin'],row['id'])
+        count=len(self.mail.messages)
+        with self.assertLogs('invitation_repository',level='ERROR'):self.ops.invitations.deliver(row['id'],attempt,self.service)
+        self.assertEqual(len(self.mail.messages),count)
+        with self.auth.connection() as db:
+            self.assertEqual(db.execute('SELECT status FROM users WHERE id=?',(row['user_id'],)).fetchone()[0],'active')
+
+    def test_completed_setup_skips_queued_worker_without_new_token(self):
+        self.invite();row=self.rows()[0]
+        attempt=self.ops.invitations.queue(self.ids['admin'],row['id'],self.service,'synthetic')
+        self.service.request(row['email']);self.complete()
+        count=len(self.mail.messages)
+        self.ops.invitations.deliver(row['id'],attempt,self.service)
+        self.assertEqual(len(self.mail.messages),count)
+        self.assertEqual(self.rows()[0]['setup_state'],'completed')
+
+    def test_cancel_during_send_preserves_fact_and_invalidates_link(self):
+        outer=self
+        class CancelDuringSend:
+            def send(self,message):
+                outer.mail.send(message)
+                row=outer.ops.invitations.list(outer.ids['admin'])[0]
+                outer.ops.invitations.cancel(outer.ids['admin'],row['id'])
+        self.service.mailer=CancelDuringSend()
+        self.invite();row=self.rows()[0]
+        self.assertEqual(row['delivery_state'],'provider_accepted')
+        self.assertEqual(row['setup_state'],'cancelled')
+        with self.assertRaises(AuthError):self.complete()
 
 
 if __name__=='__main__':unittest.main()
