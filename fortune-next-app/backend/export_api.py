@@ -12,6 +12,7 @@ from report_data import ReportError
 from report_export_service import export_reading
 from report_pdf import export_pdf_reading
 from pdf_converter import PdfConversionError
+from b2b_content_access import teacher_surface,export_authorizer
 
 router=APIRouter(prefix="/api/export")
 
@@ -22,7 +23,8 @@ async def excel_report(request: Request):
         owner=request_owner(request)
         payload=await request.json()
         repository=make_service().repository if isinstance(payload,dict) and "reading_id" in payload else None
-        filename,body=await run_in_threadpool(export_reading,owner,payload,repository,session_id=session_scope(request))
+        if teacher_surface() and repository is None:repository=make_service().repository
+        filename,body=await run_in_threadpool(export_reading,owner,payload,repository,session_id=session_scope(request),source_authorizer=export_authorizer(owner,repository))
         return Response(content=body,media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers={"Content-Disposition":"attachment; filename=\"reading-report.xlsx\"; filename*=UTF-8''"+quote(filename,safe=""),
                                  "Cache-Control":"no-store","X-Content-Type-Options":"nosniff"})
@@ -41,7 +43,8 @@ async def pdf_report(request: Request):
         owner=request_owner(request)
         payload=await request.json()
         repository=make_service().repository if isinstance(payload,dict) and "reading_id" in payload else None
-        filename,body=await run_in_threadpool(export_pdf_reading,owner,payload,repository,session_id=session_scope(request))
+        if teacher_surface() and repository is None:repository=make_service().repository
+        filename,body=await run_in_threadpool(export_pdf_reading,owner,payload,repository,session_id=session_scope(request),source_authorizer=export_authorizer(owner,repository))
         return Response(content=body,media_type="application/pdf",
                         headers={"Content-Disposition":"attachment; filename=\"reading-report.pdf\"; filename*=UTF-8''"+quote(filename,safe=""),
                                  "Cache-Control":"no-store","X-Content-Type-Options":"nosniff"})

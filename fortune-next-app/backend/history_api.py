@@ -43,10 +43,12 @@ async def listing(request: Request, keyword: str = "", start: str = "", end: str
 async def create(request: Request):
     def action(s,o,p):
         org=p.get("organization_id") if isinstance(p,dict) else None
+        from b2b_content_access import teacher_surface
+        if teacher_surface() and org is None:raise HistoryError('利用する教室を指定してください。',422)
         if org is not None:
             from product_api import identity,repositories
             identity(request)
-            if not isinstance(org,str) or not org: raise HistoryError("Organizationを確認してください。",422)
+            if not isinstance(org,str) or not org: raise HistoryError("教室を確認してください。",422)
             operations,_=repositories()
             operations.context(org,o)
         return s.create(o,p,organization_id=org)
@@ -55,7 +57,13 @@ async def create(request: Request):
 
 @router.post("/candidates")
 async def candidates(request: Request):
-    return await handle(request, lambda s, o, p: s.repository.candidates(o, validate_input({"form": p})), True)
+    def action(s,o,p):
+        from b2b_content_access import teacher_surface,require_organization
+        org=p.get('organization_id') if isinstance(p,dict) and teacher_surface() else None
+        if teacher_surface():
+            with s.repository.connection() as db:require_organization(db,o,org)
+        return s.repository.candidates(o,validate_input({'form':p}),org)
+    return await handle(request,action,True)
 
 
 @router.get("/groups/{group_id}/memos")

@@ -1,0 +1,43 @@
+server {
+    listen 80;
+    server_name mari-mutsuro.hakase-uranai.jp;
+    access_log off;
+    location ^~ /.well-known/acme-challenge/ { root /var/www/fortune-mari-acme; default_type text/plain; }
+    location / { return 301 https://mari-mutsuro.hakase-uranai.jp$request_uri; }
+}
+server {
+    listen 443 ssl;
+    server_name mari-mutsuro.hakase-uranai.jp;
+    include /etc/nginx/snippets/fortune-security-teacher.conf;
+    ssl_certificate /etc/letsencrypt/live/mari-mutsuro.hakase-uranai.jp/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mari-mutsuro.hakase-uranai.jp/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    access_log off;
+    client_max_body_size 10m;
+    location = /api/fortune { return 404; }
+    location = /api/fortune/ { return 404; }
+    location = / { return 302 /mypage; }
+    location = /product { return 302 /mypage; }
+    location = /product/ { return 302 /mypage; }
+    location = /operations { return 302 https://admin.hakase-uranai.jp$request_uri; }
+    location ^~ /operations/ { return 302 https://admin.hakase-uranai.jp$request_uri; }
+    location = /api/operations { return 404; }
+    location ^~ /api/operations/ { return 404; }
+    location /api/ {
+        proxy_pass http://127.0.0.1:8771;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+    location / {
+        proxy_pass http://127.0.0.1:3011;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+}

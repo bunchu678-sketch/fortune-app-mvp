@@ -550,7 +550,7 @@ export default function MainFortune({ mode, organizationId, organizationName }: 
         ...(organizationId ? { specificDatetimeEnabled: false } : {}) };
       if (!historyLink && user) {
         try {
-          const candidates = await historyRequest<PersonCandidate[]>("/candidates", { method: "POST", body: JSON.stringify(effectiveForm) });
+          const candidates = await historyRequest<PersonCandidate[]>("/candidates", { method: "POST", body: JSON.stringify({ ...effectiveForm, ...(organizationId ? { organization_id: organizationId } : {}) }) });
           if (candidates.length) { setPersonCandidates(candidates); return; }
         } catch (caught) {
           if (caught instanceof HistoryRequestError && (caught.status === 503 || caught.status === 401)) setHistoryHint(caught.message);
