@@ -43,7 +43,7 @@ SMTP未設定の公開APIは送信を拒否し、未設定のままUserを作ら
 | DB | `/var/lib/fortune-mari/history.sqlite3`を新規初期化。B2C原本へmigrationなし。初期User/Operatorは0件 |
 | API | `fortune-mari-api.service`、127.0.0.1:8771、health成功 |
 | Web | `fortune-mari-web.service`、127.0.0.1:3011、ログイン/初回設定ページ成功 |
-| 新サービス起動 | 手動起動で稼働。OS再起動時の自動起動は別途確認待ち |
+| 新サービス起動 | 本人の追加明示承認後、先生版Web/APIの2サービスだけをOS起動時に有効化。active/enabledを確認。VPS自体の再起動試験は未実施 |
 | 既存サービス | Web/API/nginxの状態とmaster PIDを維持。B2C Web/APIの停止・再起動なし |
 | 設定・秘密 | 所有者限定領域。秘密はGit・Notion・通常ログ・コマンド引数に出力しない |
 
@@ -90,3 +90,14 @@ SMTP設定・許可された試験1通の受付/本人の受信確認・本人Op
 Windows無人実行・バックアップ通知・対外的な保持説明は未完了。
 バックアップcron/Windowsタスクの登録・有効化は行わない。
 アプリのOS起動時有効化と、バックアップ自動運用の有効化は別の操作として管理する。
+
+### SMTP入力の案内
+
+本人から「SMTP設定が分からない」との回答を受け、Xserverの実際のサーバーパネルと
+[公式メール設定](https://www.xserver.ne.jp/manual/man_mail_setting.php)を照合した。
+SMTP hostにはパネル表示のホスト名、portには465、TLS方式にはsslを用いる。
+認証名はメールアドレス全体、パスワードはメールアカウント専用のもの。
+契約管理画面へのログインパスワードやWindowsのPINを使うものではない。
+本人Operatorの受信用メールと、Xserverの送信アカウントは役割が異なる。
+使用する送信元・本人の受信用メール・試験宛先は引き続き本人が指定し、推測しない。
+メールアカウントの新設・既存パスワードの変更・セキュリティ制限の解除は行っていない。
