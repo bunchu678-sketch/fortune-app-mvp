@@ -50,6 +50,7 @@ server {
     listen 80;
     listen [::]:80;
     server_name app.hakase-uranai.jp;
+    server_tokens off;
     return 404; # managed by Certbot
 
 

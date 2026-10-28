@@ -1,6 +1,7 @@
 server {
     listen 80;
     server_name mari-mutsuro.hakase-uranai.jp;
+    server_tokens off;
     access_log off;
     location ^~ /.well-known/acme-challenge/ { root /var/www/fortune-mari-acme; default_type text/plain; }
     location / { return 301 https://mari-mutsuro.hakase-uranai.jp$request_uri; }

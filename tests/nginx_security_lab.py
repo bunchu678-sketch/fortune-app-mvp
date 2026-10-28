@@ -2,6 +2,7 @@
 from pathlib import Path
 import http.client,json,os,re,socket,ssl,subprocess,sys,threading,time
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
+from urllib.parse import urlsplit
 
 ROOT=Path(__file__).resolve().parents[1]
 HOME=Path(sys.argv[1]).resolve();assert HOME.is_dir() and not HOME.is_symlink()
@@ -19,6 +20,7 @@ class Upstream(BaseHTTPRequestHandler):
             elif p in ('/api/auth/me','/api/history','/api/operations/invitations'):status=401
             elif p=='/api/export/excel':body=b'PK-synthetic-xlsx'
             else:body=b'{"ok":true}'
+        elif p=='/__absent':status=404
         self.send_response(status);self.send_header('Content-Type','text/html' if not p.startswith('/api/') else 'application/json')
         for k,v in [('X-Powered-By','fixture'),('X-Content-Type-Options','nosniff'),('Referrer-Policy','upstream-policy')]:self.send_header(k,v)
         if p.startswith('/api/'):self.send_header('Cache-Control','no-store')
@@ -95,6 +97,7 @@ http {{ access_log off; client_body_temp_path {LAB}/client; proxy_temp_path {LAB
             status,h,body=request(role,path);headers(role,h,role+path)
             if path=='/api/auth/me':verify(role+' 401/cookie/no-store',status==401 and h.get('cache-control')==['no-store'] and h.get('set-cookie')==['synthetic_session=fixture; Path=/; Secure; HttpOnly; SameSite=Lax'])
             if path=='/api/probe403':verify(role+' representative denial',status==(404 if role=='admin' else 403))
+            if path=='/__absent':verify(role+' 404 response',status==404)
         status,h,body=request(role,'/api/export/excel','POST');headers(role,h,role+' download')
         verify(role+' download routing',status==(404 if role=='admin' else 200))
         if role!='admin':verify(role+' download unchanged',body==b'PK-synthetic-xlsx' and h['content-disposition']==['attachment; filename="synthetic.xlsx"'] and h['cache-control']==['no-store'])
@@ -104,7 +107,8 @@ http {{ access_log off; client_body_temp_path {LAB}/client; proxy_temp_path {LAB
     verify('teacher scoped fortune routing retained',request('teacher','/api/b2b/organizations/synthetic/fortune','POST')[0]==200)
     verify('teacher operations API blocked',request('teacher','/api/operations/invitations')[0]==404)
     verify('teacher operations admin redirect',request('teacher','/operations')[1].get('location')==['https://admin.hakase-uranai.jp/operations'])
-    verify('teacher root and legacy input go to member entry',all(request('teacher',path)[1].get('location')==['https://mari-mutsuro.hakase-uranai.jp/mypage'] for path in ('/','/product','/product/')))
+    redirects=[urlsplit(request('teacher',path)[1]['location'][0]) for path in ('/','/product','/product/')]
+    verify('teacher root and legacy input go to member entry',all(u.hostname==DOMAINS['teacher'] and u.path=='/mypage' and u.scheme=='https' for u in redirects))
     verify('admin non-management API blocked',request('admin','/api/history')[0]==404)
     for role in ('teacher','admin'):
         status,h,body=request(role,'/.well-known/acme-challenge/synthetic',tls=False);verify(role+' ACME reachable over HTTP',status==200 and body==b'synthetic-challenge')
