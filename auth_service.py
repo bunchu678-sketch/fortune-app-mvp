@@ -153,6 +153,18 @@ class AuthRepository:
                            (timestamp(), row["id"]))
             return public_user(row)
 
+    def create_setup_user(self, email):
+        """Explicit operator bootstrap only; random internal secret never leaves this method."""
+        normalized=normalized_email(email);encoded=password_hash(secrets.token_urlsafe(48))
+        now=timestamp();owner=str(uuid4())
+        try:
+            with self.connection() as db:
+                db.execute('BEGIN IMMEDIATE')
+                db.execute('INSERT INTO users VALUES (?,?,?,?,?,?,?)',(owner,email.strip(),normalized,encoded,'active',now,now))
+                db.execute('INSERT INTO user_initial_setup VALUES (?,NULL)',(owner,))
+        except sqlite3.IntegrityError:raise AuthError('同じメールアドレスは登録済みです。',409) from None
+        return {'id':owner,'setup_pending':True}
+
     def admit_login(self, email, ip, settings, now):
         # Do not trust request headers for IP identity. Persist budgets across workers/restarts.
         ip_key = token_hash(ip)

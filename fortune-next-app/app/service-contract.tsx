@@ -3,7 +3,7 @@ import { useState } from "react";
 import { accountLabel, productRequest, useProductData } from "./product-client";
 import { savedTime } from "./history-client";
 
-type Contract = { state: string; activated_at: string | null; monthly_fee: number | null;
+type Contract = { state: string; access_mode?: string; activated_at: string | null; monthly_fee: number | null;
   first_billing_date: string | null; next_billing_date: string | null; paid_through: string | null;
   suspended_at: string | null; cancellation_requested_at: string | null; access_ends_at: string | null;
   deletion_due_at: string | null; recovered_at: string | null; cancellation_needs_review: boolean; deletion_hold: boolean;
@@ -27,7 +27,8 @@ export default function ServiceContractPanel({ organizationId, ownerId }: { orga
   const value = result.data;
   return <section className="serviceContract"><h3>{operator ? "利用契約・請求・保持" : "自分の利用契約"}</h3>
     {result.error || error ? <p role="alert">{error || result.error}</p> : null}{message ? <p role="status">{message}</p> : null}
-    {value?.state ? <><dl><dt>利用契約の状態</dt><dd>{accountLabel(value.state)}</dd>
+    {value?.access_mode === "free_trial" ? <p>無料試用中です。初期費用0円・月額0円で、自動請求はありません。正式契約や料金変更は運営へご確認ください。</p> : null}
+    {value?.state && value.access_mode !== "free_trial" ? <><dl><dt>利用契約の状態</dt><dd>{accountLabel(value.state)}</dd>
       <dt>利用開始日</dt><dd>{time(value.activated_at)}</dd><dt>月額利用・保守費</dt><dd>{value.monthly_fee === null ? "未確認" : `${value.monthly_fee}円`}</dd>
       <dt>初回請求起算日</dt><dd>{value.first_billing_date || "未確認"}</dd><dt>次回請求起算日</dt><dd>{value.next_billing_date || "予定なし"}</dd>
       <dt>支払済み期間の末日</dt><dd>{value.paid_through || "未確認"}</dd><dt>休止開始日</dt><dd>{time(value.suspended_at)}</dd>

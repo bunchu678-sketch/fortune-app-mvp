@@ -145,6 +145,43 @@ def queue_setup(o,actor,owner,email,service,background,ip):
     return "queued"
 
 
+@router.get('/api/operations/invitations')
+async def invitations(request:Request):
+    return await handle(request,lambda o,e,u,p:o.invitations.list(u['id']))
+
+
+@router.post('/api/operations/invitations')
+async def invitation_create(request:Request,background:BackgroundTasks):
+    def action(o,e,u,p):
+        if p.get('recipient_confirmed') is not True:raise HistoryError('送信先を確認してください。',422)
+        service=invite_service(request)
+        if service is None:raise AuthError('初回設定メールは未設定です。',503)
+        # Validate explicit HTTPS origin/config before creating a real User.
+        from password_reset_service import trusted_origin
+        trusted_origin(service.public_origin,development=not service.settings.production)
+        key=o.invitations.create(u['id'],p['organization_id'],p['alias'],p['role'],p['email'],free_trial_confirmed=p.get('free_trial_confirmed'))
+        attempt=o.invitations.queue(u['id'],key,service,request.client.host if request.client else 'unknown')
+        background.add_task(o.invitations.deliver,key,attempt,service)
+        return {'id':key,'delivery_state':'queued','mailbox_delivery_confirmed':False}
+    return await handle(request,action,True)
+
+
+@router.post('/api/operations/invitations/{invitation}/resend')
+async def invitation_resend(invitation:str,request:Request,background:BackgroundTasks):
+    def action(o,e,u,p):
+        if p.get('recipient_confirmed') is not True:raise HistoryError('送信先を確認してください。',422)
+        service=invite_service(request)
+        attempt=o.invitations.queue(u['id'],invitation,service,request.client.host if request.client else 'unknown')
+        background.add_task(o.invitations.deliver,invitation,attempt,service)
+        return {'delivery_state':'queued','mailbox_delivery_confirmed':False}
+    return await handle(request,action,True)
+
+
+@router.post('/api/operations/invitations/{invitation}/cancel')
+async def invitation_cancel(invitation:str,request:Request):
+    return await handle(request,lambda o,e,u,p:o.invitations.cancel(u['id'],invitation),True)
+
+
 @router.post("/api/operations/users")
 async def issue(request:Request,background:BackgroundTasks):
     def action(o,e,u,p):

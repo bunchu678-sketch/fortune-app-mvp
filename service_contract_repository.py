@@ -96,6 +96,12 @@ class ServiceContractRepository:
             with self.auth.connection() as db:
                 return self.summary(org, owner, now, connection=db)
         db = connection; now = utc(now)
+        from invitation_repository import trial_access
+        if (not db.execute('SELECT 1 FROM user_service_contracts WHERE organization_id=? AND user_id=?',(org,owner)).fetchone()
+            and trial_access(db,org,owner)):
+            self.operations.member_access(db,org,owner)
+            return {'organization_id':org,'state':'trial','access_mode':'free_trial','monthly_fee':0,
+                    'first_billing_date':None,'next_billing_date':None,'paid_through':None,'automatic_actions_enabled':False}
         contract = self.contract(db, org, owner)
         value = terms(db, org, owner) or dict.fromkeys(['activated_at','paid_through','suspended_at',
             'cancellation_requested_at','access_ends_at','recovered_at','purged_at','last_reminded_at'])

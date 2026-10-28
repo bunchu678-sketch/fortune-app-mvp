@@ -46,6 +46,8 @@ class OperationsRepository:
         self.services = ServiceContractRepository(self)
         from retention_repository import RetentionRepository
         self.retention = RetentionRepository(self)
+        from invitation_repository import InvitationRepository
+        self.invitations = InvitationRepository(self)
 
     @staticmethod
     def require_admin(db, actor):
@@ -90,6 +92,9 @@ class OperationsRepository:
             raise AuthError("利用権限がありません。",403)
         if context.role == "student":
             row=db.execute("SELECT state,initial_payment_confirmed FROM user_service_contracts WHERE organization_id=? AND user_id=?",(org,owner)).fetchone()
+            if row is None:
+                from invitation_repository import trial_access
+                if trial_access(db,org,owner):return context
             if not row or row["state"]!="active" or not row["initial_payment_confirmed"]:
                 raise AuthError("利用契約を確認してください。",403)
             from service_contract_repository import terms, effective_state
@@ -213,7 +218,7 @@ class OperationsRepository:
             value["memberships"]=[dict(r) for r in db.execute("""SELECT m.organization_id,m.role,o.display_name,c.state AS contract_state,
                 c.initial_payment_confirmed,c.monthly_fee,c.minimum_term_until FROM memberships m JOIN organizations o ON o.id=m.organization_id
                 LEFT JOIN user_service_contracts c ON c.organization_id=m.organization_id AND c.user_id=m.user_id WHERE m.user_id=?""",(owner,))]
-            value["service_contracts"]=[self.services.summary(m["organization_id"],owner,connection=db) for m in value["memberships"] if m["role"]=="student"]
+            value["service_contracts"]=[self.services.summary(m["organization_id"],owner,connection=db) for m in value["memberships"] if m["role"]=="student" and m["contract_state"] is not None]
             value["dues"]=[dict(r) for r in db.execute("SELECT id,organization_id,due_date,amount,confirmed_at,settled_at FROM manual_dues WHERE user_id=? ORDER BY due_date",(owner,))]
             return value
 

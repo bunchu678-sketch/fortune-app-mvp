@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -42,6 +43,12 @@ app.include_router(password_reset_router)
 app.include_router(history_router)
 app.include_router(export_router)
 app.include_router(product_router)
+
+# Opt-in only. No environment value selects live mail by default. An invalid
+# explicit configuration stops startup instead of silently pretending to send.
+if os.environ.get('FORTUNE_RESET_MAIL_CONFIG'):
+    from password_reset_configuration import configured_service
+    app.state.password_reset_service=configured_service(os.environ['FORTUNE_RESET_MAIL_CONFIG'])
 
 
 @app.get("/api/export-capabilities")

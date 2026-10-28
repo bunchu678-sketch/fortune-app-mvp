@@ -1,5 +1,6 @@
 """Password reset tokens and application service; no automatic live mail wiring."""
 from datetime import datetime, timezone
+from contextlib import nullcontext
 import hmac
 import logging
 import secrets
@@ -45,10 +46,10 @@ class PasswordResetRepository:
                 raise AuthError("しばらく時間をおいて再度お試しください。",429)
             db.execute("INSERT INTO password_reset_attempts VALUES (?,?,?,?,?)",(str(uuid4()),operation,ip_key,account_key,now))
 
-    def issue(self, email, now):
+    def issue(self, email, now, *, connection=None):
         raw_token=secrets.token_urlsafe(32)
-        with self.auth.connection() as db:
-            db.execute("BEGIN IMMEDIATE")
+        with nullcontext(connection) if connection is not None else self.auth.connection() as db:
+            if not db.in_transaction: db.execute("BEGIN IMMEDIATE")
             user=db.execute("""SELECT u.* FROM users u LEFT JOIN user_account_lifecycle l ON l.user_id=u.id
                 WHERE normalized_email=? AND u.status='active' AND COALESCE(l.state,'active')='active'""",(email,)).fetchone()
             if not user: return None
@@ -95,20 +96,26 @@ class PasswordResetService:
         self.repository.admit("request",email,ip,self.settings,self.clock())
         return email
 
-    def deliver(self, normalized):
+    def message(self,email,token,*,initial=False):
+        link=trusted_origin(self.public_origin,development=not self.settings.production)+"/reset-password#token="+token
+        subject="初回パスワード設定" if initial else "パスワード再設定"
+        return TextMail(email,subject,f"30分以内に次のリンクからパスワードを設定してください。\n{link}\n心当たりがない場合は、このメールを無視してください。")
+
+    def deliver(self, normalized, *, initial=False):
         # Called after the HTTP response. Live SMTP latency/failure must not reveal account existence.
         issued=None
         try:
             issued=self.repository.issue(normalized,self.clock())
             if issued:
                 email,token=issued
-                link=trusted_origin(self.public_origin,development=not self.settings.production)+"/reset-password#token="+token
-                self.mailer.send(TextMail(email,"パスワード再設定",f"30分以内に次のリンクからパスワードを再設定してください。\n{link}\n心当たりがない場合は、このメールを無視してください。"))
+                self.mailer.send(self.message(email,token,initial=initial))
+            return bool(issued)
         except Exception:
             if issued:
                 try: self.repository.revoke(issued[1],self.clock())
                 except Exception: pass
             logging.getLogger(__name__).error("Password reset delivery unavailable")
+            return False
 
     def request(self,email,ip="local-test"):
         normalized=self.admit_request(email,ip); self.deliver(normalized)

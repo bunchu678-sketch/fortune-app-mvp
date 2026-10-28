@@ -7,6 +7,7 @@ import { savedTime } from "../history-client";
 import "../management.css";
 import ServiceContractPanel from "../service-contract";
 import PurchaseRetentionPanel, { UserRetentionPanel } from "./retention-controls";
+import InvitationsPanel from "./invitations-panel";
 
 type Member = { user_id: string; display_name: string | null; email: string; role: string; account_state: string };
 type OrgDetail = Organization & { logo_reference: string | null; members: Member[]; teacher_contracts: Array<{ id: string; state: string }> };
@@ -46,6 +47,7 @@ export default function OperationsView({ view = "list", id = "" }: { view?: "lis
       {result.loading ? <p role="status">確認中…</p> : null}{result.error ? <p role="alert">{result.error}</p> : null}
       {failure ? <p role="alert">{failure}</p> : null}{message ? <p role="status">{message}</p> : null}
       {result.data ? <>
+        {view !== "user" ? <InvitationsPanel organizations={organizations.data || []} organizationId={view === "organization" ? id : ""} /> : null}
         {view === "list" ? <>
           <section><h2>Organization一覧</h2><ul>{(result.data as Organization[]).map(item => <li key={item.id}>
             <Link href={"/operations/organizations/" + item.id}>{item.display_name}</Link>　生徒{item.students}名／今月{item.executions_this_month}件／累計{item.executions_total}件
