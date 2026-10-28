@@ -123,12 +123,17 @@ class SecurityScopeCases(unittest.TestCase):
         self.assertEqual(candidates,[])
 
     def test_teacher_own_history_and_collaboration_end_preserve_student_access(self):
-        self.ops.teacher_contract(self.ids['admin'],self.org,'terminated')
-        self.assertEqual(self.fortune()[0],200)
         self.assertEqual(self.fortune(who='teacher')[0],200)
         value=self.data('POST','/api/history',self.payload(self.org),who='teacher')
         self.assertEqual(self.call('POST','/api/export/excel',{'reading_id':value['id']},who='teacher')[0],200)
         self.assertEqual(self.call('GET',f"/api/history/{self.scoped['id']}",who='teacher')[0],404)
+        self.ops.teacher_contract(self.ids['admin'],self.org,'terminated')
+        self.assertEqual(self.fortune()[0],200)
+        # Existing proposal stores collaboration state separately. Do not select a
+        # new automatic transition policy here; revoked teacher membership must deny.
+        with self.auth.connection() as db:db.execute("UPDATE memberships SET role='revoked' WHERE organization_id=? AND user_id=?",(self.org,self.ids['teacher']))
+        self.assertEqual(self.fortune(who='teacher')[0],403)
+        self.assertEqual(self.fortune()[0],200)
 
     def test_admin_boundary_stays_closed_and_combined_anonymous_calculation_survives(self):
         self.use('admin')
