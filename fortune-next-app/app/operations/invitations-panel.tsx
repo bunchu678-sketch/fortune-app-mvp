@@ -9,7 +9,7 @@ const setup:Record<string,string>={pending:"初回設定待ち",completed:"初�
 
 export default function InvitationsPanel({organizations,organizationId=""}:{organizations:Organization[];organizationId?:string}) {
   const invitations=useProductData<Invitation[]>("/api/operations/invitations");
-  const [org,setOrg]=useState(organizationId),[alias,setAlias]=useState("mari"),[role,setRole]=useState("teacher"),[email,setEmail]=useState("");
+  const [org,setOrg]=useState(organizationId),[alias,setAlias]=useState(""),[role,setRole]=useState("teacher"),[email,setEmail]=useState("");
   const [confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[failure,setFailure]=useState("");
   useEffect(()=>{const timer=window.setInterval(()=>void invitations.reload(),10000);return()=>window.clearInterval(timer);},[invitations.reload]);
   async function action(path:string,body:object) {
@@ -26,10 +26,11 @@ export default function InvitationsPanel({organizations,organizationId=""}:{orga
   // The parent renders this section only after an Operator API succeeds.
   if(invitations.error)return <section><h2>ユーザー招待</h2><p role="alert">{invitations.error}</p></section>;
   return <section aria-label="ユーザー招待"><h2>ユーザー招待</h2>
-    <p>メールアドレスはミーティングで本人に確認して入力します。送信前にはアカウントや初回設定リンクを作りません。</p>
+    <p>招待する本人のメールアドレスを確認して入力します。送信前にはアカウントや初回設定リンクを作りません。</p>
+    <p>名前は管理用です。ログインIDはメールアドレスです。</p>
     <p>今回の無料試用は初期費用0円・月額0円です。入金記録・購入証明・自動請求は作成しません。将来の料金変更は別途確認します。</p>
     <form onSubmit={submit}>
-      <label>招待予定<select value={alias} onChange={event=>{setAlias(event.target.value);setRole(event.target.value==="mari"?"teacher":"student");setEmail("");}}><option value="mari">mari（先生）</option><option value="akina">akina（生徒）</option></select></label>
+      <label>招待対象の名前<input required maxLength={64} autoComplete="off" value={alias} onChange={event=>{setAlias(event.target.value);setEmail("");setConfirmed(false);}} /></label>
       <label>利用者の役割<select value={role} onChange={event=>setRole(event.target.value)}><option value="teacher">Teacher（先生）</option><option value="student">Student（生徒）</option></select></label>
       <label>所属Organization<select required value={org} onChange={event=>setOrg(event.target.value)}><option value="">所属先を選択</option>{organizations.map(item=><option key={item.id} value={item.id}>{item.display_name}</option>)}</select></label>
       <label>メールアドレス<input type="email" required maxLength={254} autoComplete="off" value={email} onChange={event=>setEmail(event.target.value)} /></label>

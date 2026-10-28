@@ -22,11 +22,13 @@ def private_file(value):
     return path
 
 
-def configured_service(path,auth=None):
+def configured_service(path,auth=None,*,expected_origin=None):
     try:
         config=json.loads(private_file(path).read_bytes())
         settings=AuthSettings.load()
-        origin=trusted_origin(settings.public_origin)
+        # A distinct invitation target is allowed only through explicit trusted
+        # deployment configuration, never a request Host/Origin or user input.
+        origin=trusted_origin(settings.public_origin if expected_origin is None else expected_origin)
         if config['public_origin']!=origin or config['security'] not in ('ssl','starttls'):
             raise ValueError()
         password=private_file(config['password_file']).read_text().rstrip('\r\n')

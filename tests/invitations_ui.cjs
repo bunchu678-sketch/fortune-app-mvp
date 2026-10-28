@@ -27,7 +27,7 @@ try{
    if(p==='/api/operations/organizations')return fulfill([{id:'synthetic-org',display_name:'合成先生教室',slug:'synthetic',students:0,executions_this_month:0,executions_total:0}]);
    if(p==='/api/operations/invitations'&&request.method()==='POST'){
     const body=request.postDataJSON();assert.equal(body.recipient_confirmed,true);assert.equal(body.free_trial_confirmed,true);assert.equal(body.organization_id,'synthetic-org');
-    assert(!('password' in body));sent++;
+    assert(!('password' in body));assert.equal(body.alias,sent===0?'teacher-custom-42':'合成 生徒 2026');assert.equal(body.role,sent===0?'teacher':'student');sent++;
     invitations.push({id:'invite-'+sent,organization_id:body.organization_id,alias:body.alias,role:body.role,email:body.email,delivery_state:'provider_accepted',setup_state:'pending',expires_at:null,mailbox_delivery_confirmed:false});
     return fulfill({id:'invite-'+sent,delivery_state:'queued'});
    }
@@ -40,15 +40,18 @@ try{
   await page.goto(base+'/operations');
   const panel=page.getByRole('region',{name:'ユーザー招待'});
   await panel.getByRole('heading',{name:'ユーザー招待',exact:true}).waitFor();
-  await check(width+' no address required before meeting',async()=>{assert.equal(await panel.getByLabel('メールアドレス',{exact:true}).inputValue(),'');assert.equal(sent,0);});
+  await check(width+' no name/address precreated',async()=>{assert.equal(await panel.getByLabel('招待対象の名前').inputValue(),'');assert.equal(await panel.getByLabel('メールアドレス',{exact:true}).inputValue(),'');assert.equal(sent,0);});
+  await panel.getByLabel('招待対象の名前').fill('teacher-custom-42');
   await panel.getByLabel('所属Organization').selectOption('synthetic-org');
   await panel.getByLabel('メールアドレス',{exact:true}).fill('teacher.synthetic@example.test');
   await panel.getByRole('checkbox').check();
   await panel.getByRole('button',{name:'招待メールを送信',exact:true}).click();
   await check(width+' teacher invitation accepted honestly',()=>panel.getByText('メール：送信受付済み（到達未確認）／設定：初回設定待ち').waitFor());
-  await panel.getByLabel('招待予定').selectOption('akina');
-  await check(width+' student selection clears old recipient',async()=>{assert.equal(await panel.getByLabel('メールアドレス',{exact:true}).inputValue(),'');assert.equal(await panel.getByLabel('利用者の役割').inputValue(),'student');});
+  await panel.getByLabel('招待対象の名前').fill('合成 生徒 2026');
+  await check(width+' changing free name clears recipient and confirmation',async()=>{assert.equal(await panel.getByLabel('メールアドレス',{exact:true}).inputValue(),'');assert.equal(await panel.getByRole('checkbox').isChecked(),false);});
+  await panel.getByLabel('利用者の役割').selectOption('student');
   await panel.getByLabel('メールアドレス',{exact:true}).fill('student.synthetic@example.test');
+  await panel.getByRole('checkbox').check();
   await panel.getByRole('button',{name:'招待メールを送信',exact:true}).click();
   await check(width+' student invitation',()=>panel.getByText('student.synthetic@example.test',{exact:false}).last().waitFor());
   await panel.getByRole('button',{name:'招待を再送信',exact:true}).first().click();

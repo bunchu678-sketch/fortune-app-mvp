@@ -16,14 +16,14 @@ class InvitationConfigurationCases(unittest.TestCase):
         self.path=self.root/'config.json'
         self.config={'public_origin':'https://teacher.example.test','host':'smtp.example.test','port':465,
           'security':'ssl','username':'synthetic','sender':'operator@example.test','password_file':str(self.secret)}
-        self.environment=patch.dict(os.environ,{'FORTUNE_ENV':'production','FORTUNE_PUBLIC_ORIGIN':'https://teacher.example.test'})
+        self.environment=patch.dict(os.environ,{'FORTUNE_ENV':'production','FORTUNE_PUBLIC_ORIGIN':'https://teacher.example.test','FORTUNE_HISTORY_DB_PATH':str(self.root/'synthetic.sqlite3')})
         self.environment.start();self.addCleanup(self.environment.stop)
-    def build(self):
+    def build(self,**options):
         self.path.write_text(json.dumps(self.config))
         # Production Linux ownership checks are separate; fixtures are Windows
         # temp files and contain disposable credentials only.
         with patch('password_reset_configuration.private_file',side_effect=lambda value:Path(value)):
-            return configured_service(self.path,auth=object())
+            return configured_service(self.path,auth=object(),**options)
     def test_explicit_tls_and_sender_construct_transport_without_connection(self):
         with patch('smtplib.SMTP_SSL') as transport:
             service=self.build()
@@ -41,6 +41,31 @@ class InvitationConfigurationCases(unittest.TestCase):
         with self.assertRaises(AuthError) as error:self.build()
         self.assertNotIn('synthetic-credential-only',str(error.exception))
         with self.assertRaises(AuthError):private_file('relative-secret')
+
+    def test_admin_reset_and_explicit_teacher_invitation_have_distinct_origins(self):
+        os.environ['FORTUNE_PUBLIC_ORIGIN']='https://admin.example.test'
+        with self.assertRaises(AuthError):self.build()
+        invitation=self.build(expected_origin='https://teacher.example.test')
+        self.assertTrue(invitation.message('student@example.test','synthetic',initial=True).body.startswith('30分以内'))
+        self.assertIn('https://teacher.example.test/reset-password#token=',invitation.message('student@example.test','synthetic').body)
+        self.config['public_origin']='https://admin.example.test'
+        administrator=self.build()
+        self.assertIn('https://admin.example.test/reset-password#token=',administrator.message('admin@example.test','synthetic').body)
+        with self.assertRaises(AuthError):self.build(expected_origin='http://teacher.example.test')
+
+    def test_server_loads_separate_explicit_services_without_smtp_connection(self):
+        from tier_b import api_app
+        api_app.cache_clear();self.addCleanup(api_app.cache_clear)
+        invitation=self.root/'invitation.json';invitation.write_text(json.dumps(self.config))
+        self.config['public_origin']='https://admin.example.test';self.path.write_text(json.dumps(self.config))
+        with patch.dict(os.environ,{'FORTUNE_PUBLIC_ORIGIN':'https://admin.example.test','FORTUNE_DEPLOYMENT_SURFACE':'admin',
+            'FORTUNE_RESET_MAIL_CONFIG':str(self.path),'FORTUNE_INVITATION_MAIL_CONFIG':str(invitation),
+            'FORTUNE_INVITATION_PUBLIC_ORIGIN':'https://teacher.example.test'}),patch('password_reset_configuration.private_file',side_effect=lambda value:Path(value)),patch('smtplib.SMTP_SSL') as transport:
+            app=api_app()
+            self.assertEqual(app.state.password_reset_service.public_origin,'https://admin.example.test')
+            self.assertEqual(app.state.invitation_service.public_origin,'https://teacher.example.test')
+            self.assertEqual(app.state.invitation_service.repository.auth.path,self.root/'synthetic.sqlite3')
+            transport.assert_not_called()
 
 
 if __name__=='__main__':unittest.main()

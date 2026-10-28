@@ -130,7 +130,7 @@ async def resume(owner:str,request:Request):
 
 
 def invite_service(request):
-    service=getattr(request.app.state,"password_reset_service",None)
+    service=getattr(request.app.state,"invitation_service",getattr(request.app.state,"password_reset_service",None))
     if service is None or service.mailer is None or service.public_origin is None:return None
     if service.repository.auth.path.resolve()!=database_path().resolve():raise AuthError("メール設定を確認してください。",503)
     return service

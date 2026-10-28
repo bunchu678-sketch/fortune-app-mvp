@@ -35,9 +35,11 @@ from proxy_settings import proxy_settings
 from password_reset_api import router as password_reset_router
 from product_api import router as product_router
 from fortune_endpoint import calculation
+from deployment_boundary import DeploymentBoundary
 
 app = FastAPI()
 app.add_middleware(AuthBoundary)
+app.add_middleware(DeploymentBoundary,surface=os.environ.get('FORTUNE_DEPLOYMENT_SURFACE','combined'))
 app.include_router(auth_router)
 app.include_router(password_reset_router)
 app.include_router(history_router)
@@ -49,6 +51,13 @@ app.include_router(product_router)
 if os.environ.get('FORTUNE_RESET_MAIL_CONFIG'):
     from password_reset_configuration import configured_service
     app.state.password_reset_service=configured_service(os.environ['FORTUNE_RESET_MAIL_CONFIG'])
+
+if os.environ.get('FORTUNE_INVITATION_MAIL_CONFIG'):
+    from password_reset_configuration import configured_service
+    # The admin's own reset links use its origin; invitations explicitly target
+    # the teacher/student site. No domain is inferred from request headers.
+    app.state.invitation_service=configured_service(os.environ['FORTUNE_INVITATION_MAIL_CONFIG'],
+        expected_origin=os.environ['FORTUNE_INVITATION_PUBLIC_ORIGIN'])
 
 
 @app.get("/api/export-capabilities")
