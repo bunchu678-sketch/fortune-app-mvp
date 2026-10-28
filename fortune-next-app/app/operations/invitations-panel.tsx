@@ -31,8 +31,8 @@ export default function InvitationsPanel({organizations,organizationId=""}:{orga
     <p>今回の無料試用は初期費用0円・月額0円です。入金記録・購入証明・自動請求は作成しません。将来の料金変更は別途確認します。</p>
     <form onSubmit={submit}>
       <label>招待対象の名前<input required maxLength={64} autoComplete="off" value={alias} onChange={event=>{setAlias(event.target.value);setEmail("");setConfirmed(false);}} /></label>
-      <label>利用者の役割<select value={role} onChange={event=>setRole(event.target.value)}><option value="teacher">Teacher（先生）</option><option value="student">Student（生徒）</option></select></label>
-      <label>所属Organization<select required value={org} onChange={event=>setOrg(event.target.value)}><option value="">所属先を選択</option>{organizations.map(item=><option key={item.id} value={item.id}>{item.display_name}</option>)}</select></label>
+      <label>利用者の役割<select value={role} onChange={event=>setRole(event.target.value)}><option value="teacher">先生</option><option value="student">生徒</option></select></label>
+      <label>所属する教室・講師名<select required value={org} onChange={event=>setOrg(event.target.value)}><option value="">所属先を選択</option>{organizations.map(item=><option key={item.id} value={item.id}>{item.display_name}</option>)}</select></label>
       <label>メールアドレス<input type="email" required maxLength={254} autoComplete="off" value={email} onChange={event=>setEmail(event.target.value)} /></label>
       <label className="check"><input type="checkbox" required checked={confirmed} onChange={event=>setConfirmed(event.target.checked)} />この方の無料試用と、役割・所属・送信先を確認しました</label>
       <button disabled={busy||!confirmed}>招待メールを送信</button>

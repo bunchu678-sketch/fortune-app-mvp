@@ -42,12 +42,12 @@ export default function ServiceContractPanel({ organizationId, ownerId }: { orga
         <p>督促予定：{time(value.arrears?.next_reminder_at)}／自動送信は無効です。</p>
         <div className="managementActions"><button disabled={busy || Boolean(value.activated_at) || value.state !== "active"} onClick={() => {
           if (window.confirm("実際に利用資格が有効になったことを確認しましたか？現在日時を記録し、過去の日付は補完しません。")) void change("activate"); }}>利用開始を確認</button>
-          <button disabled={busy || value.state !== "active" || Boolean(value.cancellation_requested_at)} onClick={() => { if (window.confirm("このOrganizationの利用だけを休止しますか？他の所属先とB2Cは維持します。")) void change("suspend"); }}>この契約を休止</button>
+          <button disabled={busy || value.state !== "active" || Boolean(value.cancellation_requested_at)} onClick={() => { if (window.confirm("この教室・講師のアプリ利用だけを休止しますか？他の所属先と一般向けアプリは維持します。")) void change("suspend"); }}>この契約を休止</button>
           <button disabled={busy || value.state !== "suspended" || Boolean(value.cancellation_requested_at)} onClick={() => { if (window.confirm("この契約の未納全額精算を確認し、再開後は原則2か月継続しますか？")) void change("resume"); }}>この契約を再開</button></div>
         <form onSubmit={e => { e.preventDefault(); const form = new FormData(e.currentTarget);
           if (window.confirm("入金確認済みの支払期間を記録しますか？")) void change("paid-period", { paid_through: form.get("paid_through") }); }}>
           <label>確認した支払済み期間末日<input name="paid_through" type="date" required /></label><button disabled={busy || Boolean(value.access_ends_at)}>支払済み期間を記録</button></form>
-        {value.deletion_plan ? <p>削除ドライラン：対象履歴{value.deletion_plan.reading_ids.length}件／{value.deletion_plan.can_delete ? "期限到達・依存なし" : "未到達または要確認"}。物理削除の実行操作はありません。</p> : null}
+        {value.deletion_plan ? <p>削除前の確認：対象履歴{value.deletion_plan.reading_ids.length}件／{value.deletion_plan.can_delete ? "期限到達・依存なし" : "未到達または要確認"}。物理削除の実行操作はありません。</p> : null}
       </> : null}
       <div className="managementActions"><button disabled={busy || Boolean(value.access_ends_at)} onClick={() => {
         if (window.confirm("正式解約を申請しますか？支払済み期間末日まで利用できます。利用終了後のデータ保持は30日です。")) void change("cancellation"); }}>{operator ? "正式解約を受付・確認" : "正式解約を申請"}</button>

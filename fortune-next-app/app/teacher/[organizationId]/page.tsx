@@ -14,7 +14,7 @@ export default function TeacherPage() {
       {data ? <><h2>{data.display_name}</h2>
         <section className="memberStart" aria-label="鑑定の入口"><h2>鑑定を始める</h2><p>所属先の先生版で、ご自身の鑑定を行います。</p>
           <Link className="memberStartButton" href={"/b2b/" + org} aria-label={data.display_name + "で鑑定を始める"}>鑑定を始める</Link></section>
-        <section><h2>Organization全体の利用状況</h2>
+        <section><h2>教室全体の利用状況</h2>
         <dl><dt>今月の鑑定実行件数</dt><dd>{data.executions_this_month}件</dd><dt>累計鑑定実行件数</dt><dd>{data.executions_total}件</dd></dl>
         <p>先生ご本人の鑑定実行も含みます。今月は日本時間で集計します。</p></section>
         <section><h2>生徒一覧</h2>{!data.students.length ? <p>生徒は登録されていません。</p> : <ul>{data.students.map((item, index) =>

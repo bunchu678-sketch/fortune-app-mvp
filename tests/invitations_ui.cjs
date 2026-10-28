@@ -42,7 +42,7 @@ try{
   await panel.getByRole('heading',{name:'ユーザー招待',exact:true}).waitFor();
   await check(width+' no name/address precreated',async()=>{assert.equal(await panel.getByLabel('招待対象の名前').inputValue(),'');assert.equal(await panel.getByLabel('メールアドレス',{exact:true}).inputValue(),'');assert.equal(sent,0);});
   await panel.getByLabel('招待対象の名前').fill('teacher-custom-42');
-  await panel.getByLabel('所属Organization').selectOption('synthetic-org');
+  await panel.getByLabel('所属する教室・講師名').selectOption('synthetic-org');
   await panel.getByLabel('メールアドレス',{exact:true}).fill('teacher.synthetic@example.test');
   await panel.getByRole('checkbox').check();
   await panel.getByRole('button',{name:'招待メールを送信',exact:true}).click();
