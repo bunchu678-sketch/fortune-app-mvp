@@ -20,27 +20,32 @@ class ExportTokens:
         for token,entry in list(self.entries.items()):
             if entry[0]<=now:self.entries.pop(token)
 
-    def issue(self, owner, form, result, session_id=None):
+    def issue(self, owner, form, result, session_id=None, organization_id=None):
         with self.lock:
             self._expire()
             token=secrets.token_urlsafe(32)
-            self.entries[token]=(self.clock()+self.ttl,owner,deepcopy(form),public_result_snapshot(result),session_id)
+            self.entries[token]=(self.clock()+self.ttl,owner,deepcopy(form),public_result_snapshot(result),session_id,organization_id)
             while len(self.entries)>self.capacity:self.entries.popitem(last=False)
             return token
 
     def get(self, owner, token, session_id=None):
+        return self.source(owner,token,session_id)[:2]
+
+    def source(self, owner, token, session_id=None):
         with self.lock:
             self._expire()
             entry=self.entries.get(token)
             if not entry or entry[1]!=owner or entry[4]!=session_id:
                 raise ReportError("出力元の鑑定結果を取得できません。保存済み履歴から出力するか、再度鑑定してください。",404)
-            return deepcopy(entry[2]),deepcopy(entry[3])
+            # Old in-memory entries have no class. Combined/B2C still accepts them;
+            # the teacher authorizer rejects them instead of inferring a class.
+            return deepcopy(entry[2]),deepcopy(entry[3]),entry[5] if len(entry)>5 else None
 
 
 export_tokens=ExportTokens()
 
 
-def export_reading(owner, payload, repository=None, tokens=export_tokens, session_id=None):
+def export_reading(owner, payload, repository=None, tokens=export_tokens, session_id=None, source_authorizer=None):
     if not owner or not isinstance(payload,dict) or set(payload) not in ({"reading_id"},{"export_token"}):
         raise ReportError("出力元の鑑定を指定してください。")
     key=next(iter(payload));value=payload[key]
@@ -50,8 +55,14 @@ def export_reading(owner, payload, repository=None, tokens=export_tokens, sessio
         if repository is None:raise ReportError("履歴の保存先を利用できません。",503)
         # Repository detail excludes deleted readings and enforces owner in its SQL query.
         reading=repository.detail(owner,value)
+        organization_id=repository.organization_scope(owner,value) if source_authorizer else None
         form,result=reading["input_snapshot"]["form"],reading["result_snapshot"]
     else:
-        form,result=tokens.get(owner,value,session_id)
+        if source_authorizer:form,result,organization_id=tokens.source(owner,value,session_id)
+        else:form,result=tokens.get(owner,value,session_id)
+    if source_authorizer:source_authorizer(organization_id)
     report=build_reading_report(form,result)
-    return report.filename,render_xlsx(report)
+    body=render_xlsx(report)
+    # A contract can change while rendering. Check again before releasing bytes.
+    if source_authorizer:source_authorizer(organization_id)
+    return report.filename,body

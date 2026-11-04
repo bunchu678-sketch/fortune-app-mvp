@@ -75,11 +75,15 @@ class HistoryService:
         if link["mode"] != "new_person" and not link.get("person_id"):
             raise HistoryError("鑑定対象者の選択が必要です。")
         # A race with another save requires confirmation; no automatic merge.
-        if "link" not in payload and self.repository.candidates(owner, form):
+        from b2b_content_access import teacher_surface
+        if "link" not in payload and self.repository.candidates(owner, form, organization_id if teacher_surface() else None):
             raise HistoryError("過去に鑑定履歴がありますが、同一人物ですか？", 409)
         return self.repository.create(owner, payload, VERSIONS, organization_id=organization_id)
 
     def prepare(self, owner, reading_id, mode):
+        from b2b_content_access import teacher_surface,require_reading
+        if teacher_surface():
+            with self.repository.connection() as db:require_reading(db,owner,reading_id)
         if mode not in ("existing_group", "new_group"):
             raise HistoryError("再鑑定方法を選択してください。")
         reading = self.repository.detail(owner, reading_id)

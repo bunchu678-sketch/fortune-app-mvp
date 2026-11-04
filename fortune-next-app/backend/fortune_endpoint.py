@@ -46,7 +46,7 @@ async def calculation(request,org=None):
                 await run_in_threadpool(ledger.record_success,user["id"],org,key,payload)
             if payload.get("includeGogyoVariants"):
                 owner=user["id"] if user else None
-                if owner:result={**result,"excel_export_token":export_tokens.issue(owner,payload,result,session_scope(request))}
+                if owner:result={**result,"excel_export_token":export_tokens.issue(owner,payload,result,session_scope(request),organization_id=org)}
         return JSONResponse(result,status_code=200 if result.get("ok") else 422,headers={"Cache-Control":"no-store"})
     except HistoryError as exc:
         # Preserve the W error shape, including auth errors, without echoing personal input.

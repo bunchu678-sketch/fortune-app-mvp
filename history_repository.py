@@ -103,7 +103,7 @@ class SQLiteHistoryRepository:
         data["result_snapshot"] = public_result_snapshot(data["result_snapshot"])
         return data
 
-    def candidates(self, owner, form):
+    def candidates(self, owner, form, organization_id=None):
         surname, given = normalize(form.get("surname", "")), normalize(form.get("givenName", ""))
         if not surname or not given:
             return []
@@ -117,6 +117,10 @@ class SQLiteHistoryRepository:
             candidates = []
             for row in rows:
                 person = dict(row)
+                if organization_id:
+                    from b2b_content_access import require_person_scope
+                    try:require_person_scope(db,owner,row['id'],organization_id)
+                    except HistoryError:continue
                 history = db.execute("""SELECT id,group_id,reading_date,saved_at FROM readings
                     WHERE owner_user_id=? AND person_id=? AND deleted_at IS NULL
                     ORDER BY saved_at DESC""", (owner, row["id"])).fetchall()
@@ -134,9 +138,16 @@ class SQLiteHistoryRepository:
         form, link = snapshot["form"], payload.get("link") or {"mode": "new_person"}
         now, reading_id = timestamp(), str(uuid4())
         with self.connection() as db:
+            from b2b_content_access import teacher_surface,require_organization,require_person_scope,require_reading
+            if teacher_surface():
+                db.execute('BEGIN IMMEDIATE')
+                require_organization(db,owner,organization_id)
+                if link.get('person_id'):require_person_scope(db,owner,link['person_id'],organization_id)
+                if link.get('source_reading_id') and require_reading(db,owner,link['source_reading_id'])!=organization_id:
+                    raise HistoryError('別の教室の再鑑定元は使用できません。',404)
             if organization_id:
                 from operations_repository import OperationsRepository
-                db.execute("BEGIN IMMEDIATE")
+                if not db.in_transaction:db.execute("BEGIN IMMEDIATE")
                 OperationsRepository.member_access(db,organization_id,owner)
                 source_id=link.get("source_reading_id")
                 if source_id:
@@ -228,6 +239,9 @@ class SQLiteHistoryRepository:
 
     def update_memo(self, owner, reading_id, memo, expected_updated_at):
         with self.connection() as db:
+            from b2b_content_access import teacher_surface,require_reading
+            if teacher_surface():
+                db.execute('BEGIN IMMEDIATE');require_reading(db,owner,reading_id)
             self.reading(db, owner, reading_id)
             updated = db.execute("""UPDATE readings SET memo=?,updated_at=?
                 WHERE owner_user_id=? AND id=? AND deleted_at IS NULL AND updated_at=?""",
@@ -238,6 +252,9 @@ class SQLiteHistoryRepository:
 
     def soft_delete(self, owner, reading_id):
         with self.connection() as db:
+            from b2b_content_access import teacher_surface,require_reading
+            if teacher_surface():
+                db.execute('BEGIN IMMEDIATE');require_reading(db,owner,reading_id)
             self.reading(db, owner, reading_id)
             now = timestamp()
             db.execute("UPDATE readings SET deleted_at=?,updated_at=? WHERE owner_user_id=? AND id=?",
@@ -246,6 +263,9 @@ class SQLiteHistoryRepository:
     def update_person(self, owner, person_id, snapshot):
         form = snapshot["form"]
         with self.connection() as db:
+            from b2b_content_access import teacher_surface,require_person_scope
+            if teacher_surface():
+                db.execute('BEGIN IMMEDIATE');require_person_scope(db,owner,person_id)
             self.person(db, owner, person_id)
             db.execute("""UPDATE persons SET surname=?,given_name=?,surname_kana=?,given_name_kana=?,
                 normalized_surname=?,normalized_given_name=?,birth_date=?,current_input=?,updated_at=?
@@ -289,6 +309,8 @@ class SQLiteHistoryRepository:
         now=now or datetime.now(timezone.utc)
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
+            from b2b_content_access import teacher_surface,require_reading
+            if teacher_surface():require_reading(db,owner,reading_id)
             row=db.execute("SELECT deleted_at FROM readings WHERE owner_user_id=? AND id=? AND deleted_at IS NOT NULL",(owner,reading_id)).fetchone()
             from service_contract_repository import content_visible
             if not content_visible(db,owner,reading_id,now): raise HistoryError("復旧可能な鑑定履歴が見つかりません。",404)

@@ -13,7 +13,7 @@ class DeploymentBoundary:
             path=scope.get('path','')
             operations=path=='/api/operations' or path.startswith('/api/operations/')
             allowed_admin=operations or path.startswith(('/api/auth/','/api/account/'))
-            blocked=(self.surface=='teacher' and operations) or (
+            blocked=(self.surface=='teacher' and (operations or path.rstrip('/')=='/api/fortune')) or (
                 self.surface=='admin' and path.startswith('/api/') and not allowed_admin)
             if blocked:
                 await JSONResponse({'ok':False,'error':'Not found'},status_code=404,
