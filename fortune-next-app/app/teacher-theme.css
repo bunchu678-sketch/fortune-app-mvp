@@ -1,0 +1,37 @@
+/* These rules apply only after an authenticated Mari organization response. */
+html[data-teacher-theme] { color-scheme: light; }
+html[data-teacher-theme="black"] { color-scheme: dark; }
+html[data-teacher-theme] body { background: var(--bg); }
+html[data-teacher-theme] a { color: var(--accent); }
+html[data-teacher-theme] :is(.inputPanel,.outputPanel,.resultSummary div,.infoCard,.miniPanel,.timelineItem,.monthCard,.textBlock,.gogyoVariant,table) { background: var(--panel); }
+html[data-teacher-theme] :is(.candidateBox,.workTile,.memoPanel,.memoContent) { background: var(--bg-soft); border-color: var(--line); }
+html[data-teacher-theme] :is(input,select,textarea,button,.prominent) { border-color: var(--line); }
+html[data-teacher-theme] .prominent { background: var(--bg-soft); }
+html[data-teacher-theme] input:disabled { background: var(--panel-strong); color: var(--soft); }
+html[data-teacher-theme] :is(input,select,textarea,button,a):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+html[data-teacher-theme] :is(input,select,textarea):focus { border-color: var(--accent); box-shadow: none; }
+html[data-teacher-theme] :is(.scoreTrack,.gogyoTrack) { background: var(--panel-strong); }
+html[data-teacher-theme] :is(.sectionHeading h2,.panelTitle,.cardEyebrow) { color: var(--accent); }
+html[data-teacher-theme] .gogyoFigure circle[r="31"] { fill: var(--panel); stroke: var(--ink); }
+html[data-teacher-theme] .gogyoFigure [stroke="#9eb9a8"] { stroke: var(--accent); }
+html[data-teacher-theme] .gogyoFigure [stroke="#d7a96b"] { stroke: var(--soft); }
+html[data-teacher-theme] .gogyoFigure [fill="#9eb9a8"] { fill: var(--accent); }
+html[data-teacher-theme] .gogyoFigure [fill="#d7a96b"] { fill: var(--soft); }
+html[data-teacher-theme] :is(.marked,.boundaryPanel,.sekkiWarning) { background: var(--bg-soft); border-color: var(--accent-2); }
+.teacherThemeControl { max-width: 1180px; margin: 0 auto; padding: 0 20px 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
+.teacherThemeControl label { display: flex; align-items: center; gap: 10px; }
+.teacherThemeControl select { width: 150px; }
+.teacherThemeControl p { flex-basis: 100%; text-align: right; color: var(--danger); }
+.threeGroups { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.threeGroups h3 { margin: 0 0 12px; font-size: 1rem; }
+.threeGroupBar { display: flex; width: 100%; height: 26px; overflow: hidden; border-radius: 5px; outline: 1px solid var(--line); }
+.threeGroupBar span { flex-shrink: 0; }
+.threeGroups [data-group="0"] { background: #2463c5; }
+.threeGroups [data-group="1"] { background: #f4cd38; }
+.threeGroups [data-group="2"] { background: #d93636; }
+.threeGroupBar .groupMissing { background: repeating-linear-gradient(135deg, var(--panel-strong) 0 4px, var(--soft) 4px 5px); }
+.threeGroupLegend { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-top: 12px; }
+.threeGroupLegend span { display: inline-flex; align-items: center; gap: 6px; }
+.threeGroupLegend i { width: 14px; height: 14px; border: 1px solid var(--soft); border-radius: 2px; }
+.threeGroups .empty { margin-top: 10px; }
+@media(max-width: 480px) { .teacherThemeControl { padding-inline: 14px; } .threeGroupLegend { gap: 10px 16px; } }

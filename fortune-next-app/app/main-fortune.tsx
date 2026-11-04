@@ -14,6 +14,9 @@ import { HistoryLink, PersonCandidate, PastMemo, RerunDraft, HistoryRequestError
 import { ReadingControls } from "./history-controls";
 import { ReportExport } from "./report-export";
 import "./history/history.css";
+import { useTeacherTheme } from "./teacher-theme";
+import ThinkingGroups from "./three-group-bar";
+import type { GroupConfig } from "./thinking-groups";
 
 type FortuneForm = {
   surname: string;
@@ -219,7 +222,9 @@ function ThinkingBars({ thinking }: { thinking: any }) {
   );
 }
 
-function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos }: {
+function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos, compact, groupConfig }: {
+  compact: boolean;
+  groupConfig?: GroupConfig;
   result: FortuneResult;
   form: FortuneForm;
   memo: string;
@@ -309,7 +314,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
       <Section id="nikkan" title="元命式から読み取れる性格">
         <div className="textBlock">
           <h3>{starData.day_tenkan || "日干"}の傾向</h3>
-          <p>{result.personality?.nikkan?.description || "日干コメントが未登録です。"}</p>
+          {!compact ? <p>{result.personality?.nikkan?.description || "日干コメントが未登録です。"}</p> : null}
           {result.personality?.nikkan?.keywords ? (
             <p className="keyword">キーワード：{result.personality.nikkan.keywords}</p>
           ) : null}
@@ -322,16 +327,16 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
             <article className="infoCard" key={row.stage}>
               <span className="cardEyebrow">{stages[index] ?? ""}</span>
               <h3>社会に見せている自分：{row.outer || "－"}</h3>
-              {row.outer_comment ? <p>{row.outer_comment}</p> : null}
+              {!compact && row.outer_comment ? <p>{row.outer_comment}</p> : null}
               <h3 className="stageInner">本来の自分：{row.inner || "－"}</h3>
-              {row.inner_comment ? <p>{row.inner_comment}</p> : null}
+              {!compact && row.inner_comment ? <p>{row.inner_comment}</p> : null}
             </article>
           ))}
         </div>
-        {currentStage?.public_comment ? <div className="textBlock">
+        {(compact ? currentStage : currentStage?.public_comment) ? <div className="textBlock">
           <h3>本来の自分らしさ</h3>
           <p>{currentStageName}：{currentStage.outer} × {currentStage.inner}</p>
-          <p>{currentStage.public_comment}</p>
+          {!compact ? <p>{currentStage.public_comment}</p> : null}
         </div> : null}
       </Section>
 
@@ -341,14 +346,15 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
             <article className="infoCard" key={row.pillar_key}>
               <span className="cardEyebrow">{row.pillar_label} / {row.personality_weight}</span>
               <h3>{row.personality_heading}：{row.juuni_unsei}</h3>
-              <p>{row.public_comment || "コメント未登録"}</p>
+              {!compact ? <p>{row.public_comment || "コメント未登録"}</p> : null}
               <p className="keyword">{row.keywords}</p>
             </article>
           ))}
         </div>
       </Section>
 
-      <Section id="thinking" title="考え方の傾向">
+      <Section id="thinking" title={compact ? "十二運星からわかる考え方の傾向" : "考え方の傾向"}>
+        {compact && groupConfig ? <ThinkingGroups rows={juuniRows} config={groupConfig} /> : null}
         <ThinkingBars thinking={result.personality?.juuni_unsei?.thinking} />
       </Section>
 
@@ -361,7 +367,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
               <span>{row["大運"]} {row["地支"] && kubou.includes(row["地支"]) ? "空亡" : ""}</span>
               <h3>{row["大運干支"]}｜{row["通変星"]}｜{row["十二運星"]}</h3>
               <p>{row["開始年齢"]}〜{row["終了年齢"]}／{row["目安開始年"]}年〜{row["目安終了年"]}年</p>
-              <p>{row["コメント"]}</p>
+              {!compact ? <p>{row["コメント"]}</p> : null}
               <small>{row["周期"]} / {row["キーワード"]}</small>
             </article>
             {row["次の大運との間が接木運"] ? <article className="timelineItem setsubokuItem">
@@ -382,7 +388,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
               <span>{row["月"]} {row["空亡"] ? "空亡" : ""}</span>
               <p>対象期間：{row["対象期間"] ? `${formatTime(row["対象期間"].start)}（${row["対象期間"].start_term}）〜 ${formatTime(row["対象期間"].end_exclusive)}（${row["対象期間"].end_term}）直前` : "取得できませんでした"}</p>
               <h3>{row["月干支"]}｜{row["通変星"]}</h3>
-              <p>{row["コメント"] || row.error}</p>
+              {compact ? (row.error ? <p>{row.error}</p> : null) : <p>{row["コメント"] || row.error}</p>}
               {row["キーワード"] ? <small>{row["キーワード"]}</small> : null}
             </article>
           ))}
@@ -393,7 +399,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
         <div className="textBlock">
           <h3>{result.yearly_overall?.year}年 {result.yearly_overall?.year_kanchi}｜{result.yearly_overall?.tsuhensei}</h3>
           {result.yearly_overall?.theme ? <p className="keyword">テーマ：{result.yearly_overall.theme}</p> : null}
-          <p>{result.yearly_overall?.comment || result.yearly_overall?.interpretation_message || result.yearly_overall?.error}</p>
+          {compact ? <p>{result.yearly_overall?.interpretation_message || result.yearly_overall?.error}</p> : <p>{result.yearly_overall?.comment || result.yearly_overall?.interpretation_message || result.yearly_overall?.error}</p>}
         </div>
       </Section>
 
@@ -401,7 +407,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
         <div className="cardGrid">{specificRows.map((row) => <article className="infoCard" key={row.label}>
           <span className="cardEyebrow">{row.label} / {row.display_datetime}</span>
           <h3>{row.day_kanchi}｜{row.tsuhensei}</h3>
-          <p>{row.comment || row.error}</p>
+          {compact ? (row.error ? <p>{row.error}</p> : null) : <p>{row.comment || row.error}</p>}
           {asRows(row.parts).map((part: any) => <p className="keyword" key={part.display_name}>
             {part.display_name}: {part.kanchi} / {part.keyword}
           </p>)}
@@ -437,6 +443,8 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
 export function ReadingPage({ saved, onChange }: {
   saved: FortuneSaved; onChange: (value: FortuneSaved) => void;
 }) {
+    const teacher = useTeacherTheme();
+    const compact = !!saved.organizationId && teacher?.organizationId === saved.organizationId;
     const specialRows = asRows(saved.result.special_meishiki?.rows);
     const visibleSections: Array<readonly [string, string]> = sectionList.filter(([id]) => id !== "special" || specialRows.length);
     if (asRows(saved.result.specific_datetime?.rows).length) {
@@ -454,7 +462,7 @@ export function ReadingPage({ saved, onChange }: {
             }}>鑑定履歴</Link></div>
             <ReportExport saved={saved} />
           </header>
-          <ResultView result={saved.result} form={saved.form as FortuneForm}
+          <ResultView compact={compact} groupConfig={compact ? teacher?.branding.thinking_groups : undefined} result={saved.result} form={saved.form as FortuneForm}
             manualChoices={saved.manualChoices} memo={saved.memo ?? ""}
             onMemoChange={memo => onChange({ ...saved, memo })} pastMemos={saved.pastMemos ?? []} />
           <footer className="resultFooter"><ReadingControls saved={saved} onChange={onChange} /></footer>

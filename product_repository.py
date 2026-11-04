@@ -6,6 +6,7 @@ import json
 import re
 import sqlite3
 from uuid import uuid4
+from teacher_presentation import presentation
 from auth_service import AuthRepository
 from auth_schema import apply_migration
 from history_repository import SQLiteHistoryRepository, HistoryError, timestamp, encode
@@ -131,7 +132,18 @@ class ProductRepository:
         with self.auth.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             self.context(db,organization_id,authenticated_user_id)
-            if not db.execute("SELECT 1 FROM organization_themes WHERE organization_id=? AND theme_key=?",(organization_id,theme_key)).fetchone():
+            org = self.organization(db,organization_id)
+            stored = [{"key": r["theme_key"], "display_name": r["display_name"],
+                       "definition": json.loads(r["definition_json"])}
+                      for r in db.execute("SELECT * FROM organization_themes WHERE organization_id=?", (organization_id,))]
+            available = presentation(org, stored)
+            if available:
+                selected = next((item for item in available["themes"] if item["key"] == theme_key), None)
+                if not selected: raise HistoryError("Theme not found",404)
+                # Explicit selection is the only write. Existing definitions are preserved.
+                db.execute("INSERT OR IGNORE INTO organization_themes VALUES (?,?,?,?)",
+                           (organization_id,theme_key,selected["display_name"],encode({})))
+            elif not any(item["key"] == theme_key for item in stored):
                 raise HistoryError("Theme not found",404)
             db.execute("UPDATE memberships SET selected_theme_key=?,updated_at=? WHERE organization_id=? AND user_id=?",
                        (theme_key,timestamp(),organization_id,authenticated_user_id))
@@ -144,7 +156,8 @@ class ProductRepository:
                     for r in db.execute("SELECT * FROM organization_themes WHERE organization_id=? ORDER BY theme_key",(organization_id,))]
             return {"display_name":org["display_name"],"logo_reference":org["logo_reference"],
                     "settings":json.loads(org["settings_json"]),"themes":themes,"selected_theme_key":context.selected_theme_key,
-                    "provider":"Powered by 博士の占いらぼ","service_name":"占い師向け鑑定支援システム"}
+                    "provider":"Powered by 博士の占いらぼ","service_name":"占い師向け鑑定支援システム",
+                    **presentation(org, themes)}
 
     def create_contract(self, organization_id, state, start_date=None, end_date=None, plan=None, *, connection=None):
         if state not in ("active","suspended","terminated"): raise HistoryError("Invalid contract state",422)

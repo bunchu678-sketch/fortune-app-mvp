@@ -69,6 +69,15 @@ async def membership_self(org:str,request:Request):
     return await handle(request,action)
 
 
+@router.post("/api/b2b/organizations/{org}/theme")
+async def theme_selection(org:str,request:Request):
+    def action(o,e,u,p):
+        o.context(org,u["id"])
+        o.product.select_theme(org,u["id"],p["theme_key"])
+        return o.product.branding(org,u["id"])
+    return await handle(request,action,True)
+
+
 @router.get("/api/b2b/organizations/{org}/teacher")
 async def teacher(org:str,request:Request):
     return await handle(request,lambda o,e,u,p:{**o.teacher(org,u["id"]),**e.organization_totals(org)})
