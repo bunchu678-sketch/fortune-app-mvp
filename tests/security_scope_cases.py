@@ -14,6 +14,8 @@ from history_repository import HistoryError,timestamp
 from report_export_service import export_tokens,render_xlsx
 
 
+@unittest.skipUnless(os.environ.get('FORTUNE_TEST_RESTORED_FEATURES') == '1',
+                     '履歴・帳票の復元時用。現在の先生版認可はreading_only_casesで検証する。')
 class SecurityScopeCases(unittest.TestCase):
     setUpClass=classmethod(base.ProductAPICases.setUpClass.__func__)
     call=base.ProductAPICases.call

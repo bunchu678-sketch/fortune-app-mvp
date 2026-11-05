@@ -36,6 +36,7 @@ from password_reset_api import router as password_reset_router
 from product_api import router as product_router
 from fortune_endpoint import calculation
 from deployment_boundary import DeploymentBoundary
+from reading_only import router as reading_only_router
 
 app = FastAPI()
 app.add_middleware(AuthBoundary)
@@ -45,6 +46,7 @@ app.include_router(password_reset_router)
 app.include_router(history_router)
 app.include_router(export_router)
 app.include_router(product_router)
+app.include_router(reading_only_router)
 
 # Opt-in only. No environment value selects live mail by default. An invalid
 # explicit configuration stops startup instead of silently pretending to send.

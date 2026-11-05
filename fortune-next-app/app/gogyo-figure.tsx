@@ -22,7 +22,7 @@ function ends(a: number, b: number, startOffset: number, endOffset: number) {
     last.x - ux * endOffset, last.y - uy * endOffset];
 }
 
-export default function GogyoFigure({ gogyo, id }: { gogyo: Gogyo; id: string }) {
+export default function GogyoFigure({ gogyo, id, hideStrengthHalo = false }: { gogyo: Gogyo; id: string; hideStrengthHalo?: boolean }) {
   const order = gogyo.chart_order ?? [];
   if (order.length !== 5) return <p className="empty">五行図の表示データがありません。</p>;
   const scores = gogyo.scores ?? {};
@@ -38,7 +38,7 @@ export default function GogyoFigure({ gogyo, id }: { gogyo: Gogyo; id: string })
       const strength = Math.max(0, Number(scores[order[index]] ?? 0)) / maximum;
       return <g key={node.label}>
         <text x={node.lx} y={node.ly} textAnchor="middle" className="gogyoRole">{node.label}</text>
-        <circle cx={node.x} cy={node.y} r={22 + strength * 17} fill="rgba(158, 185, 168, 0.25)" />
+        {!hideStrengthHalo ? <circle cx={node.x} cy={node.y} r={22 + strength * 17} fill="rgba(158, 185, 168, 0.25)" /> : null}
         <circle cx={node.x} cy={node.y} r="31" fill="#232825" stroke="#f4efe6" strokeWidth="2" />
         <text x={node.x} y={node.y + 7} textAnchor="middle" className="gogyoElement">{order[index]}{formatScore(scores[order[index]])}</text>
       </g>;

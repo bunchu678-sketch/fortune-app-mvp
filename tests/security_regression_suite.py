@@ -6,7 +6,7 @@ PATTERNS=('product_api_cases.py','password_reset_cases.py','invitation_cases.py'
  'initial_setup_delivery_cases.py','admin_domain_cases.py','auth_cases.py','history_cases.py','history_recovery_cases.py',
  'report_export_cases.py','report_pdf_cases.py','billing_api_cases.py','billing_retention_cases.py','operations_cases.py',
  'execution_cases.py','product_foundation_cases.py','usage_cases.py','account_lifecycle_cases.py',
- 'final_retention_cases.py','final_retention_api_cases.py','security_scope_cases.py','certbot_hook_cases.py')
+ 'final_retention_cases.py','final_retention_api_cases.py','reading_only_cases.py','certbot_hook_cases.py')
 def main():
  out=Path(sys.argv[1]).resolve();out.mkdir(parents=True,exist_ok=True);workers=int(sys.argv[2]) if len(sys.argv)>2 else 1
  def run(name):

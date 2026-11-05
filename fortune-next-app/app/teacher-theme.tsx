@@ -1,24 +1,27 @@
 "use client";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./auth";
 import { useFortuneState } from "./fortune-state";
 import { productRequest, type Personal } from "./product-client";
 import type { GroupConfig } from "./thinking-groups";
 import "./teacher-theme.css";
+import { useReadingMode } from "./reading-mode";
+import { themeStyle, themeTokens } from "./theme-tokens";
 
 type Theme = { key: string; display_name: string; definition: Record<string, string> };
 type Branding = { presentation_mode?: string; themes: Theme[]; selected_theme_key: string; thinking_groups: GroupConfig };
 type State = { organizationId: string; branding: Branding };
 const Context = createContext<State | null>(null);
 export const useTeacherTheme = () => useContext(Context);
-const tokens = ["bg", "bg-soft", "panel", "panel-strong", "line", "ink", "muted", "soft", "accent", "accent-2", "accent-3", "blue", "button", "button-text", "danger", "shadow"];
 
 export function TeacherThemeProvider({ children }: { children: React.ReactNode }) {
   const { user, isCurrentUser } = useAuth();
+  const bootstrap = useReadingMode();
+  const readingOnly = !!bootstrap?.enabled;
   const { saved } = useFortuneState();
   const pathname = usePathname();
-  const [state, setState] = useState<State | null>(null);
+  const [state, setState] = useState<State | null>(() => bootstrap?.branding && bootstrap.organization_id && user?.id === bootstrap.user?.id ? { organizationId: bootstrap.organization_id, branding: bootstrap.branding } : null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const sequence = useRef(0);
@@ -28,6 +31,10 @@ export function TeacherThemeProvider({ children }: { children: React.ReactNode }
   // The B2C input and B2C results always retain their existing presentation.
   const b2c = pathname === "/" || (pathname === "/result" && !resultOrg) || pathname.startsWith("/operations") || pathname.startsWith("/product");
   useEffect(() => {
+    if (readingOnly) {
+      if (!user || user.id !== bootstrap?.user?.id) { ++sequence.current; setState(null); }
+      return;
+    }
     const requestId = ++sequence.current;
     setState(null); setError(""); setBusy(false);
     if (!user || user.development || b2c) return;
@@ -53,27 +60,24 @@ export function TeacherThemeProvider({ children }: { children: React.ReactNode }
       } catch { /* Existing page controls retain their own authorization/error handling. */ }
     })();
     return () => { ++sequence.current; };
-  }, [user?.id, requestedOrg, b2c, pathname]);
+  }, [user?.id, requestedOrg, b2c, pathname, readingOnly, bootstrap?.user?.id]);
 
-  useEffect(() => {
-    if (!state) return;
-    const selected = state.branding.themes.find(item => item.key === state.branding.selected_theme_key) || state.branding.themes[0];
+  useLayoutEffect(() => {
+    const fallback = bootstrap?.default_theme;
+    const selected = state ? (state.branding.themes.find(item => item.key === state.branding.selected_theme_key) || state.branding.themes[0]) : fallback;
     if (!selected) return;
     const html = document.documentElement;
     html.dataset.teacherTheme = selected.key;
-    for (const token of tokens) {
-      const value = selected.definition[token === "bg" ? "background" : token === "ink" ? "foreground" : ""] || selected.definition[token];
-      if (typeof value === "string" && CSS.supports("color", value)) html.style.setProperty(`--${token}`, value);
-    }
-    return () => { delete html.dataset.teacherTheme; tokens.forEach(token => html.style.removeProperty(`--${token}`)); };
-  }, [state]);
+    for (const [token, value] of Object.entries(themeStyle(selected))) html.style.setProperty(token, value);
+    return () => { delete html.dataset.teacherTheme; themeTokens.forEach(token => html.style.removeProperty(`--${token}`)); };
+  }, [state, bootstrap?.default_theme]);
 
   async function select(key: string) {
     if (!state || !user || busy) return;
     const requestId = sequence.current, owner = user.id;
     setBusy(true); setError("");
     try {
-      const branding = await productRequest<Branding>(`/api/b2b/organizations/${state.organizationId}/theme`, { method: "POST", body: JSON.stringify({ theme_key: key }) });
+      const branding = await productRequest<Branding>(readingOnly ? "/api/reading/theme" : `/api/b2b/organizations/${state.organizationId}/theme`, { method: "POST", body: JSON.stringify({ theme_key: key }) });
       if (requestId === sequence.current && isCurrentUser(owner)) setState({ ...state, branding });
     } catch (caught) {
       if (requestId === sequence.current && isCurrentUser(owner)) setError(caught instanceof Error ? caught.message : "テーマを保存できません。");

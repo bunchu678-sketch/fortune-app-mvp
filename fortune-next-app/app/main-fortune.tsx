@@ -17,6 +17,7 @@ import "./history/history.css";
 import { useTeacherTheme } from "./teacher-theme";
 import ThinkingGroups from "./three-group-bar";
 import type { GroupConfig } from "./thinking-groups";
+import { useReadingMode } from "./reading-mode";
 
 type FortuneForm = {
   surname: string;
@@ -222,7 +223,8 @@ function ThinkingBars({ thinking }: { thinking: any }) {
   );
 }
 
-function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos, compact, groupConfig }: {
+function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos, compact, groupConfig, readingOnly }: {
+  readingOnly: boolean;
   compact: boolean;
   groupConfig?: GroupConfig;
   result: FortuneResult;
@@ -239,6 +241,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
   const specialRows = asRows(result.special_meishiki?.rows);
   const juuniRows = asRows(result.personality?.juuni_unsei?.rows);
   const lifeStageRows = asRows(result.personality?.life_stage_tsuhensei);
+  const pillarCards = compact ? ["year", "month", "day", "hour"].flatMap(key => juuniRows.filter(row => row.pillar_key === key)) : juuniRows;
   const sekkiWarnings = result.calendar?.boundary_warnings ?? [];
   const variants = result.gogyo_variants ?? {};
   const stages = ["幼年期", "青年期", "成熟期", "老年期"];
@@ -296,7 +299,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
             const kanteiYear = variant?.gogyo?.kantei_year;
             return <article className="gogyoVariant" key={code}>
               <h3>{code}. {variantLabels[code]}</h3>
-              {variant?.status === "available" ? <GogyoFigure gogyo={variant.gogyo} id={`main-${code}`} /> :
+              {variant?.status === "available" ? <GogyoFigure gogyo={variant.gogyo} id={`main-${code}`} hideStrengthHalo={compact} /> :
                 <p className="empty" role="status">{variant?.status === "boundary_pending" ? "節入りの確認後に算出します。" : variant?.status === "unavailable" ? "大運を取得できないため算出できません。" : "算出結果を取得できませんでした。"}</p>}
               {code === "B" && variant?.status === "available" && kanteiYear?.tenkan && kanteiYear?.chishi ? <p className="empty gogyoVariantContext">鑑定年：{kanteiYear.tenkan}{kanteiYear.chishi}</p> : null}
               {code === "C" && variant?.daiun ? <p className="empty gogyoVariantContext">対象大運：{variant.daiun.name} {variant.daiun.kanshi}</p> : null}
@@ -325,7 +328,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
         <div className="stageList">
           {lifeStageRows.map((row, index) => (
             <article className="infoCard" key={row.stage}>
-              <span className="cardEyebrow">{stages[index] ?? ""}</span>
+              <span className="cardEyebrow">{stages[index] ?? ""}{compact ? ` / ${row.stage}` : ""}</span>
               <h3>社会に見せている自分：{row.outer || "－"}</h3>
               {!compact && row.outer_comment ? <p>{row.outer_comment}</p> : null}
               <h3 className="stageInner">本来の自分：{row.inner || "－"}</h3>
@@ -341,11 +344,16 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
       </Section>
 
       <Section id="juuni" title="十二運星から読み取れる性格">
-        <div className="juuniList">
-          {juuniRows.map((row) => (
+        <div className={compact ? "juuniColumns" : "juuniList"}>
+          {pillarCards.map((row) => (
             <article className="infoCard" key={row.pillar_key}>
-              <span className="cardEyebrow">{row.pillar_label} / {row.personality_weight}</span>
-              <h3>{row.personality_heading}：{row.juuni_unsei}</h3>
+              {compact ? <>
+                <h3 className="pillarName">{row.pillar_label}</h3>
+                <p className="pillarMeaning">{row.personality_heading}</p>
+                <strong className="pillarStar">{row.juuni_unsei || "未入力"}</strong>
+                <span className="pillarWeight">{row.personality_weight}</span>
+              </> : <><span className="cardEyebrow">{row.pillar_label} / {row.personality_weight}</span>
+              <h3>{row.personality_heading}：{row.juuni_unsei}</h3></>}
               {!compact ? <p>{row.public_comment || "コメント未登録"}</p> : null}
               <p className="keyword">{row.keywords}</p>
             </article>
@@ -364,11 +372,14 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
         <div className="timeline">
           {daiunRows.map((row) => <div className="timelineGroup" key={row["大運"]}>
             <article className={`timelineItem ${row["地支"] && kubou.includes(row["地支"]) ? "marked" : ""}`}>
-              <span>{row["大運"]} {row["地支"] && kubou.includes(row["地支"]) ? "空亡" : ""}</span>
+              {compact ? <>
+                <div className="flowHeading"><strong>{row["大運"]}</strong><span>{row["地支"] && kubou.includes(row["地支"]) ? "空亡" : ""}</span><h3>{row["大運干支"]}｜{row["通変星"]}｜{row["十二運星"]}</h3></div>
+                <div className="flowDetails"><span>{row["開始年齢"]}〜{row["終了年齢"]}／{row["目安開始年"]}年〜{row["目安終了年"]}年</span><span>{row["周期"]} / {row["キーワード"]}</span></div>
+              </> : <><span>{row["大運"]} {row["地支"] && kubou.includes(row["地支"]) ? "空亡" : ""}</span>
               <h3>{row["大運干支"]}｜{row["通変星"]}｜{row["十二運星"]}</h3>
               <p>{row["開始年齢"]}〜{row["終了年齢"]}／{row["目安開始年"]}年〜{row["目安終了年"]}年</p>
               {!compact ? <p>{row["コメント"]}</p> : null}
-              <small>{row["周期"]} / {row["キーワード"]}</small>
+              <small>{row["周期"]} / {row["キーワード"]}</small></>}
             </article>
             {row["次の大運との間が接木運"] ? <article className="timelineItem setsubokuItem">
               <h3>接木運</h3>
@@ -385,11 +396,17 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
         <div className="monthGrid">
           {yearlyRows.map((row) => (
             <article className={`monthCard ${row["空亡"] ? "marked" : ""}`} key={`${row["年"]}-${row["月番号"]}`}>
+              {compact ? <>
+                <div className="flowHeading"><strong>{row["月"]}</strong>{row["空亡"] ? <span>空亡</span> : null}<h3>{row["月干支"]}｜{row["通変星"]}</h3>{row["キーワード"] ? <span className="keyword">{row["キーワード"]}</span> : null}</div>
+                <p className="flowPeriod">対象期間：{row["対象期間"] ? `${formatTime(row["対象期間"].start)}（${row["対象期間"].start_term}）〜 ${formatTime(row["対象期間"].end_exclusive)}（${row["対象期間"].end_term}）直前` : "取得できませんでした"}</p>
+                {row.error ? <p>{row.error}</p> : null}
+              </> : <>
               <span>{row["月"]} {row["空亡"] ? "空亡" : ""}</span>
               <p>対象期間：{row["対象期間"] ? `${formatTime(row["対象期間"].start)}（${row["対象期間"].start_term}）〜 ${formatTime(row["対象期間"].end_exclusive)}（${row["対象期間"].end_term}）直前` : "取得できませんでした"}</p>
               <h3>{row["月干支"]}｜{row["通変星"]}</h3>
               {compact ? (row.error ? <p>{row.error}</p> : null) : <p>{row["コメント"] || row.error}</p>}
               {row["キーワード"] ? <small>{row["キーワード"]}</small> : null}
+              </>}
             </article>
           ))}
         </div>
@@ -414,7 +431,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
         </article>)}</div>
       </Section> : null}
 
-      <details id="memo" className="memoPanel">
+      {!readingOnly ? <details id="memo" className="memoPanel">
         <summary>
           <ChevronDown size={18} />
           鑑定者用メモ
@@ -435,7 +452,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
             <textarea aria-label="鑑定者用メモの自由記入欄" value={memo} onChange={event => onMemoChange(event.target.value)} />
           </label>
         </div>
-      </details>
+      </details> : null}
     </div>
   );
 }
@@ -443,10 +460,13 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
 export function ReadingPage({ saved, onChange }: {
   saved: FortuneSaved; onChange: (value: FortuneSaved) => void;
 }) {
+    const readingOnly = !!useReadingMode()?.enabled;
+    const { setSaved, setDraft } = useFortuneState();
+    const router = useRouter();
     const teacher = useTeacherTheme();
     const compact = !!saved.organizationId && teacher?.organizationId === saved.organizationId;
     const specialRows = asRows(saved.result.special_meishiki?.rows);
-    const visibleSections: Array<readonly [string, string]> = sectionList.filter(([id]) => id !== "special" || specialRows.length);
+    const visibleSections: Array<readonly [string, string]> = sectionList.filter(([id]) => (id !== "special" || specialRows.length) && (!readingOnly || id !== "memo"));
     if (asRows(saved.result.specific_datetime?.rows).length) {
       visibleSections.splice(visibleSections.findIndex(([id]) => id === "memo"), 0, ["specific", "特定日時での運勢"]);
     }
@@ -456,16 +476,16 @@ export function ReadingPage({ saved, onChange }: {
           {visibleSections.map(([id, title]) => <a key={id} href={`#${id}`}>{title}</a>)}
         </nav></aside>
         <div className="resultContent">
-          <header className="resultPageHeader"><div><p>四柱推命 鑑定補助</p><h1>鑑定結果</h1><p>{saved.history ? "保存済み鑑定" : "未保存の鑑定"}</p><Link href="/history" onClick={event => {
+          <header className="resultPageHeader"><div><p>{readingOnly ? "占い師向け鑑定支援システム" : "四柱推命 鑑定補助"}</p><h1>鑑定結果</h1>{!readingOnly ? <><p>{saved.history ? "保存済み鑑定" : "未保存の鑑定"}</p><Link href="/history" onClick={event => {
               if (saved.history && (saved.memo ?? "") !== saved.history.memo &&
                 !window.confirm("未保存のメモ変更を破棄して履歴一覧へ移動しますか？")) event.preventDefault();
-            }}>鑑定履歴</Link></div>
-            <ReportExport saved={saved} />
+            }}>鑑定履歴</Link></> : null}</div>
+            {!readingOnly ? <ReportExport saved={saved} /> : null}
           </header>
-          <ResultView compact={compact} groupConfig={compact ? teacher?.branding.thinking_groups : undefined} result={saved.result} form={saved.form as FortuneForm}
+          <ResultView readingOnly={readingOnly} compact={compact} groupConfig={compact ? teacher?.branding.thinking_groups : undefined} result={saved.result} form={saved.form as FortuneForm}
             manualChoices={saved.manualChoices} memo={saved.memo ?? ""}
             onMemoChange={memo => onChange({ ...saved, memo })} pastMemos={saved.pastMemos ?? []} />
-          <footer className="resultFooter"><ReadingControls saved={saved} onChange={onChange} /></footer>
+          <footer className="resultFooter">{readingOnly ? <nav className="readingActions"><Link href="/">入力に戻る</Link><button type="button" onClick={() => { setSaved(null); setDraft(null); router.push("/"); }}>新しく鑑定する</button></nav> : <ReadingControls saved={saved} onChange={onChange} />}</footer>
         </div>
       </div>
     </main>;
@@ -473,11 +493,12 @@ export function ReadingPage({ saved, onChange }: {
 
 export default function MainFortune({ mode, organizationId, organizationName }: { mode: "input" | "result"; organizationId?: string; organizationName?: string }) {
   const router = useRouter();
-  const { user } = useAuth();
+  const readingOnly = !!useReadingMode()?.enabled;
+  const { user, loading: authLoading } = useAuth();
   const isActive = useActiveView();
   const { saved, setSaved, draft, setDraft } = useFortuneState();
   const executions = useRef(executionRequestIds());
-  const [form, setForm] = useState<FortuneForm>(() => ({ ...defaultForm(), ...draft?.form }));
+  const [form, setForm] = useState<FortuneForm>(() => ({ ...defaultForm(), ...(readingOnly ? saved?.form : draft?.form) }));
   const [historyLink, setHistoryLink] = useState<HistoryLink | undefined>(draft?.link);
   const [pastMemos, setPastMemos] = useState<PastMemo[]>(draft?.pastMemos ?? []);
   const [inheritedBirth, setInheritedBirth] = useState<Record<string, any>>(draft?.boundarySelections ?? {});
@@ -485,6 +506,7 @@ export default function MainFortune({ mode, organizationId, organizationName }: 
   const [personCandidates, setPersonCandidates] = useState<PersonCandidate[]>([]);
   const [historyHint, setHistoryHint] = useState("");
   useEffect(() => { if (mode === "input") setDraft(null); }, []);
+  useEffect(() => { if (readingOnly && !authLoading && !user) router.replace("/login"); }, [readingOnly, authLoading, user, router]);
   async function choosePerson(candidate?: PersonCandidate, groupId?: string) {
     setError("");
     try {
@@ -556,7 +578,7 @@ export default function MainFortune({ mode, organizationId, organizationName }: 
       const effectiveForm = { ...form, name: displayName(form), furigana: displayKana(form),
         readingDate: form.readingDate || formatJstDate(new Date()),
         ...(organizationId ? { specificDatetimeEnabled: false } : {}) };
-      if (!historyLink && user) {
+      if (!readingOnly && !historyLink && user) {
         try {
           const candidates = await historyRequest<PersonCandidate[]>("/candidates", { method: "POST", body: JSON.stringify({ ...effectiveForm, ...(organizationId ? { organization_id: organizationId } : {}) }) });
           if (candidates.length) { setPersonCandidates(candidates); return; }
@@ -573,7 +595,7 @@ export default function MainFortune({ mode, organizationId, organizationName }: 
           specificDatetimeCandidates: !organizationId && form.specificDatetimeEnabled ? visibleCandidates : [],
       };
       async function request(payload: Record<string, unknown>): Promise<FortuneResult> {
-        const response = await fetch(`${API_BASE}${organizationId ? "/api/b2b/organizations/" + encodeURIComponent(organizationId) + "/fortune" : "/api/fortune"}`, {
+        const response = await fetch(`${API_BASE}${readingOnly ? "/api/reading/fortune" : organizationId ? "/api/b2b/organizations/" + encodeURIComponent(organizationId) + "/fortune" : "/api/fortune"}`, {
           method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "Idempotency-Key": executions.current.key(payload) }, body: JSON.stringify(payload),
         });
         return response.json();
@@ -656,6 +678,8 @@ export default function MainFortune({ mode, organizationId, organizationName }: 
     setBoundaryChoices({});
   }
 
+  if (readingOnly && (authLoading || !user)) return <main className="appShell"><p role="status">ログイン状態を確認しています。</p></main>;
+
   if (mode === "result") {
     if (!saved) return <main className="appShell resultMissing">
       <h1>鑑定結果</h1><p>この画面で確認できる鑑定結果がありません。</p>
@@ -673,7 +697,7 @@ export default function MainFortune({ mode, organizationId, organizationName }: 
           </div> : null}
           <div>
             <p>{organizationId ? "占い師向け鑑定支援システム" : "四柱推命 鑑定補助"}</p>
-            <h1>{organizationName || "鑑定結果を、見せる画面へ。"}</h1><Link href="/history">鑑定履歴</Link>
+            <h1>{organizationName || "鑑定結果を、見せる画面へ。"}</h1>{!readingOnly ? <Link href="/history">鑑定履歴</Link> : null}
             {organizationId ? <p>Powered by 博士の占いらぼ</p> : null}
           </div>
         </header>

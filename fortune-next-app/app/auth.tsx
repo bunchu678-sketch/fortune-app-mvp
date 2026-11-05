@@ -4,6 +4,7 @@ import { flushSync } from "react-dom";
 import { createContext, Fragment, ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useFortuneState } from "./fortune-state";
 import "./auth.css";
+import { useReadingMode } from "./reading-mode";
 
 export type AuthUser = { id: string; email: string; development?: boolean };
 type AuthState = { user: AuthUser | null; loading: boolean; error: string; refresh: () => Promise<void>; login: (email: string, password: string) => Promise<AuthUser>; isCurrentUser: (id: string) => boolean; logout: () => Promise<void> };
@@ -21,13 +22,13 @@ async function authRequest(action: string, payload?: object) {
   return body.data.user ?? null;
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children, initialUser }: { children: ReactNode; initialUser?: AuthUser | null }) {
   const { setSaved, setDraft } = useFortuneState();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(initialUser ?? null);
+  const [loading, setLoading] = useState(initialUser === undefined);
   const [error, setError] = useState("");
   const [generation, setGeneration] = useState(0);
-  const identity = useRef<string | null>(null);
+  const identity = useRef<string | null>(initialUser?.id ?? null);
   const requestSequence = useRef(0);
   const apply = useCallback((value: AuthUser | null) => {
     if (identity.current !== (value?.id ?? null)) {
@@ -77,6 +78,7 @@ export function useActiveView() {
 }
 
 function AuthBar() {
+  const readingOnly = useReadingMode()?.enabled;
   const { user, loading, error, logout } = useAuth();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
@@ -90,7 +92,7 @@ function AuthBar() {
   return <div className="authBar" aria-label="ログイン状態">
     {loading ? <span role="status">認証を確認中…</span> : user ? <>
       <span>{user.development ? "開発用固定利用者" : user.email + " でログイン中"}</span>
-      {!user.development ? <Link href="/member">マイページ</Link> : null}
+      {!user.development && !readingOnly ? <Link href="/member">マイページ</Link> : null}
       {!user.development ? <button type="button" disabled={busy} onClick={exit}>ログアウト</button> : null}
     </> : <Link href="/login">ログイン</Link>}
     {failure || error ? <p role="alert">{failure || error}</p> : null}

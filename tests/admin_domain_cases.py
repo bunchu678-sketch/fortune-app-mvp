@@ -37,7 +37,8 @@ class AdminDomainCases(unittest.TestCase):
             for path in ('/api/operations/invitations','/api/operations/users'):
                 status,headers,_=self.call('GET',path,who=who)
                 self.assertEqual(status,404);self.assertEqual(headers[b'cache-control'],b'no-store')
-        self.assertEqual(self.call('GET',f'/api/b2b/organizations/{self.org}/me',who='teacher')[0],200)
+        self.assertEqual(self.call('GET',f'/api/b2b/organizations/{self.org}/me',who='teacher')[0],404)
+        self.assertEqual(self.call('GET','/api/reading/bootstrap',who='teacher')[0],200)
 
     def test_admin_process_keeps_operator_authorization_and_refuses_readings(self):
         self.use_surface('admin')
