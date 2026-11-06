@@ -99,6 +99,7 @@ html[data-teacher-theme] .personalityPillars dl { margin: 14px 0 0; }
 html[data-teacher-theme] .personalityPillars dt { color: var(--muted); }
 html[data-teacher-theme] .personalityPillars dd { margin: 3px 0 16px; line-height: 1.4; font-weight: 700; }
 html[data-teacher-theme] .personalityPillars dd:last-child { margin-bottom: 0; }
+html[data-teacher-theme] .personalityPillars .personalityKeyword { font-weight: 400; }
 html[data-teacher-theme] .resultStack .pillarStar { font-size: var(--reading-major); }
 html[data-teacher-theme] .pillarStar[data-star-group="地球"] { color: var(--star-earth); }
 html[data-teacher-theme] .pillarStar[data-star-group="月"] { color: var(--star-moon); }

@@ -19,6 +19,7 @@ import ThinkingGroups from "./three-group-bar";
 import type { GroupConfig } from "./thinking-groups";
 import { useReadingMode } from "./reading-mode";
 import { personalityPillars } from "./personality-pillars";
+import { mariPersonalityKeywords } from "./mari-personality-keywords";
 
 type FortuneForm = {
   surname: string;
@@ -125,6 +126,13 @@ function percent(value: number, total: number) {
 
 function asRows(value: any): any[] {
   return Array.isArray(value) ? value : [];
+}
+
+function MariPersonalityStar({ name }: { name: string }) {
+  const keywords = mariPersonalityKeywords(name);
+  return <dd><span className="personalityStar">{name}</span>
+    {keywords ? <p className="keyword personalityKeyword">{keywords}</p> : null}
+  </dd>;
 }
 
 function PlainTable({ rows }: { rows: any[] }) {
@@ -331,8 +339,8 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
             <article className="infoCard" key={pillar.key} data-pillar={pillar.key}>
               <h3 className="pillarName">{pillar.label}</h3>
               <dl>
-                <dt>通変星</dt><dd>{pillar.tsuhensei}</dd>
-                <dt>蔵干通変星</dt><dd>{pillar.zokkanTsuhensei}</dd>
+                <dt>通変星</dt><MariPersonalityStar name={pillar.tsuhensei} />
+                <dt>蔵干通変星</dt><MariPersonalityStar name={pillar.zokkanTsuhensei} />
               </dl>
             </article>
           ))}
