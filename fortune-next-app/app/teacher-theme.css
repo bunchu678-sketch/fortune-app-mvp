@@ -89,6 +89,13 @@ html[data-teacher-theme] #daiun :is(.flowHeading h3,.flowHeading strong,.setsubo
 html[data-teacher-theme] #daiun :is(.flowKeyword,.flowDetails,.flowDetails span,.setsubokuItem p) { font-size: 1.125rem; line-height: 1.6; }
 html[data-teacher-theme] #daiun .flowKeyword { max-width: 100%; overflow-wrap: anywhere; }
 @media(max-width: 700px) {
+  html[data-teacher-theme] .juuniColumns { direction: ltr; grid-template-columns: repeat(2,minmax(0,1fr)); overflow-x: visible; }
+  /* Match the neighbouring personality cards: hour/day, then month/year. */
+  html[data-teacher-theme] .juuniColumns .infoCard:nth-child(1) { order: 4; }
+  html[data-teacher-theme] .juuniColumns .infoCard:nth-child(2) { order: 3; }
+  html[data-teacher-theme] .juuniColumns .infoCard:nth-child(3) { order: 2; }
+  html[data-teacher-theme] .juuniColumns .infoCard:nth-child(4) { order: 1; }
+  html[data-teacher-theme] .juuniColumns .keyword { overflow-wrap: anywhere; }
   html[data-teacher-theme] #daiun { font-size: 1rem; }
   html[data-teacher-theme] #daiun .sectionHeading h2 { font-size: 1.375rem; }
   html[data-teacher-theme] #daiun :is(.flowHeading h3,.flowHeading strong,.setsubokuItem h3) { font-size: 1.125rem; }
