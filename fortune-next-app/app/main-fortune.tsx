@@ -384,8 +384,8 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
           {daiunRows.map((row) => <div className="timelineGroup" key={row["大運"]}>
             <article className={`timelineItem ${row["地支"] && kubou.includes(row["地支"]) ? "marked" : ""}`}>
               {compact ? <>
-                <div className="flowHeading"><strong>{row["大運"]}</strong><span>{row["地支"] && kubou.includes(row["地支"]) ? "空亡" : ""}</span><h3>{row["大運干支"]}｜{row["通変星"]}｜{row["十二運星"]}</h3></div>
-                <div className="flowDetails"><span>{row["開始年齢"]}〜{row["終了年齢"]}／{row["目安開始年"]}年〜{row["目安終了年"]}年</span><span>{row["周期"]} / <span className="flowKeyword">{row["キーワード"]}</span></span></div>
+                <div className="flowHeading"><strong>{row["大運"]}</strong>{row["地支"] && kubou.includes(row["地支"]) ? <span>空亡</span> : null}<h3>{row["大運干支"]}｜{row["通変星"]}｜{row["十二運星"]}</h3><span className="flowKeyword">{row["周期"]} / {row["キーワード"]}</span></div>
+                <div className="flowDetails"><span>{row["開始年齢"]}〜{row["終了年齢"]}／{row["目安開始年"]}年〜{row["目安終了年"]}年</span></div>
               </> : <><span>{row["大運"]} {row["地支"] && kubou.includes(row["地支"]) ? "空亡" : ""}</span>
               <h3>{row["大運干支"]}｜{row["通変星"]}｜{row["十二運星"]}</h3>
               <p>{row["開始年齢"]}〜{row["終了年齢"]}／{row["目安開始年"]}年〜{row["目安終了年"]}年</p>
