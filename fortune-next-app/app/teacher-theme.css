@@ -44,51 +44,79 @@ html[data-teacher-theme] :is(.textBlock,.infoCard) .keyword { margin-top: 5px !i
 html[data-teacher-theme] .juuniColumns { direction: rtl; min-width: 0; max-width: 100%; width: 100%; display: grid; grid-template-columns: repeat(4,minmax(170px,1fr)); gap: 8px; overflow-x: auto; padding-bottom: 4px; }
 html[data-teacher-theme] .juuniColumns .infoCard { direction: ltr; text-align: left; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 html[data-teacher-theme] .pillarName { color: var(--accent); margin: 0; }
-html[data-teacher-theme] .pillarMeaning { font-size: .94rem; line-height: 1.5; min-block-size: 3em; flex-shrink: 0; }
-html[data-teacher-theme] .pillarStar { font-size: 1.45rem; line-height: 1.3; }
-html[data-teacher-theme] .pillarWeight { font-size: .94rem; color: var(--muted); }
+html[data-teacher-theme] .pillarMeaning { line-height: 1.5; min-block-size: 3em; flex-shrink: 0; }
+html[data-teacher-theme] .pillarStar { line-height: 1.3; }
+html[data-teacher-theme] .pillarWeight { color: var(--muted); }
 html[data-teacher-theme] :is(.timeline,.timelineGroup,.monthGrid) { gap: 7px; }
 html[data-teacher-theme] .monthGrid { grid-template-columns: 1fr; }
 html[data-teacher-theme] .flowHeading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 13px; }
-html[data-teacher-theme] .flowHeading :is(h3,.keyword) { margin: 0 !important; font-size: 1rem; line-height: 1.55; }
+html[data-teacher-theme] .flowHeading :is(h3,.keyword) { margin: 0 !important; line-height: 1.55; }
 html[data-teacher-theme] .flowDetails { display: flex; flex-wrap: wrap; gap: 3px 20px; margin-top: 2px; }
-html[data-teacher-theme] :is(.flowDetails,.flowDetails span,.flowPeriod) { color: var(--muted); font-size: .94rem; line-height: 1.6; }
+html[data-teacher-theme] :is(.flowDetails,.flowDetails span,.flowPeriod) { color: var(--muted); line-height: 1.6; }
 html[data-teacher-theme] .setsubokuItem { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 14px; }
 html[data-teacher-theme] .setsubokuItem h3 { margin: 0; }
 .readingActions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
 .readingActions button { padding: 10px 18px; border: 1px solid var(--line); border-radius: 7px; color: var(--button-text); background: var(--button); }
 
-/* Reading typography is scoped to Mari. */
-html[data-teacher-theme] :is(.inputPanel,.resultPageHeader,.resultSummary,.section:not(#daiun)) { font-size: 1.125rem; }
-html[data-teacher-theme] :is(.inputPanel label,.inputPanel input,.inputPanel select,.inputPanel textarea,.inputPanel button,.teacherThemeControl) { font-size: 1.125rem; }
-html[data-teacher-theme] .section:not(#daiun) .sectionHeading h2 { font-size: 1.5rem; }
-html[data-teacher-theme] .section:not(#daiun) :is(.textBlock h3,.infoCard h3,.miniPanel h3,.flowHeading h3,.flowHeading .keyword,.gogyoVariant h3) { font-size: 1.25rem; }
-html[data-teacher-theme] :is(.resultSummary span,.resultSummary b,.pillarMeaning,.pillarWeight,.flowPeriod,.threeGroups h3) { font-size: 1.0625rem; }
-html[data-teacher-theme] :is(th,td) { font-size: 1.125rem; }
-html[data-teacher-theme] #basic td { font-size: 1.25rem; }
-html[data-teacher-theme] #meishiki td:not(:first-child) { font-size: 1.375rem; font-weight: 600; }
+/* Meaning-based result typography. Adjust the scale here, not per section. */
+html[data-teacher-theme] {
+  --reading-page-title: 1.75rem;
+  --reading-section: 1.5rem;
+  --reading-label: 1rem;
+  --reading-major: 1.25rem;
+  --reading-keyword: 1.125rem;
+  --reading-note: 1rem;
+  --reading-body: 1.125rem;
+  /* Deliberate large-data exceptions, retained from the accepted display. */
+  --reading-basic-value: 1.25rem;
+  --reading-table-value: 1.375rem;
+  --reading-star: 1.75rem;
+  --star-earth: #245ba8;
+  --star-moon: #806018;
+  --star-sun: #b33228;
+}
+html[data-teacher-theme="black"] { --star-earth: #9fcaff; --star-moon: #f0cf70; --star-sun: #ffaaa0; }
+html[data-teacher-theme] .resultStack { font-size: var(--reading-body); }
+html[data-teacher-theme] .resultPageHeader h1 { font-size: var(--reading-page-title); }
+html[data-teacher-theme] .resultPageHeader p { font-size: var(--reading-label); }
+html[data-teacher-theme] .resultStack .sectionHeading h2 { font-size: var(--reading-section); }
+html[data-teacher-theme] .resultStack :where(.textBlock,.infoCard,.flowHeading) h3 { font-size: var(--reading-major); }
+html[data-teacher-theme] .resultStack :is(.pillarName,.miniPanel h3,.threeGroups h3,.gogyoVariant h3,.cardEyebrow,.personalityPillars dt,.flowHeading strong,.setsubokuItem h3,.readingLabel,.workTile span,.scoreMeta > span,.resultSummary span,.meishikiKubou > span) { font-size: var(--reading-label); }
+html[data-teacher-theme] .resultStack :is(.keyword,.flowKeyword) { font-size: var(--reading-keyword); color: var(--accent) !important; }
+html[data-teacher-theme] .resultStack :is(.empty,.pillarMeaning,.pillarWeight,.flowDetails,.flowDetails span,.flowPeriod,.setsubokuItem p) { font-size: var(--reading-note); }
+html[data-teacher-theme] .resultStack :is(.personalityPillars dd,.workTile b,.scoreMeta b,.threeGroupLegend b,.resultSummary b,.meishikiKubou strong) { font-size: var(--reading-major); }
+html[data-teacher-theme] .resultStack .threeGroupLegend { font-size: var(--reading-label); }
+html[data-teacher-theme] .resultStack #special .infoCard h3 { font-size: var(--reading-label); }
+html[data-teacher-theme] .resultStack #special .infoCard p { font-size: var(--reading-major); }
+html[data-teacher-theme] .resultStack :is(th,td:first-child) { font-size: var(--reading-label); }
+html[data-teacher-theme] .resultStack td { font-size: var(--reading-body); }
+html[data-teacher-theme] .resultStack #basic td:not(:first-child) { font-size: var(--reading-basic-value); }
+html[data-teacher-theme] .resultStack #meishiki td:not(:first-child) { font-size: var(--reading-table-value); font-weight: 600; }
 html[data-teacher-theme] #meishiki :is(th,td) { word-break: keep-all; overflow-wrap: normal; }
 html[data-teacher-theme] #meishiki table { min-width: 620px; }
 html[data-teacher-theme] #meishiki .tableWrap { overflow-x: auto; }
-html[data-teacher-theme] :is(.keyword,.flowKeyword) { color: var(--accent) !important; }
 html[data-teacher-theme] .personalityPillars { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
 html[data-teacher-theme] .personalityPillars dl { margin: 14px 0 0; }
-html[data-teacher-theme] .personalityPillars dt { font-size: 1.0625rem; color: var(--muted); }
-html[data-teacher-theme] .personalityPillars dd { margin: 3px 0 16px; font-size: 1.625rem; line-height: 1.4; font-weight: 700; }
+html[data-teacher-theme] .personalityPillars dt { color: var(--muted); }
+html[data-teacher-theme] .personalityPillars dd { margin: 3px 0 16px; line-height: 1.4; font-weight: 700; }
 html[data-teacher-theme] .personalityPillars dd:last-child { margin-bottom: 0; }
-html[data-teacher-theme] .pillarStar { font-size: 1.75rem; }
-html[data-teacher-theme] { --star-earth: #245ba8; --star-moon: #806018; --star-sun: #b33228; }
-html[data-teacher-theme="black"] { --star-earth: #9fcaff; --star-moon: #f0cf70; --star-sun: #ffaaa0; }
+html[data-teacher-theme] .resultStack .pillarStar { font-size: var(--reading-star); }
 html[data-teacher-theme] .pillarStar[data-star-group="地球"] { color: var(--star-earth); }
 html[data-teacher-theme] .pillarStar[data-star-group="月"] { color: var(--star-moon); }
 html[data-teacher-theme] .pillarStar[data-star-group="太陽"] { color: var(--star-sun); }
-/* Daiun: existing vertical list, larger type and period/keywords in the heading. */
-html[data-teacher-theme] #daiun { font-size: 1.125rem; }
-html[data-teacher-theme] #daiun .sectionHeading h2 { font-size: 1.5rem; }
-html[data-teacher-theme] #daiun :is(.flowHeading h3,.flowHeading strong,.setsubokuItem h3) { font-size: 1.25rem; }
-html[data-teacher-theme] #daiun :is(.flowKeyword,.flowDetails,.flowDetails span,.setsubokuItem p) { font-size: 1.125rem; line-height: 1.6; }
 html[data-teacher-theme] #daiun .flowKeyword { max-width: 100%; overflow-wrap: anywhere; }
+/* Input controls retain their previously accepted sizes. */
+html[data-teacher-theme] :is(.inputPanel,.inputPanel label,.inputPanel input,.inputPanel select,.inputPanel textarea,.inputPanel button,.teacherThemeControl) { font-size: 1.125rem; }
 @media(max-width: 700px) {
+  html[data-teacher-theme] {
+    --reading-page-title: 1.5rem;
+    --reading-section: 1.375rem;
+    --reading-major: 1.125rem;
+    --reading-keyword: 1.0625rem;
+    --reading-body: 1rem;
+    --reading-basic-value: 1.0625rem;
+    --reading-table-value: 1.25rem;
+  }
   html[data-teacher-theme] .juuniColumns { direction: ltr; grid-template-columns: repeat(2,minmax(0,1fr)); overflow-x: visible; }
   /* Match the neighbouring personality cards: hour/day, then month/year. */
   html[data-teacher-theme] .juuniColumns .infoCard:nth-child(1) { order: 4; }
@@ -96,18 +124,6 @@ html[data-teacher-theme] #daiun .flowKeyword { max-width: 100%; overflow-wrap: a
   html[data-teacher-theme] .juuniColumns .infoCard:nth-child(3) { order: 2; }
   html[data-teacher-theme] .juuniColumns .infoCard:nth-child(4) { order: 1; }
   html[data-teacher-theme] .juuniColumns .keyword { overflow-wrap: anywhere; }
-  html[data-teacher-theme] #daiun { font-size: 1rem; }
-  html[data-teacher-theme] #daiun .sectionHeading h2 { font-size: 1.375rem; }
-  html[data-teacher-theme] #daiun :is(.flowHeading h3,.flowHeading strong,.setsubokuItem h3) { font-size: 1.125rem; }
-  html[data-teacher-theme] #daiun :is(.flowKeyword,.flowDetails,.flowDetails span,.setsubokuItem p) { font-size: 1rem; }
   html[data-teacher-theme] .personalityPillars { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  html[data-teacher-theme] :is(.inputPanel,.resultPageHeader,.resultSummary,.section:not(#daiun)) { font-size: 1rem; }
-  html[data-teacher-theme] :is(.inputPanel label,.inputPanel input,.inputPanel select,.inputPanel textarea,.inputPanel button,.teacherThemeControl) { font-size: 1rem; }
-  html[data-teacher-theme] .section:not(#daiun) .sectionHeading h2 { font-size: 1.375rem; }
-  html[data-teacher-theme] .section:not(#daiun) :is(.textBlock h3,.infoCard h3,.miniPanel h3,.flowHeading h3,.flowHeading .keyword,.gogyoVariant h3) { font-size: 1.125rem; }
-  html[data-teacher-theme] :is(th,td,.resultSummary span,.resultSummary b,.pillarMeaning,.pillarWeight,.flowPeriod,.threeGroups h3) { font-size: 1rem; }
-  html[data-teacher-theme] #basic td { font-size: 1.0625rem; }
-  html[data-teacher-theme] #meishiki td:not(:first-child) { font-size: 1.25rem; }
-  html[data-teacher-theme] .personalityPillars dt { font-size: 1rem; }
-  html[data-teacher-theme] .personalityPillars dd { font-size: 1.5rem; }
+  html[data-teacher-theme] :is(.inputPanel,.inputPanel label,.inputPanel input,.inputPanel select,.inputPanel textarea,.inputPanel button,.teacherThemeControl) { font-size: 1rem; }
 }

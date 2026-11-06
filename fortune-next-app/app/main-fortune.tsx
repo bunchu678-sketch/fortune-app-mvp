@@ -331,8 +331,8 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
             <article className="infoCard" key={pillar.key} data-pillar={pillar.key}>
               <h3 className="pillarName">{pillar.label}</h3>
               <dl>
-                <dt>蔵干通変星</dt><dd>{pillar.zokkanTsuhensei}</dd>
                 <dt>通変星</dt><dd>{pillar.tsuhensei}</dd>
+                <dt>蔵干通変星</dt><dd>{pillar.zokkanTsuhensei}</dd>
               </dl>
             </article>
           ))}
@@ -384,7 +384,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
           {daiunRows.map((row) => <div className="timelineGroup" key={row["大運"]}>
             <article className={`timelineItem ${row["地支"] && kubou.includes(row["地支"]) ? "marked" : ""}`}>
               {compact ? <>
-                <div className="flowHeading"><strong>{row["大運"]}</strong>{row["地支"] && kubou.includes(row["地支"]) ? <span>空亡</span> : null}<h3>{row["大運干支"]}｜{row["通変星"]}｜{row["十二運星"]}</h3><span className="flowKeyword">{row["周期"]} / {row["キーワード"]}</span></div>
+                <div className="flowHeading"><strong>{row["大運"]}</strong>{row["地支"] && kubou.includes(row["地支"]) ? <span>空亡</span> : null}<h3>{row["大運干支"]}｜{row["通変星"]}</h3><span className="flowKeyword">{row["周期"]} / {row["キーワード"]}</span></div>
                 <div className="flowDetails"><span>{row["開始年齢"]}〜{row["終了年齢"]}／{row["目安開始年"]}年〜{row["目安終了年"]}年</span></div>
               </> : <><span>{row["大運"]} {row["地支"] && kubou.includes(row["地支"]) ? "空亡" : ""}</span>
               <h3>{row["大運干支"]}｜{row["通変星"]}｜{row["十二運星"]}</h3>
@@ -425,7 +425,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
 
       <Section id="overall" title="今年一年の総合運勢">
         <div className="textBlock">
-          <h3>{result.yearly_overall?.year}年 {result.yearly_overall?.year_kanchi}｜{result.yearly_overall?.tsuhensei}</h3>
+          <h3>{compact ? <><span className="readingLabel">{result.yearly_overall?.year}年</span>{" "}{result.yearly_overall?.year_kanchi}｜{result.yearly_overall?.tsuhensei}</> : <>{result.yearly_overall?.year}年 {result.yearly_overall?.year_kanchi}｜{result.yearly_overall?.tsuhensei}</>}</h3>
           {result.yearly_overall?.theme ? <p className="keyword">テーマ：{result.yearly_overall.theme}</p> : null}
           {compact ? <p>{result.yearly_overall?.interpretation_message || result.yearly_overall?.error}</p> : <p>{result.yearly_overall?.comment || result.yearly_overall?.interpretation_message || result.yearly_overall?.error}</p>}
         </div>
