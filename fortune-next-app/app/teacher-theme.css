@@ -70,7 +70,6 @@ html[data-teacher-theme] {
   /* Deliberate large-data exceptions, retained from the accepted display. */
   --reading-basic-value: 1.25rem;
   --reading-table-value: 1.375rem;
-  --reading-star: 1.75rem;
   --star-earth: #245ba8;
   --star-moon: #806018;
   --star-sun: #b33228;
@@ -100,7 +99,7 @@ html[data-teacher-theme] .personalityPillars dl { margin: 14px 0 0; }
 html[data-teacher-theme] .personalityPillars dt { color: var(--muted); }
 html[data-teacher-theme] .personalityPillars dd { margin: 3px 0 16px; line-height: 1.4; font-weight: 700; }
 html[data-teacher-theme] .personalityPillars dd:last-child { margin-bottom: 0; }
-html[data-teacher-theme] .resultStack .pillarStar { font-size: var(--reading-star); }
+html[data-teacher-theme] .resultStack .pillarStar { font-size: var(--reading-major); }
 html[data-teacher-theme] .pillarStar[data-star-group="地球"] { color: var(--star-earth); }
 html[data-teacher-theme] .pillarStar[data-star-group="月"] { color: var(--star-moon); }
 html[data-teacher-theme] .pillarStar[data-star-group="太陽"] { color: var(--star-sun); }
