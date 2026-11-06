@@ -18,6 +18,7 @@ import { useTeacherTheme } from "./teacher-theme";
 import ThinkingGroups from "./three-group-bar";
 import type { GroupConfig } from "./thinking-groups";
 import { useReadingMode } from "./reading-mode";
+import { personalityPillars } from "./personality-pillars";
 
 type FortuneForm = {
   surname: string;
@@ -317,7 +318,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
       <Section id="nikkan" title="元命式から読み取れる性格">
         <div className="textBlock">
           <h3>{starData.day_tenkan || "日干"}の傾向</h3>
-          {!compact ? <p>{result.personality?.nikkan?.description || "日干コメントが未登録です。"}</p> : null}
+          <p>{result.personality?.nikkan?.description || "日干コメントが未登録です。"}</p>
           {result.personality?.nikkan?.keywords ? (
             <p className="keyword">キーワード：{result.personality.nikkan.keywords}</p>
           ) : null}
@@ -325,7 +326,17 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
       </Section>
 
       <Section id="tsuhensei" title="通変星/蔵干通変星から読み取れる性格">
-        <div className="stageList">
+        {compact ? <div className="personalityPillars">
+          {personalityPillars(starData).map((pillar) => (
+            <article className="infoCard" key={pillar.key} data-pillar={pillar.key}>
+              <h3 className="pillarName">{pillar.label}</h3>
+              <dl>
+                <dt>蔵干通変星</dt><dd>{pillar.zokkanTsuhensei}</dd>
+                <dt>通変星</dt><dd>{pillar.tsuhensei}</dd>
+              </dl>
+            </article>
+          ))}
+        </div> : <><div className="stageList">
           {lifeStageRows.map((row, index) => (
             <article className="infoCard" key={row.stage}>
               <span className="cardEyebrow">{stages[index] ?? ""}{compact ? ` / ${row.stage}` : ""}</span>
@@ -340,7 +351,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
           <h3>本来の自分らしさ</h3>
           <p>{currentStageName}：{currentStage.outer} × {currentStage.inner}</p>
           {!compact ? <p>{currentStage.public_comment}</p> : null}
-        </div> : null}
+        </div> : null}</>}
       </Section>
 
       <Section id="juuni" title="十二運星から読み取れる性格">
@@ -350,7 +361,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
               {compact ? <>
                 <h3 className="pillarName">{row.pillar_label}</h3>
                 <p className="pillarMeaning">{row.personality_heading}</p>
-                <strong className="pillarStar">{row.juuni_unsei || "未入力"}</strong>
+                <strong className="pillarStar" data-star-group={groupConfig?.classification[row.juuni_unsei]}>{row.juuni_unsei || "未入力"}</strong>
                 <span className="pillarWeight">{row.personality_weight}</span>
               </> : <><span className="cardEyebrow">{row.pillar_label} / {row.personality_weight}</span>
               <h3>{row.personality_heading}：{row.juuni_unsei}</h3></>}
@@ -374,7 +385,7 @@ function ResultView({ result, form, manualChoices, memo, onMemoChange, pastMemos
             <article className={`timelineItem ${row["地支"] && kubou.includes(row["地支"]) ? "marked" : ""}`}>
               {compact ? <>
                 <div className="flowHeading"><strong>{row["大運"]}</strong><span>{row["地支"] && kubou.includes(row["地支"]) ? "空亡" : ""}</span><h3>{row["大運干支"]}｜{row["通変星"]}｜{row["十二運星"]}</h3></div>
-                <div className="flowDetails"><span>{row["開始年齢"]}〜{row["終了年齢"]}／{row["目安開始年"]}年〜{row["目安終了年"]}年</span><span>{row["周期"]} / {row["キーワード"]}</span></div>
+                <div className="flowDetails"><span>{row["開始年齢"]}〜{row["終了年齢"]}／{row["目安開始年"]}年〜{row["目安終了年"]}年</span><span>{row["周期"]} / <span className="flowKeyword">{row["キーワード"]}</span></span></div>
               </> : <><span>{row["大運"]} {row["地支"] && kubou.includes(row["地支"]) ? "空亡" : ""}</span>
               <h3>{row["大運干支"]}｜{row["通変星"]}｜{row["十二運星"]}</h3>
               <p>{row["開始年齢"]}〜{row["終了年齢"]}／{row["目安開始年"]}年〜{row["目安終了年"]}年</p>
