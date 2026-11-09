@@ -12,6 +12,7 @@ from history_repository import HistoryError
 from product_api import identity, repositories
 from fortune_service import calculate_fortune
 from teacher_presentation import MARI_SLUG, MARI_THEMES
+from mari_prototype_access import require_prototype_reader
 
 router = APIRouter(prefix="/api/reading")
 
@@ -26,6 +27,7 @@ def response(data, status=200):
 
 def context(request):
     user = identity(request)  # Real session only; no development owner fallback.
+    require_prototype_reader(user['id'])  # Restriction only; existing access checks still follow.
     operations, _ledger = repositories()
     slug = os.environ.get("FORTUNE_READING_ORGANIZATION_SLUG", MARI_SLUG)
     with operations.auth.connection() as db:

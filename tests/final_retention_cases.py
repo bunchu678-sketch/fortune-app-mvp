@@ -71,7 +71,11 @@ class FinalRetentionCases(unittest.TestCase):
         self.assertFalse(self.ops.retention.user_plan(self.admin,self.owner,deadline-timedelta(microseconds=1))['can_delete'])
         self.assertTrue(self.ops.retention.user_plan(self.admin,self.owner,deadline)['can_delete'])
     def test_recontract_cancels_schedule_preserves_other_org(self):
-        self.proof();self.cancel_all();self.save(self.other)
+        self.proof();self.cancel_all()
+        # Seed the historical record while its fixed fixture period is active.
+        # Wall-clock drift must not turn this setup into an expired-contract write.
+        with patch('service_contract_repository.utc', return_value=NOW):
+            self.save(self.other)
         result=self.fresh_recontract();self.assertFalse(result['initial_fee_required'])
         value=self.services.summary(self.org,self.owner,DUE)
         self.assertIsNone(value['deletion_due_at']);self.assertIsNone(value['access_ends_at'])
