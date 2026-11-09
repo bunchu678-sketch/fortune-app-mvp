@@ -6,15 +6,17 @@ import sqlite3
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from mari_runtime import runtime_configuration
+DEPLOYMENT_SURFACE = runtime_configuration()
+
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 from fortune_service import calculate_fortune  # noqa: E402
 
@@ -40,7 +42,7 @@ from reading_only import router as reading_only_router
 
 app = FastAPI()
 app.add_middleware(AuthBoundary)
-app.add_middleware(DeploymentBoundary,surface=os.environ.get('FORTUNE_DEPLOYMENT_SURFACE','combined'))
+app.add_middleware(DeploymentBoundary,surface=DEPLOYMENT_SURFACE)
 app.include_router(auth_router)
 app.include_router(password_reset_router)
 app.include_router(history_router)

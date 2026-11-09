@@ -1,42 +1,30 @@
-"""Dedicated prototype entry point: refuse missing pair config before startup."""
+"""Dedicated classroom entry point: validate surface and existing DB, never headcount."""
 import sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 import argparse
-import json
 import os
 import sqlite3
 from contextlib import closing
-from mari_prototype_access import PROFILE, require_prototype_reader
+from mari_runtime import runtime_configuration
 
 
 def validate_configuration():
-    if (os.environ.get('FORTUNE_DEPLOYMENT_SURFACE') != 'teacher'
-            or os.environ.get('FORTUNE_READING_ACCESS_PROFILE') != PROFILE):
-        raise ValueError('prototype_profile_required')
+    if runtime_configuration() != 'teacher':
+        raise ValueError('teacher_surface_required')
     try:
-        ids = json.loads(os.environ.get('FORTUNE_READING_ALLOWED_USER_IDS', ''))
-        require_prototype_reader(ids[0])
         path = Path(os.environ.get('FORTUNE_HISTORY_DB_PATH', ''))
         if not path.is_absolute() or not path.is_file():
             raise ValueError()
         with closing(sqlite3.connect(path.resolve().as_uri()+'?mode=ro', uri=True, timeout=3)) as db:
             db.execute('PRAGMA query_only=ON')
-            roles = []
-            for owner in ids:
-                row = db.execute("""SELECT m.role FROM memberships m JOIN users u ON u.id=m.user_id
-                    JOIN organizations o ON o.id=m.organization_id
-                    LEFT JOIN user_account_lifecycle l ON l.user_id=u.id
-                    WHERE m.user_id=? AND o.slug=? AND u.status='active'
-                    AND COALESCE(l.state,'active')='active'
-                    AND NOT EXISTS(SELECT 1 FROM user_initial_setup s WHERE s.user_id=u.id AND s.completed_at IS NULL)""",
-                    (owner, os.environ.get('FORTUNE_READING_ORGANIZATION_SLUG', 'mari-mutsuro'))).fetchone()
-                if row is None: raise ValueError()
-                roles.append(row[0])
-            if sorted(roles) != ['student', 'teacher']: raise ValueError()
+            row = db.execute('SELECT id FROM organizations WHERE slug=?',
+                (os.environ.get('FORTUNE_READING_ORGANIZATION_SLUG', 'mari-mutsuro'),)).fetchone()
+            if row is None:raise ValueError()
+            db.execute('SELECT organization_id,user_id,role FROM memberships LIMIT 0')
     except Exception:
-        raise ValueError('prototype_pair_configuration_invalid') from None
+        raise ValueError('classroom_database_configuration_invalid') from None
 
 
 def main():

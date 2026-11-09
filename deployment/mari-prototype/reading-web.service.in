@@ -1,0 +1,37 @@
+[Unit]
+Description=Dedicated classroom prototype Web
+After=network.target
+
+[Service]
+Type=simple
+User=@WEB_USER@
+Group=@WEB_GROUP@
+WorkingDirectory=@RELEASE@/fortune-next-app
+EnvironmentFile=@PRIVATE_DIRECTORY@/web.env
+Environment=FORTUNE_REQUIRED_DEPLOYMENT_SURFACE=teacher
+Environment=NEXT_TELEMETRY_DISABLED=1
+ExecStart=@NODE@ @RELEASE@/deployment/mari-prototype/start_web.mjs --app-dir @RELEASE@/fortune-next-app --port 3012
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CacheDirectory=fortune-mari-reading-web
+CacheDirectoryMode=0700
+BindPaths=/var/cache/fortune-mari-reading-web:@RELEASE@/fortune-next-app/.next/cache
+InaccessiblePaths=@PRIVATE_DIRECTORY@ @DB_DIRECTORY@ @BACKUP_DIRECTORY@ @DOCTOR_DATA_DIRECTORY@ @LEGACY_HOME@
+
+[Install]
+WantedBy=multi-user.target

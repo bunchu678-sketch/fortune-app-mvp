@@ -1,0 +1,35 @@
+[Unit]
+Description=Dedicated classroom prototype API
+After=network.target
+
+[Service]
+Type=simple
+User=@API_USER@
+Group=@API_GROUP@
+WorkingDirectory=@RELEASE@
+EnvironmentFile=@PRIVATE_DIRECTORY@/api.env
+Environment=FORTUNE_REQUIRED_DEPLOYMENT_SURFACE=teacher
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=@PYTHON@ -B @RELEASE@/deployment/mari-prototype/start_api.py --port 8773
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=@DB_DIRECTORY@
+InaccessiblePaths=@PRIVATE_DIRECTORY@ @BACKUP_DIRECTORY@ @DOCTOR_DATA_DIRECTORY@ @LEGACY_HOME@
+
+[Install]
+WantedBy=multi-user.target

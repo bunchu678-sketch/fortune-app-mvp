@@ -36,3 +36,6 @@ sekki_correction_reference_template.backup.csv
 /data/
 *.sqlite3
 *.sqlite3-*
+
+# Dedicated release identity is generated only after isolated extraction.
+.mari-reading-release
